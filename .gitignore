@@ -1,6 +1,4 @@
-node_modules/
 .DS_Store
-.vercel
+node_modules/
+.vercel/
 .env
-.env.local
-*.log
