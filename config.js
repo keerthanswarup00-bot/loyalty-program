@@ -2,7 +2,7 @@
 // browsers that already opened the site pick up the new settings.
 window.CLIENT = {
   version: 1,
-  name: 'Bean & Brew',
+  name: 'Cheesora Bliss',
   emoji: '',                       // 1-2 letters shown if no logo image (blank = first letter of name)
   logo: '',                        // e.g. 'logo.png' (upload the file to the repo next to index.html)
   color: '#8a4b2a',                // brand colour
