@@ -7,6 +7,7 @@ index.html            customer app          assets/customer.js
 admin/index.html      owner dashboard       assets/admin.js
 assets/config.js      per-deployment settings (the only file you edit)
 assets/common.js, style.css   shared
+assets/vendor/        supabase-js and qrcode-generator, served from this site (no CDN)
 supabase/schema.sql   run once        supabase/new-client.sql   run per client
 archive/              unused old code, kept for reference only (never deployed)
 ```
@@ -44,6 +45,18 @@ Branding, offers, cooldown, expiry, first stamp and card length are then edited 
 - **Staff:** there are no separate staff logins yet. Staff use the owner login on the counter device.
 
 **Updating an existing database:** just run `supabase/schema.sql` again. It is safe to re-run and keeps all data. Numbers saved earlier in `+91` or 12-digit form will not match the new 10-digit rule, so delete test accounts and sign up again.
+
+## Messaging customers on WhatsApp (admin -> Message)
+
+- **Pick who:** a group (everyone, joined this week, visited this week, not visited in 30+ days, birthday this month, has an unused offer, card ending soon) or hand-pick. You can also tick customers in **Customers** and press **Message selected**.
+- **Write once:** `{name}` becomes each customer's first name. Optional image link, rewards-card link and a "Reply STOP" line. If someone replies STOP, delete them in Customers.
+- **Send:** WhatsApp does not allow one web page to message many people, so **Start sending** opens each customer's chat with the message already typed. Press send in WhatsApp, come back, tap next. Nothing is sent without you pressing send.
+- **One image to everyone at once:** download the contacts (.vcf), import them on your phone, create a WhatsApp **Broadcast list**, and send the image there. "Share image" and "Copy image" help when you attach a picture from your device.
+- Fully automatic sending (no tapping) needs the paid WhatsApp Business Cloud API with approved templates. It is a separate integration.
+
+## Libraries
+
+`assets/vendor/` holds supabase-js 2.117.2 and qrcode-generator 1.4.4, copied from npm, so the site loads no third-party scripts. To update one: download the new file from npm, put it in `assets/vendor/`, and change the `<script>` line in `index.html` / `admin/index.html`.
 
 ## Passwords
 

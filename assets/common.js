@@ -62,3 +62,27 @@ function socials(b) {
 }
 const notReady = () => /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !window.supabase;
 const setupMsg = '<div class="card"><h2>Almost there</h2><p class="sub">Add your Supabase URL and key in <b>assets/config.js</b>, then reload. See README.md.</p></div>';
+
+// ---- Small touches shared by both apps ----
+async function copyText(t, msg) { try { await navigator.clipboard.writeText(t); toast(msg || 'Copied') } catch (e) { toast('Press and hold to copy: ' + t) } }
+const haptic = () => { try { navigator.vibrate && navigator.vibrate(30) } catch (e) { } };
+// A short burst of confetti in the brand colour (skipped for people who prefer reduced motion).
+function burst() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const w = document.createElement('div'); w.className = 'confetti'; w.setAttribute('aria-hidden', 'true');
+  const c = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#8a4b2a', cols = [c, '#f5b942', '#ffffff', '#e8e0d5', c];
+  for (let i = 0; i < 36; i++) {
+    const p = document.createElement('i');
+    p.style.cssText = `left:${50 + (Math.random() - .5) * 30}%;background:${cols[i % cols.length]};--dx:${(Math.random() - .5) * 360}px;--dy:${-120 - Math.random() * 220}px;--r:${Math.random() * 720 - 360}deg;animation-delay:${Math.random() * .12}s`;
+    w.appendChild(p);
+  }
+  document.body.appendChild(w); setTimeout(() => w.remove(), 1800);
+}
+// Enter in a text box presses the primary button of the same card (buttons opt in with the data-go attribute).
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  const t = e.target;
+  if (!t || t.tagName !== 'INPUT' || t.type === 'checkbox' || t.type === 'file') return;
+  const card = t.closest('.card'), b = card && card.querySelector('[data-go]:not([disabled])');
+  if (b) { e.preventDefault(); b.click() }
+});

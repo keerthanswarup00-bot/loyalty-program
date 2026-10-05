@@ -1,6 +1,8 @@
-// Owner app: login, overview, redeem, customers, QR & NFC, settings.
+// Owner app: login, overview, redeem, customers, message (WhatsApp), QR & NFC, settings.
 const sb = notReady() ? null : mkClient('lk-admin');
-let signed = false, recover = false, biz = null, M = [], tab = 'o', q = '', rq = '', rc = '', rp = '', rd = null, rbusy = false;
+let signed = false, recover = false, biz = null, M = [], V = [], tab = 'o', q = '', rq = '', rc = '', rp = '', rd = null, rbusy = false;
+// Customers tab + Message tab state
+let sel = new Set(), bsel = new Set(), sortBy = 'joined', bseg = 'all', bmsg = 'Hi {name}! ', bimg = '', bfile = null, blink = true, bstop = true, bq = null, binit = false;
 const first = u => (u.name || '').split(' ')[0];
 
 const scanUrl = () => location.origin + '/#scan=' + biz.scan_token;
@@ -8,8 +10,21 @@ const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).le
 // When this customer's current card runs out (null = no deadline: no stamps yet, full card, or the owner set no limit).
 const cardEnd = u => { if (!biz.card_months || !u.card_started_at || !(u.stamps > 0) || u.stamps >= biz.need) return null; const d = new Date(u.card_started_at); d.setMonth(d.getMonth() + biz.card_months); return d };
 const sameMonth = d => d && +d.slice(5, 7) == new Date().getMonth() + 1;
+const go = t => { tab = t; render(); window.scrollTo({ top: 0, behavior: 'smooth' }) };
 
 async function enter() { signed = true; await load(); render() }
+
+// PostgREST returns at most 1,000 rows per request, so read a query page by page until it runs out.
+async function pages(make) {
+  const PAGE = 1000; let out = [];
+  for (let from = 0; from < 100000; from += PAGE) {
+    const { data, error } = await make().range(from, from + PAGE - 1);
+    if (error) throw error;
+    out = out.concat(data);
+    if (data.length < PAGE) break;
+  }
+  return out;
+}
 async function load() {
   try {
     const { data, error } = await sb.from('businesses').select('*').eq('slug', CFG.slug).maybeSingle();
@@ -17,9 +32,11 @@ async function load() {
     biz = data;
     if (biz) {
       brand(biz); document.title = 'Owner dashboard · ' + biz.name;
-      const r = await sb.from('members').select('*,offers(id,type,text,code,valid_from,used_at,expires_at)').eq('business_id', biz.id).order('joined', { ascending: false });
-      if (r.error) throw r.error;
-      M = r.data;
+      M = await pages(() => sb.from('members').select('*,offers(id,type,text,code,valid_from,used_at,expires_at)').eq('business_id', biz.id).order('joined', { ascending: false }).order('id'));
+      try {
+        const since = new Date(Date.now() - 14 * 864e5).toISOString();
+        V = (await pages(() => sb.from('visits').select('id,created_at').eq('business_id', biz.id).gte('created_at', since).order('id'))).map(x => x.created_at);
+      } catch (e) { V = [] }
     }
   } catch (e) { toast(nice(e)) }
 }
@@ -33,7 +50,7 @@ async function login(btn) {
   if (error) { btn.disabled = false; return toast(nice(error)) }
   await enter();
 }
-async function out() { await sb.auth.signOut(); signed = false; biz = null; M = []; render() }
+async function out() { await sb.auth.signOut(); signed = false; biz = null; M = []; V = []; sel = new Set(); bsel = new Set(); bq = null; binit = false; render() }
 
 // Owner forgot password: Supabase emails a link that returns to /admin/ and opens the "new password" form.
 async function forgot() {
@@ -54,7 +71,7 @@ async function setPw(btn) {
 }
 const recoverV = () => `<div class="card" style="margin-top:40px"><h2>Set a new password</h2><p class="sub">Choose a new password for your owner account.</p>
   <label class="lb">New password <span>(6+ characters)</span></label>${pwField('np', 'new-password')}
-  <button class="btn" onclick="setPw(this)">Save password</button></div>`;
+  <button class="btn" data-go onclick="setPw(this)">Save password</button></div>`;
 
 // Customers have no real email, so the owner sets a temporary password for them.
 const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
@@ -98,7 +115,7 @@ function loginV() {
   return `<div class="card" style="margin-top:40px"><h2>Owner login</h2><p class="sub">Sign in to manage your rewards programme.</p>
   <label class="lb">Email</label><input id="em" type="email" autocomplete="email">
   <label class="lb">Password</label>${pwField('pw', 'current-password')}
-  <button class="btn" onclick="login(this)">Sign in</button>
+  <button class="btn" data-go onclick="login(this)">Sign in</button>
   <p class="note" style="margin:14px 0 0"><a href="#" onclick="forgot();return false">Forgot password?</a></p></div>`;
 }
 
@@ -112,7 +129,7 @@ async function chk(confirmIt) {
   try {
     const r = await rpc(sb, 'redeem_code', { p_slug: CFG.slug, p_code: rc, p_phone: ph, p_confirm: !!confirmIt });
     rd = r;
-    if (r.ok && r.confirmed) { toast('Coupon redeemed'); rc = rp = ''; await load() }
+    if (r.ok && r.confirmed) { toast('Coupon redeemed'); haptic(); rc = rp = ''; await load() }
   } catch (e) { rd = null; toast(nice(e)) }
   rbusy = false; render();
 }
@@ -126,7 +143,7 @@ function redeemV() {
   else if (rd) res = `<div class="rw"><small class="bad">Cannot redeem</small><b>${esc(RERR[rd.error] || rd.error)}</b>${o ? `<span>${esc(o.type || '')} ${esc(o.text || '')} · ${esc(o.name || '')}${o.used_at ? ' · used ' + fdt(o.used_at) : ''}${rd.error == 'early' ? ' · valid from ' + fd(o.valid_from) : ''}${rd.error == 'expired' ? ' · ended ' + fd(o.expires_at) : ''}</span>` : ''}</div>`;
   return `<div class="card"><h2>Redeem a coupon</h2><p class="sub">The customer shows a 6-character code on their card. Type it here. Adding their phone number is optional but checks it is really theirs.</p>
   <div class="row"><div><label class="lb">Coupon code</label><input id="rc" class="big" maxlength="8" autocapitalize="characters" autocomplete="off" value="${esc(rc)}"></div><div><label class="lb">Phone <span>(optional)</span></label><input id="rp" type="tel" inputmode="numeric" placeholder="10 digits" value="${esc(rp)}"></div></div>
-  ${rd && rd.ok && !rd.confirmed ? '' : `<button class="btn" ${rbusy ? 'disabled' : ''} onclick="chk(false)">Check coupon</button>`}${res ? '<div style="margin-top:14px">' + res + '</div>' : ''}</div>
+  ${rd && rd.ok && !rd.confirmed ? '' : `<button class="btn" data-go ${rbusy ? 'disabled' : ''} onclick="chk(false)">Check coupon</button>`}${res ? '<div style="margin-top:14px">' + res + '</div>' : ''}</div>
   <div class="card"><div class="row2"><h2>Redeemed coupons</h2></div><input placeholder="Search name, phone or code" value="${esc(rq)}" oninput="rq=this.value;$('#rl').innerHTML=rlog()"><div id="rl">${rlog()}</div></div>`;
 }
 function rlog() {
@@ -135,7 +152,7 @@ function rlog() {
 }
 
 // Reminders: birthdays in the next 7 days and offers ending within 3 days, each with a ready-to-send WhatsApp message.
-function reminders() {
+function remList() {
   const L = [], t = new Date(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), link = location.origin + '/';
   M.forEach(u => {
     if (u.bday && biz.bday_offer) {
@@ -154,31 +171,184 @@ function reminders() {
         msg: `Hi ${first(u)}, your offer at ${biz.name} ("${o.text}") expires on ${fd(o.expires_at)}. Open your card to see your code: ${link}` });
     });
   });
-  L.sort((a, b) => a.k - b.k);
+  return L.sort((a, b) => a.k - b.k);
+}
+function reminders(L) {
   return `<div class="card" style="margin-top:16px"><h2>Reminders</h2><p class="sub">Birthdays this week, offers ending soon and cards about to run out. Tap WhatsApp to send a ready-made message.</p>`
     + (L.map(r => `<div class="of"><div><div class="tag">${r.tag} · ${r.when}</div><b>${esc(r.u.name)}</b><div class="mut sm">${esc(r.u.phone)}</div></div><a class="btn sm" href="${esc(waLink(r.u.phone, r.msg))}" target="_blank" rel="noopener">WhatsApp</a></div>`).join('')
       || '<p class="sub" style="margin:0">Nothing due right now.</p>') + '</div>';
 }
 const deniedV = () => `<div class="card" style="margin-top:40px"><h2>No access</h2><p class="sub">This account doesn't manage this business. Sign in with the owner account, or ask for access.</p></div>`;
 
-function rows() {
-  const s = q.toLowerCase(), L = M.filter(u => (u.name + u.phone).toLowerCase().includes(s));
-  return L.map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.phone)}</td><td>${fbd(u.bday)}</td><td>${u.stamps}</td><td>${cardEnd(u) ? fd(cardEnd(u)) : '—'}</td><td>${u.total}</td><td>${u.redeemed}</td><td>${heldOffers(u)}</td><td>${fd(u.joined)}</td><td>${fd(u.last_stamp)}</td><td><a href="#" onclick="resetPw('${u.id}');return false">Reset password</a> &nbsp;·&nbsp; <a href="#" onclick="del('${u.id}');return false" style="color:#c33">Delete</a></td></tr>`).join('') || '<tr><td colspan="11" class="mut">No customers yet</td></tr>';
+// Stamps given per day over the last 14 days (from the visits log).
+function chartV() {
+  const days = [...Array(14)].map((_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 13 + i); return d });
+  const by = {}; V.forEach(t => { const k = new Date(t).toDateString(); by[k] = (by[k] || 0) + 1 });
+  const cnt = days.map(d => by[d.toDateString()] || 0), max = Math.max(1, ...cnt), total = cnt.reduce((a, b) => a + b, 0);
+  return `<div class="card" style="margin-top:16px"><div class="row2"><h2>Stamps, last 14 days</h2><span class="mut sm">${total} in total</span></div>`
+    + (total ? `<div class="bars">${days.map((d, i) => `<div class="bar" title="${esc(d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }))}: ${cnt[i]}"><b>${cnt[i] || ''}</b><i style="height:${Math.max(3, Math.round(cnt[i] / max * 84))}px;animation-delay:${i * 30}ms"></i><span>${esc(d.toLocaleDateString(undefined, { weekday: 'narrow' }))}</span></div>`).join('')}</div>`
+      : '<p class="sub" style="margin:8px 0 0">No stamps yet. They will show up here as customers tap the tag.</p>') + '</div>';
 }
 
+// ---- Customers tab ----
+const SORTS = { joined: 'Newest first', name: 'Name A to Z', stamps: 'Most stamps', visit: 'Latest visit', total: 'Most visits' };
+function sorted(L) {
+  const t = x => x ? +new Date(x) : 0;
+  const f = { joined: null, name: (a, b) => (a.name || '').localeCompare(b.name || ''), stamps: (a, b) => b.stamps - a.stamps, visit: (a, b) => t(b.last_stamp) - t(a.last_stamp), total: (a, b) => b.total - a.total }[sortBy];
+  return f ? L.slice().sort(f) : L;
+}
+const filtered = () => { const s = q.toLowerCase(); return sorted(M.filter(u => (u.name + u.phone).toLowerCase().includes(s))) };
+function rows() {
+  const L = filtered();
+  return L.map(u => `<tr><td><input type="checkbox" aria-label="Select ${esc(u.name)}" ${sel.has(u.id) ? 'checked' : ''} onchange="tg('${u.id}',this.checked)"></td><td>${esc(u.name)}</td><td>${esc(u.phone)}</td><td>${fbd(u.bday)}</td><td>${u.stamps}</td><td>${cardEnd(u) ? fd(cardEnd(u)) : '—'}</td><td>${u.total}</td><td>${u.redeemed}</td><td>${heldOffers(u)}</td><td>${fd(u.joined)}</td><td>${fd(u.last_stamp)}</td><td><a href="${esc(waLink(u.phone, 'Hi ' + first(u) + '! '))}" target="_blank" rel="noopener">WhatsApp</a> &nbsp;·&nbsp; <a href="#" onclick="resetPw('${u.id}');return false">Reset password</a> &nbsp;·&nbsp; <a href="#" onclick="del('${u.id}');return false" style="color:#c33">Delete</a></td></tr>`).join('') || '<tr><td colspan="12" class="mut">No customers found</td></tr>';
+}
+function selBtn() { const b = $('#selb'); if (b) { b.textContent = sel.size ? `Message selected (${sel.size})` : 'Message selected'; b.disabled = !sel.size } }
+function tg(id, on) { on ? sel.add(id) : sel.delete(id); selBtn() }
+function tgAll(on) { filtered().forEach(u => on ? sel.add(u.id) : sel.delete(u.id)); $('#tb').innerHTML = rows(); selBtn() }
+function msgSel() { if (!sel.size) return; bsel = new Set(sel); bseg = 'custom'; binit = true; go('b') }
+
+// ---- Message tab: WhatsApp to many customers ----
+// WhatsApp does not let a web page message many people (or attach an image) in one go, so this tab prepares
+// everything and walks through the customers one tap at a time. See also: contact export for a WhatsApp Broadcast list.
+const SEGS = [['all', 'Everyone'], ['new7', 'Joined in the last 7 days'], ['active7', 'Visited in the last 7 days'], ['lapsed', 'Not visited in 30+ days'], ['bday', 'Birthday this month'], ['offers', 'Have an unused offer'], ['ending', 'Card ending within 14 days'], ['custom', 'Hand-picked']];
+const SEGF = {
+  all: () => true,
+  new7: u => new Date(u.joined) > Date.now() - 6048e5,
+  active7: u => u.last_stamp && new Date(u.last_stamp) > Date.now() - 6048e5,
+  lapsed: u => !u.last_stamp || new Date(u.last_stamp) < Date.now() - 2592e6,
+  bday: u => sameMonth(u.bday),
+  offers: u => heldOffers(u) > 0,
+  ending: u => { const e = cardEnd(u); return e && daysTo(e) <= 14 && daysTo(e) >= 0 },
+  custom: u => bsel.has(u.id)
+};
+const segPool = () => bseg == 'custom' ? M : M.filter(SEGF[bseg] || (() => false));
+function bpick() { if (bseg != 'custom') bsel = new Set(segPool().map(u => u.id)) }
+const bto = () => M.filter(u => bsel.has(u.id) && u.phone);
+const BT = () => [
+  ['We miss you', `Hi {name}, we miss you at ${biz.name}! Come by this week and collect a stamp. You are closer to ${biz.reward} than you think.`],
+  ['New offer', `Hi {name}! A little something for our rewards members at ${biz.name}: `],
+  ['News or event', `Hi {name}, news from ${biz.name}: `]
+];
+function bText(u) {
+  let t = bmsg.trim().replace(/\{name\}/gi, first(u) || 'there');
+  if (/^https:\/\/\S+$/.test(bimg)) t += '\n' + bimg;
+  if (blink) t += '\n' + location.origin + '/';
+  if (bstop) t += '\n\nReply STOP if you do not want these messages.';
+  return t;
+}
+function plistV() {
+  const P = segPool(), more = P.length - 300;
+  return P.slice(0, 300).map(u => `<label class="pr"><input type="checkbox" ${bsel.has(u.id) ? 'checked' : ''} onchange="tgB('${u.id}',this.checked)"><span><b>${esc(u.name)}</b><small>${esc(u.phone)}</small></span></label>`).join('')
+    + (more > 0 ? `<p class="hint" style="padding:10px 0">Showing the first 300 of ${P.length}. "Select all" still covers the whole group.</p>` : '') || '<p class="sub" style="padding:12px 0;margin:0">Nobody in this group right now.</p>';
+}
+function tgB(id, on) { on ? bsel.add(id) : bsel.delete(id); bupd() }
+function bAll(on) { segPool().forEach(u => on ? bsel.add(u.id) : bsel.delete(u.id)); $('#pl').innerHTML = plistV(); bupd() }
+function bupd() { const n = bto().length; $('#bcount').textContent = n + (n == 1 ? ' customer selected' : ' customers selected'); bpv() }
+function bpv() {
+  const p = $('#bpv'); if (p) p.textContent = bText(bto()[0] || { name: 'Priya' });
+  const s = $('#bsend'); if (s) s.innerHTML = bsendV();
+}
+function tpl(i) { bmsg = BT()[i][1]; const t = $('#bm'); t.value = bmsg; t.focus(); bpv() }
+function imgNote() {
+  return bfile ? `<span class="mut sm">Attached: ${esc(bfile.name)} (${Math.round(bfile.size / 1024)} KB)</span> <button type="button" class="lnk" onclick="bNoImg()">Remove</button>` : '';
+}
+function bpickImg(inp) {
+  const f = inp.files[0]; if (!f) return;
+  if (!/^image\/(png|jpeg|webp)$/i.test(f.type)) { inp.value = ''; return toast('Use a PNG, JPG or WebP image') }
+  if (f.size > 5e6) { inp.value = ''; return toast('Image too big (max 5 MB)') }
+  bfile = f; $('#bfn').innerHTML = imgNote(); bpv();
+}
+function bNoImg() { bfile = null; const i = $('#bf'); if (i) i.value = ''; $('#bfn').innerHTML = ''; bpv() }
+const canShareImg = () => bfile && navigator.canShare && navigator.canShare({ files: [bfile] });
+async function bShare() { try { await navigator.share({ files: [bfile], text: bText({ name: 'there' }) }) } catch (e) { } }
+async function bCopyImg() {
+  try {
+    const bm = await createImageBitmap(bfile), c = document.createElement('canvas'); c.width = bm.width; c.height = bm.height; c.getContext('2d').drawImage(bm, 0, 0);
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    toast('Image copied. Paste it into the WhatsApp chat.');
+  } catch (e) { toast('This browser cannot copy images. Use "Share image" or the contact export instead.') }
+}
+function bsendV() {
+  const n = bto().length, ok = n > 0 && bmsg.trim();
+  return `<h2>Send</h2><p class="sub">${n} recipient${n == 1 ? '' : 's'}. WhatsApp only lets you send one chat at a time from a web page, so this goes through your customers quickly: open the chat, press send in WhatsApp, come back, next.</p>
+  <button class="btn" ${ok ? '' : 'disabled'} onclick="bStart()">Start sending to ${n}</button>
+  <div class="row" style="margin-top:14px"><button class="btn sm alt" ${n ? '' : 'disabled'} onclick="bVcf()">Download contacts (.vcf)</button><button class="btn sm alt" ${n ? '' : 'disabled'} onclick="bCopyNums()">Copy numbers</button>${bfile ? `${canShareImg() ? '<button class="btn sm alt" onclick="bShare()">Share image…</button>' : ''}<button class="btn sm alt" onclick="bCopyImg()">Copy image</button>` : ''}</div>
+  <p class="hint">Sending one image to everyone at once: download the contacts, import them on your phone, then create a WhatsApp Broadcast list with them. Each person gets it as a normal message. Image links pasted in the message also show a preview.</p>`;
+}
+function msgV() {
+  if (bq) return queueV();
+  const n = bto().length;
+  return `<div class="card"><h2>Who to message</h2><p class="sub">Everyone here agreed to receive offers when they joined.</p>
+  <label class="lb">Group</label><select onchange="bseg=this.value;bpick();render()">${SEGS.map(s => `<option value="${s[0]}"${bseg == s[0] ? ' selected' : ''}>${s[1]} (${s[0] == 'custom' ? bsel.size : M.filter(SEGF[s[0]]).length})</option>`).join('')}</select>
+  <div class="row2" style="margin-top:12px"><span class="mut sm" id="bcount">${n} ${n == 1 ? 'customer' : 'customers'} selected</span><span><button class="lnk" onclick="bAll(true)">Select all</button> &nbsp;·&nbsp; <button class="lnk" onclick="bAll(false)">Clear</button></span></div>
+  <div class="plist" id="pl">${plistV()}</div></div>
+  <div class="card"><h2>Your message</h2>
+  <div class="chips">${BT().map((t, i) => `<button type="button" class="chip" onclick="tpl(${i})">${esc(t[0])}</button>`).join('')}</div>
+  <label class="lb">Message <span>(write {name} to use their first name)</span></label>
+  <textarea id="bm" rows="5" maxlength="1000" oninput="bmsg=this.value;bpv()">${esc(bmsg)}</textarea>
+  <label class="lb">Image link <span>(optional, https://…)</span></label><input id="bi" value="${esc(bimg)}" placeholder="https://…" oninput="bimg=this.value.trim();bpv()">
+  <label class="lb">Or an image from this device <span>(optional)</span></label><input type="file" id="bf" accept="image/png,image/jpeg,image/webp" onchange="bpickImg(this)"><div id="bfn">${imgNote()}</div>
+  <label class="chk"><input type="checkbox" ${blink ? 'checked' : ''} onchange="blink=this.checked;bpv()"><span>Add a link to the rewards card</span></label>
+  <label class="chk"><input type="checkbox" ${bstop ? 'checked' : ''} onchange="bstop=this.checked;bpv()"><span>Add "Reply STOP to opt out" (if someone replies STOP, delete them in Customers)</span></label>
+  <div class="lb" style="margin-top:18px">Preview</div><div class="bubble" id="bpv">${esc(bText(bto()[0] || { name: 'Priya' }))}</div></div>
+  <div class="card" id="bsend">${bsendV()}</div>`;
+}
+function bStart() {
+  if (!bmsg.trim()) return toast('Write a message first');
+  const ids = bto().map(u => u.id);
+  if (!ids.length) return toast('Select at least one customer');
+  bq = { ids, i: 0, opened: false, sent: 0 }; render(); window.scrollTo({ top: 0 });
+}
+function queueV() {
+  const U = bq.ids.map(id => M.find(u => u.id == id)).filter(Boolean), n = U.length, u = U[bq.i];
+  if (!u) return `<div class="card"><h2>All done</h2><button class="btn" onclick="bStop()">Back</button></div>`;
+  return `<div class="card"><div class="row2"><h2>Customer ${bq.i + 1} of ${n}</h2><button class="lnk" onclick="bStop()">Stop</button></div>
+  <div class="prog"><i style="width:${bq.i / n * 100}%"></i></div>
+  <div class="rw"><small>To</small><b>${esc(u.name)}</b><span class="mut">${esc(u.phone)}</span></div>
+  <div class="lb" style="margin-top:16px">Message</div><div class="bubble">${esc(bText(u))}</div>
+  ${bq.opened
+      ? `<button class="btn" onclick="bNext()">${bq.i + 1 < n ? 'Sent. Next customer' : 'Sent. Finish'}</button><button class="btn alt" onclick="bOpen()">Open this chat again</button>`
+      : `<button class="btn" data-go onclick="bOpen()">Open WhatsApp chat</button><button class="btn alt" onclick="bNext()">Skip this customer</button>`}
+  <p class="hint">The message is already typed in WhatsApp. Press send there, then come back to this page.</p></div>`;
+}
+function bOpen() {
+  const u = bq.ids.map(id => M.find(x => x.id == id)).filter(Boolean)[bq.i]; if (!u) return;
+  window.open(waLink(u.phone, bText(u)), '_blank', 'noopener');
+  if (!bq.opened) bq.sent++;
+  bq.opened = true; render();
+}
+function bNext() {
+  bq.i++; bq.opened = false;
+  if (bq.i >= bq.ids.length) { toast('Done. You opened ' + bq.sent + (bq.sent == 1 ? ' chat.' : ' chats.')); bq = null; burst() }
+  render(); window.scrollTo({ top: 0 });
+}
+function bStop() { bq = null; render() }
+function bVcf() {
+  const to = bto(); if (!to.length) return toast('Select at least one customer');
+  const cc = CFG.countryCode || '91', e = s => String(s).replace(/[\\;,]/g, m => '\\' + m).replace(/[\r\n]+/g, ' ');
+  dl(slug() + '-contacts.vcf', to.map(u => `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:${e(u.name)} (${e(biz.name)})\r\nTEL;TYPE=CELL:+${cc}${u.phone}\r\nEND:VCARD`).join('\r\n') + '\r\n', 'text/vcard');
+  toast(to.length + ' contacts downloaded');
+}
+function bCopyNums() { const cc = CFG.countryCode || '91'; copyText(bto().map(u => '+' + cc + u.phone).join(', '), 'Numbers copied') }
+
 function dash() {
-  const tabs = [['o', 'Overview'], ['r', 'Redeem'], ['c', 'Customers'], ['q', 'QR & NFC'], ['s', 'Settings']];
-  let o = `<div class="tabs">${tabs.map(t => `<button class="${tab == t[0] ? 'on' : ''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</div>`;
+  const L = remList();
+  const tabs = [['o', 'Overview', L.length], ['r', 'Redeem'], ['c', 'Customers'], ['b', 'Message'], ['q', 'QR & NFC'], ['s', 'Settings']];
+  let o = `<div class="tabs" role="tablist">${tabs.map(t => `<button role="tab" aria-selected="${tab == t[0]}" class="${tab == t[0] ? 'on' : ''}" onclick="go('${t[0]}')">${t[1]}${t[2] ? `<i class="bd">${t[2]}</i>` : ''}</button>`).join('')}</div>`;
   if (tab == 'o') {
     const wk = Date.now() - 6048e5, tot = M.reduce((a, u) => a + u.total, 0), rd = M.reduce((a, u) => a + u.redeemed, 0);
-    o += `<div class="stats"><div class="stat"><b>${M.length}</b>Members</div><div class="stat"><b>${tot}</b>Stamps given</div><div class="stat"><b>${rd}</b>Rewards redeemed</div><div class="stat"><b>${M.filter(u => u.last_stamp && new Date(u.last_stamp) > wk).length}</b>Active, 7 days</div><div class="stat"><b>${M.filter(u => sameMonth(u.bday)).length}</b>Birthdays this month</div>
+    o += `<div class="qa"><button class="btn sm" onclick="go('r')">Redeem a coupon</button><button class="btn sm alt" onclick="go('b')">Message customers</button><a class="btn sm alt" href="/">Open customer page</a></div>
+    <div class="stats"><div class="stat"><b>${M.length}</b>Members</div><div class="stat"><b>${tot}</b>Stamps given</div><div class="stat"><b>${rd}</b>Rewards redeemed</div><div class="stat"><b>${M.filter(u => u.last_stamp && new Date(u.last_stamp) > wk).length}</b>Active, 7 days</div><div class="stat"><b>${M.filter(u => sameMonth(u.bday)).length}</b>Birthdays this month</div>
     <div class="stat"><b>${M.reduce((a, u) => a + heldOffers(u), 0)}</b>Coupons outstanding</div><div class="stat"><b>${M.reduce((a, u) => a + (u.offers || []).filter(x => x.used_at && new Date(x.used_at) > new Date().setHours(0, 0, 0, 0)).length, 0)}</b>Redeemed today</div><div class="stat"><b>${M.filter(u => { const e = cardEnd(u); return e && daysTo(e) <= 14 && daysTo(e) >= 0 }).length}</b>Cards ending in 14 days</div></div>
-    ${reminders()}
+    ${chartV()}
+    ${reminders(L)}
     <div class="card" style="margin-top:16px"><h2>Latest sign-ups</h2>${M.slice(0, 5).map(u => `<div class="of"><b>${esc(u.name)}</b><span class="mut sm">${esc(u.phone)} · ${fd(u.joined)}</span></div>`).join('') || '<p class="sub" style="margin:0">No members yet. Share your customer page to get started.</p>'}</div>`;
   }
   if (tab == 'r') o += redeemV();
-  if (tab == 'c') o += `<div class="row"><input placeholder="Search name or phone" value="${esc(q)}" oninput="q=this.value;$('#tb').innerHTML=rows()"><button class="btn sm" onclick="exp()">Export CSV</button></div>
-  <div class="card tw" style="margin-top:12px"><table><thead><tr><th>Name</th><th>Phone</th><th>Birthday</th><th>Stamps</th><th>Card ends</th><th>Visits</th><th>Rewards</th><th>Offers held</th><th>Joined</th><th>Last visit</th><th></th></tr></thead><tbody id="tb">${rows()}</tbody></table></div>`;
+  if (tab == 'c') o += `<div class="row"><input placeholder="Search name or phone" value="${esc(q)}" oninput="q=this.value;$('#tb').innerHTML=rows()"><select aria-label="Sort" onchange="sortBy=this.value;$('#tb').innerHTML=rows()">${Object.keys(SORTS).map(k => `<option value="${k}"${sortBy == k ? ' selected' : ''}>${SORTS[k]}</option>`).join('')}</select><button class="btn sm" id="selb" ${sel.size ? '' : 'disabled'} onclick="msgSel()">${sel.size ? `Message selected (${sel.size})` : 'Message selected'}</button><button class="btn sm alt" onclick="exp()">Export CSV</button></div>
+  <div class="card tw" style="margin-top:12px"><table><thead><tr><th><input type="checkbox" aria-label="Select all shown" onchange="tgAll(this.checked)"></th><th>Name</th><th>Phone</th><th>Birthday</th><th>Stamps</th><th>Card ends</th><th>Visits</th><th>Rewards</th><th>Offers held</th><th>Joined</th><th>Last visit</th><th></th></tr></thead><tbody id="tb">${rows()}</tbody></table></div>`;
+  if (tab == 'b') { if (!binit) { bpick(); binit = true } o += msgV() }
   if (tab == 'q') o += `<div class="card"><h2>Stamp link</h2><p class="sub">Opening this link on a customer's phone adds a stamp (after sign-in). Put it on a QR code or write it to NFC tags for your staff.</p>
   <label>Link for the QR code or NFC tag</label><input readonly class="ro" value="${esc(scanUrl())}" onclick="this.select()">
   <div class="qr" id="qrb"></div>
@@ -195,7 +365,7 @@ function dash() {
     <div class="card"><h2>Stamp card</h2><div class="row"><div><label>First stamp when a customer joins</label><select id="js"><option value="1"${biz.join_stamp ? ' selected' : ''}>Yes, give a free first stamp</option><option value="0"${biz.join_stamp ? '' : ' selected'}>No</option></select></div><div>${f('cm', 'Each card lasts (months from first stamp, 0 = never)', biz.card_months, 'type=number min=0 max=60')}</div></div>
     <p class="hint">An unfinished card that passes its end date starts again from zero. A full card never expires, so the customer can always claim the reward.</p></div>
     <div class="card"><h2>Offers</h2><p class="sub">Leave any offer blank to switch it off.</p>${f('wo', 'Welcome offer (given when a customer joins)', biz.welcome_offer)}${f('bo', 'Birthday offer (valid only on their birthday)', biz.bday_offer)}${f('ca', 'Surprise on stamp number(s), e.g. 3,6', biz.sur_stamps)}${f('co', 'Surprise offer', biz.sur_offer)}${f('cx', 'Offers expire after (days, 0 = never)', biz.exp_days, 'type=number min=0')}</div>
-    <button class="btn" onclick="sv(this)">Save settings</button>`;
+    <div class="savebar"><button class="btn" onclick="sv(this)">Save settings</button></div>`;
   }
   return o;
 }
@@ -258,7 +428,7 @@ async function doSave({ logoUrl, stampUrl, t, btn }) {
 
 async function del(id) {
   if (!confirm('Delete this customer and all their data permanently?')) return;
-  try { await rpc(sb, 'delete_member', { p_member: id }); M = M.filter(u => u.id != id); render() } catch (e) { toast(nice(e)) }
+  try { await rpc(sb, 'delete_member', { p_member: id }); M = M.filter(u => u.id != id); sel.delete(id); render() } catch (e) { toast(nice(e)) }
 }
 
 async function regen() {
