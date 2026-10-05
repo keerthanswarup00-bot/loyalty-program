@@ -59,9 +59,16 @@ const recoverV = () => `<div class="card" style="margin-top:40px"><h2>Set a new 
 // Customers have no real email, so the owner sets a temporary password for them.
 const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
+// Uses the browser's secure random source; values above the largest multiple of the alphabet size are
+// skipped so every character is equally likely.
 function genPw() {
+  const lim = 256 - (256 % chars.length);
   let s = '';
-  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  while (s.length < 8) {
+    for (const b of crypto.getRandomValues(new Uint8Array(16))) {
+      if (b < lim && s.length < 8) s += chars[b % chars.length];
+    }
+  }
   return s;
 }
 
