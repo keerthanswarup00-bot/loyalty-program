@@ -1,0 +1,6 @@
+# Files that must never be published to the web.
+# schema.sql exposes the full database structure, so the supabase/ folder is not public.
+archive/
+supabase/
+*.md
+.DS_Store

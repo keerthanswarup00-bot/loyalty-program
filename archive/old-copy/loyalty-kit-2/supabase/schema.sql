@@ -1,0 +1,397 @@
+-- Loyalty Kit backend (Supabase / Postgres)
+-- Run once: Supabase dashboard -> SQL Editor -> New query -> paste -> Run.
+-- Safe to re-run any time (after every update of this file): it only adds what is missing and replaces the functions.
+
+-- ---------- Tables ----------
+create table if not exists public.businesses (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null check (slug ~ '^[a-z0-9-]+$'),
+  owner_id uuid references auth.users(id) on delete set null,
+  name text not null,
+  tagline text not null default '',
+  color text not null default '#8a4b2a',
+  logo_url text not null default '',
+  ig text not null default '',
+  fb text not null default '',
+  wa text not null default '',
+  web text not null default '',
+  need int not null default 8 check (need between 2 and 20),
+  reward text not null default 'Free reward',
+  cooldown_min int not null default 60 check (cooldown_min >= 0),
+  sur_stamps text not null default '',
+  sur_offer text not null default '',
+  welcome_offer text not null default '',
+  bday_offer text not null default '',
+  exp_days int not null default 30 check (exp_days >= 0),
+  join_stamp boolean not null default true,
+  card_months int not null default 6 check (card_months >= 0),
+  tz text not null default 'Asia/Kolkata',
+  scan_token text not null default substr(md5(random()::text || clock_timestamp()::text), 1, 12),
+  created_at timestamptz not null default now()
+);
+alter table public.businesses add column if not exists join_stamp boolean not null default true;
+alter table public.businesses add column if not exists card_months int not null default 6 check (card_months >= 0);
+
+create table if not exists public.members (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  phone text not null,
+  bday date,
+  stamps int not null default 0,
+  total int not null default 0,
+  redeemed int not null default 0,
+  last_stamp timestamptz,
+  card_started_at timestamptz,
+  bday_year int,
+  consent boolean not null default true,
+  joined timestamptz not null default now(),
+  unique (business_id, user_id),
+  unique (business_id, phone)
+);
+alter table public.members add column if not exists card_started_at timestamptz;
+create index if not exists members_business_idx on public.members (business_id);
+
+create table if not exists public.offers (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references public.members(id) on delete cascade,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  type text not null,
+  text text not null,
+  code text not null,
+  valid_from timestamptz,
+  expires_at timestamptz,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table public.offers add column if not exists valid_from timestamptz;
+create index if not exists offers_member_idx on public.offers (member_id);
+create index if not exists offers_code_idx on public.offers (business_id, code);
+
+create table if not exists public.visits (
+  id bigint generated always as identity primary key,
+  member_id uuid not null references public.members(id) on delete cascade,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists visits_business_idx on public.visits (business_id, created_at);
+
+-- ---------- Row level security ----------
+-- Customers can read only their own rows. Owners can read only their business's rows.
+-- Nobody writes to members/offers/visits directly: all writes go through the functions below.
+alter table public.businesses enable row level security;
+alter table public.members enable row level security;
+alter table public.offers enable row level security;
+alter table public.visits enable row level security;
+
+drop policy if exists biz_owner_select on public.businesses;
+create policy biz_owner_select on public.businesses for select to authenticated
+  using (owner_id = auth.uid());
+drop policy if exists biz_owner_update on public.businesses;
+create policy biz_owner_update on public.businesses for update to authenticated
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+drop policy if exists member_self_select on public.members;
+create policy member_self_select on public.members for select to authenticated
+  using (user_id = auth.uid());
+drop policy if exists member_owner_select on public.members;
+create policy member_owner_select on public.members for select to authenticated
+  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+
+drop policy if exists offer_self_select on public.offers;
+create policy offer_self_select on public.offers for select to authenticated
+  using (member_id in (select id from public.members where user_id = auth.uid()));
+drop policy if exists offer_owner_select on public.offers;
+create policy offer_owner_select on public.offers for select to authenticated
+  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+
+drop policy if exists visit_owner_select on public.visits;
+create policy visit_owner_select on public.visits for select to authenticated
+  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+
+-- Table privileges: read-only for members/offers/visits; owners may edit only these business columns.
+revoke all on public.businesses, public.members, public.offers, public.visits from anon, authenticated;
+grant select on public.businesses, public.members, public.offers, public.visits to authenticated;
+grant update (name, tagline, color, logo_url, ig, fb, wa, web, need, reward, cooldown_min,
+              sur_stamps, sur_offer, welcome_offer, bday_offer, exp_days, join_stamp, card_months, scan_token)
+  on public.businesses to authenticated;
+
+-- ---------- Functions ----------
+-- Functions from earlier versions that no longer exist (customers no longer mark their own offers as used).
+drop function if exists public.use_offer(uuid);
+drop function if exists public.redeem_reward(text);
+drop function if exists public._give(uuid, uuid, text, text, int);
+
+-- Public branding for the customer page (never exposes the scan token or owner).
+create or replace function public.get_business(p_slug text) returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object(
+    'name', name, 'tagline', tagline, 'color', color, 'logo_url', logo_url,
+    'ig', ig, 'fb', fb, 'wa', wa, 'web', web, 'need', need, 'reward', reward,
+    'cooldown_min', cooldown_min, 'sur_stamps', sur_stamps, 'sur_offer', sur_offer,
+    'welcome_offer', welcome_offer, 'bday_offer', bday_offer, 'exp_days', exp_days,
+    'join_stamp', join_stamp, 'card_months', card_months, 'tz', tz)
+  from businesses where slug = p_slug;
+$$;
+
+-- Internal: a fresh 6-character coupon code (no look-alike letters), unique within the business.
+create or replace function public._code(p_biz uuid) returns text
+language plpgsql set search_path = public as $$
+declare chars constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; c text; i int;
+begin
+  loop
+    c := '';
+    for i in 1..6 loop c := c || substr(chars, 1 + floor(random() * length(chars))::int, 1); end loop;
+    exit when not exists (select 1 from offers where business_id = p_biz and code = c);
+  end loop;
+  return c;
+end $$;
+
+-- Internal: hand a coupon to a member. Returns its code. valid_from / until are optional (used for birthdays).
+create or replace function public._give(p_member uuid, p_biz uuid, p_type text, p_text text, p_days int,
+                                        p_from timestamptz default null, p_until timestamptz default null)
+returns text language plpgsql security definer set search_path = public as $$
+declare c text := _code(p_biz);
+begin
+  insert into offers (member_id, business_id, type, text, code, valid_from, expires_at)
+  values (p_member, p_biz, p_type, p_text, c, p_from,
+          coalesce(p_until, case when p_days > 0 then now() + make_interval(days => p_days) end));
+  return c;
+end $$;
+
+-- Internal: the next date a birthday falls on, today or later (29 Feb becomes 28 Feb in non-leap years).
+create or replace function public._next_bday(p_bday date, p_today date) returns date
+language plpgsql immutable as $$
+declare y int := extract(year from p_today)::int; mo int := extract(month from p_bday)::int;
+        dd int := extract(day from p_bday)::int; d date; i int;
+begin
+  for i in 0..1 loop
+    d := make_date(y + i, mo, least(dd, extract(day from (make_date(y + i, mo, 1) + interval '1 month' - interval '1 day'))::int));
+    if d >= p_today then return d; end if;
+  end loop;
+  return d;
+end $$;
+
+-- Internal: if the member's unfinished card is older than the business's card validity, wipe its stamps.
+-- Returns how many stamps were lost (0 if nothing expired). A full card (ready to claim) never expires.
+create or replace function public._expire_card(p_member uuid) returns int
+language plpgsql security definer set search_path = public as $$
+declare m members; b businesses;
+begin
+  select * into m from members where id = p_member;
+  select * into b from businesses where id = m.business_id;
+  if b.card_months > 0 and m.card_started_at is not null and m.stamps > 0 and m.stamps < b.need
+     and now() > m.card_started_at + make_interval(months => b.card_months) then
+    update members set stamps = 0, card_started_at = null where id = m.id;
+    return m.stamps;
+  end if;
+  return 0;
+end $$;
+
+-- Internal: add one stamp (no cooldown check), start the card clock on the first stamp, give the surprise offer if due.
+create or replace function public._do_stamp(p_member uuid) returns json
+language plpgsql security definer set search_path = public as $$
+declare b businesses; m members; pos int; surprise text := null; lost int;
+begin
+  select * into m from members where id = p_member;
+  select * into b from businesses where id = m.business_id;
+  lost := _expire_card(m.id);
+  update members set stamps = stamps + 1, total = total + 1, last_stamp = now(),
+         card_started_at = coalesce(card_started_at, now())
+   where id = m.id returning * into m;
+  insert into visits (member_id, business_id) values (m.id, b.id);
+  pos := (m.stamps - 1) % b.need + 1;
+  if b.sur_offer <> '' and exists (
+       select 1 from unnest(string_to_array(regexp_replace(b.sur_stamps, '\s', '', 'g'), ',')) s
+       where s ~ '^[0-9]+$' and s::int = pos) then
+    perform _give(m.id, b.id, 'Surprise', b.sur_offer, b.exp_days);
+    surprise := b.sur_offer;
+  end if;
+  return json_build_object('stamps', m.stamps, 'surprise', surprise, 'lost', lost);
+end $$;
+
+-- Create the member row for the signed-in customer, give the welcome offer and (if switched on) the first stamp.
+create or replace function public.join_business(p_slug text, p_name text, p_phone text, p_bday date, p_consent boolean)
+returns void language plpgsql security definer set search_path = public as $$
+declare b businesses; m uuid;
+begin
+  if auth.uid() is null then raise exception 'Not signed in'; end if;
+  if not coalesce(p_consent, false) then raise exception 'Consent is required to join'; end if;
+  select * into b from businesses where slug = p_slug;
+  if not found then raise exception 'Unknown business'; end if;
+  if length(trim(coalesce(p_name, ''))) < 2 then raise exception 'Please enter your full name'; end if;
+  if coalesce(p_phone, '') !~ '^[0-9]{10}$' then raise exception 'Enter a valid 10-digit mobile number'; end if;
+  insert into members (business_id, user_id, name, phone, bday, consent)
+  values (b.id, auth.uid(), trim(p_name), p_phone, p_bday, true)
+  returning id into m;
+  if b.welcome_offer <> '' then perform _give(m, b.id, 'Welcome', b.welcome_offer, b.exp_days); end if;
+  if b.join_stamp then perform _do_stamp(m); end if;
+end $$;
+
+-- The customer's card: stats, coupons and card validity. Also reserves the birthday coupon (valid only on the birthday).
+create or replace function public.my_card(p_slug text) returns json
+language plpgsql security definer set search_path = public as $$
+declare b businesses; m members; today date; nb date; lost int; granted boolean := false; ends timestamptz;
+begin
+  if auth.uid() is null then return null; end if;
+  select * into b from businesses where slug = p_slug;
+  if not found then return null; end if;
+  select * into m from members where business_id = b.id and user_id = auth.uid();
+  if not found then return null; end if;
+  lost := _expire_card(m.id);
+  select * into m from members where id = m.id;
+  today := (now() at time zone b.tz)::date;
+  if b.bday_offer <> '' and m.bday is not null then
+    nb := _next_bday(m.bday, today);
+    if nb - today <= 7 and coalesce(m.bday_year, 0) <> extract(year from nb)::int then
+      -- Reserved up to 7 days ahead, but only usable from the start to the end of the birthday itself.
+      perform _give(m.id, b.id, 'Birthday', b.bday_offer, 0,
+                    nb::timestamp at time zone b.tz, (nb + 1)::timestamp at time zone b.tz);
+      update members set bday_year = extract(year from nb)::int where id = m.id;
+      granted := true;
+    end if;
+  end if;
+  if b.card_months > 0 and m.card_started_at is not null and m.stamps < b.need then
+    ends := m.card_started_at + make_interval(months => b.card_months);
+  end if;
+  return json_build_object(
+    'granted', granted, 'lost', lost,
+    'member', json_build_object('name', m.name, 'phone', m.phone, 'bday', m.bday,
+              'stamps', m.stamps, 'total', m.total, 'redeemed', m.redeemed, 'last_stamp', m.last_stamp,
+              'card_started_at', m.card_started_at, 'card_ends_at', ends),
+    'offers', coalesce((select json_agg(json_build_object(
+                'id', o.id, 'type', o.type, 'text', o.text, 'valid_from', o.valid_from,
+                'expires_at', o.expires_at, 'used_at', o.used_at,
+                -- the code is only shown while the coupon can actually be used
+                'code', case when o.used_at is null
+                              and (o.valid_from is null or o.valid_from <= now())
+                              and (o.expires_at is null or o.expires_at > now()) then o.code end)
+                order by o.created_at desc)
+              from offers o where o.member_id = m.id), '[]'::json));
+end $$;
+
+-- Add one stamp (needs the secret scan token from the QR / NFC link). Enforces the cooldown.
+create or replace function public.add_stamp(p_slug text, p_token text) returns json
+language plpgsql security definer set search_path = public as $$
+declare b businesses; m members; wait int; r json;
+begin
+  if auth.uid() is null then return json_build_object('ok', false, 'error', 'auth'); end if;
+  select * into b from businesses where slug = p_slug;
+  if not found or b.scan_token <> coalesce(p_token, '') then
+    return json_build_object('ok', false, 'error', 'invalid');
+  end if;
+  select * into m from members where business_id = b.id and user_id = auth.uid() for update;
+  if not found then return json_build_object('ok', false, 'error', 'nomember'); end if;
+  if m.last_stamp is not null then
+    wait := ceil(extract(epoch from (m.last_stamp + make_interval(mins => b.cooldown_min) - now())))::int;
+    if wait > 0 then return json_build_object('ok', false, 'error', 'cooldown', 'wait', wait); end if;
+  end if;
+  r := _do_stamp(m.id);
+  return json_build_object('ok', true, 'stamps', r->'stamps', 'surprise', r->'surprise', 'lost', r->'lost');
+end $$;
+
+-- Turn a full card into a Reward coupon (the code is then redeemed by staff like any other coupon).
+create or replace function public.claim_reward(p_slug text) returns json
+language plpgsql security definer set search_path = public as $$
+declare b businesses; m members; c text; rest int;
+begin
+  if auth.uid() is null then raise exception 'Not signed in'; end if;
+  select * into b from businesses where slug = p_slug;
+  select * into m from members where business_id = b.id and user_id = auth.uid() for update;
+  if not found or m.stamps < b.need then raise exception 'Your card is not full yet'; end if;
+  rest := m.stamps - b.need;
+  update members set stamps = rest, redeemed = redeemed + 1,
+         card_started_at = case when rest > 0 then now() else null end
+   where id = m.id;
+  c := _give(m.id, b.id, 'Reward', b.reward, b.exp_days);
+  return json_build_object('code', c);
+end $$;
+
+-- Owner / staff redeem a coupon: type the code (and optionally the customer's phone).
+-- p_confirm = false only checks it; p_confirm = true marks it used. All rules are enforced here on the server.
+create or replace function public.redeem_code(p_slug text, p_code text, p_phone text, p_confirm boolean)
+returns json language plpgsql security definer set search_path = public as $$
+declare b businesses; x offers; m members; c text; ph text;
+begin
+  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  if not found then raise exception 'Not allowed'; end if;
+  c := upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'));
+  ph := right(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), 10);
+  if c = '' then return json_build_object('ok', false, 'error', 'nocode'); end if;
+  select o.* into x from offers o join members mm on mm.id = o.member_id
+   where o.business_id = b.id and o.code = c and (ph = '' or mm.phone = ph)
+   order by (o.used_at is null) desc, o.created_at desc limit 1 for update of o;
+  if not found then
+    if ph <> '' and exists (select 1 from offers where business_id = b.id and code = c) then
+      return json_build_object('ok', false, 'error', 'phone');
+    end if;
+    return json_build_object('ok', false, 'error', 'notfound');
+  end if;
+  select * into m from members where id = x.member_id;
+  if x.used_at is not null then
+    return json_build_object('ok', false, 'error', 'used', 'offer', json_build_object('type', x.type, 'text', x.text,
+      'name', m.name, 'phone', m.phone, 'code', x.code, 'used_at', x.used_at));
+  end if;
+  if x.expires_at is not null and x.expires_at <= now() then
+    return json_build_object('ok', false, 'error', 'expired', 'offer', json_build_object('type', x.type, 'text', x.text,
+      'name', m.name, 'phone', m.phone, 'code', x.code, 'expires_at', x.expires_at));
+  end if;
+  if x.valid_from is not null and x.valid_from > now() then
+    return json_build_object('ok', false, 'error', 'early', 'offer', json_build_object('type', x.type, 'text', x.text,
+      'name', m.name, 'phone', m.phone, 'code', x.code, 'valid_from', x.valid_from));
+  end if;
+  if coalesce(p_confirm, false) then
+    update offers set used_at = now() where id = x.id;
+    x.used_at := now();
+  end if;
+  return json_build_object('ok', true, 'confirmed', coalesce(p_confirm, false), 'offer', json_build_object(
+    'type', x.type, 'text', x.text, 'name', m.name, 'phone', m.phone, 'code', x.code,
+    'valid_from', x.valid_from, 'expires_at', x.expires_at, 'used_at', x.used_at));
+end $$;
+
+-- Owner deletes a customer completely (login, card, offers, visits).
+create or replace function public.delete_member(p_member uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare uid uuid;
+begin
+  select m.user_id into uid from members m join businesses b on b.id = m.business_id
+   where m.id = p_member and b.owner_id = auth.uid();
+  if uid is null then raise exception 'Not allowed'; end if;
+  if exists (select 1 from businesses where owner_id = uid) then raise exception 'Not allowed'; end if;
+  delete from auth.users where id = uid;
+end $$;
+
+-- Owner sets a temporary password for a customer who forgot theirs (customers have no real email to reset by).
+create or replace function public.reset_member_password(p_member uuid, p_password text) returns void
+language plpgsql security definer set search_path = public, extensions, auth as $$
+declare uid uuid;
+begin
+  if length(coalesce(p_password, '')) < 6 then raise exception 'Password must be at least 6 characters'; end if;
+  select m.user_id into uid from members m join businesses b on b.id = m.business_id
+   where m.id = p_member and b.owner_id = auth.uid();
+  if uid is null then raise exception 'Not allowed'; end if;
+  if exists (select 1 from businesses where owner_id = uid) then raise exception 'Not allowed'; end if;
+  update auth.users set encrypted_password = crypt(p_password, gen_salt('bf')), updated_at = now() where id = uid;
+end $$;
+
+-- Customer deletes their own account.
+create or replace function public.delete_me() returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'Not signed in'; end if;
+  if exists (select 1 from businesses where owner_id = auth.uid()) then raise exception 'Owner accounts cannot be deleted here'; end if;
+  delete from auth.users where id = auth.uid();
+end $$;
+
+-- ---------- Who may call what ----------
+revoke execute on all functions in schema public from public, anon, authenticated;
+grant execute on function public.get_business(text) to anon, authenticated;
+grant execute on function public.join_business(text, text, text, date, boolean) to authenticated;
+grant execute on function public.my_card(text) to authenticated;
+grant execute on function public.add_stamp(text, text) to authenticated;
+grant execute on function public.claim_reward(text) to authenticated;
+grant execute on function public.redeem_code(text, text, text, boolean) to authenticated;
+grant execute on function public.delete_member(uuid) to authenticated;
+grant execute on function public.delete_me() to authenticated;
+grant execute on function public.reset_member_password(uuid, text) to authenticated;

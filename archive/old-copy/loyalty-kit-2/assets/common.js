@@ -1,0 +1,62 @@
+// Shared helpers for the customer app and the owner app.
+const CFG = window.LK;
+const $ = s => document.querySelector(s);
+const v = i => ($('#' + i) || {}).value || '';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const ico = (p, fill) => `<svg viewBox="0 0 24 24" fill="${fill ? 'currentColor' : 'none'}" stroke="${fill ? 'none' : 'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const IC = {
+  ig: ico('<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".6" fill="currentColor"/>'),
+  fb: ico('<path d="M13.5 21v-7.5H16l.5-3h-3V8.8c0-.9.3-1.5 1.6-1.5h1.5V4.6c-.3 0-1.2-.1-2.2-.1-2.3 0-3.9 1.4-3.9 4v2H7.5v3H10V21z"/>', 1),
+  wa: ico('<path d="M20 11.8a8 8 0 0 1-11.9 7L4 20l1.2-4A8 8 0 1 1 20 11.8z"/><path d="M9.2 8.6c-.3.6-.2 1.6.7 2.9s2 2.1 3.2 2.5c.7.2 1.5-.1 1.8-.8l-1.6-.9-.7.6c-.9-.4-1.6-1.1-2-2l.6-.7z"/>'),
+  web: ico('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.8 2.6 15.2 0 18M12 3c-2.6 2.8-2.6 15.2 0 18"/>'),
+  chk: ico('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  eye: ico('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
+  off: ico('<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.7A17 17 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4-.9M9.9 9.9a3 3 0 0 0 4.2 4.2"/>')
+};
+
+// Separate storage keys so an owner and a customer can be signed in on the same browser.
+const mkClient = key => window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { storageKey: key } });
+async function rpc(c, fn, args) { const { data, error } = await c.rpc(fn, args); if (error) throw error; return data }
+
+const toast = m => { $('#t').innerHTML = '<div class="toast">' + esc(m) + '</div>'; setTimeout(() => $('#t').innerHTML = '', 3200) };
+const fd = t => t ? new Date(t).toLocaleDateString() : '—';
+const fbd = b => b ? new Date(b + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const isExp = x => !!x.expires_at && new Date(x.expires_at) < Date.now();
+const daysTo = iso => Math.ceil((new Date(iso) - Date.now()) / 864e5);
+// Phone numbers: accept "+91 98765 43210", "098765-43210", "919876543210" etc. and reduce to exactly 10 digits (or null).
+const PHONE_MSG = 'Enter a valid 10-digit mobile number (without +91 or spaces)';
+function normPhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '').replace(/^0+/, '');
+  if (d.length == 12 && d.slice(0, 2) == '91') d = d.slice(2);
+  if (!/^\d{10}$/.test(d)) return null;
+  if ((CFG.countryCode || '91') == '91' && !/^[6-9]/.test(d)) return null;
+  return d;
+}
+const isEarly = x => !!x.valid_from && new Date(x.valid_from) > Date.now();
+const fdt = t => t ? new Date(t).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '—';
+const waLink = (phone, text) => { const d = normPhone(phone) || String(phone).replace(/\D/g, ''); const p = d.length == 10 ? (CFG.countryCode || '') + d : d; return 'https://wa.me/' + p + '?text=' + encodeURIComponent(text) };
+const tp = (id, b) => { const i = $('#' + id), sh = i.type == 'password'; i.type = sh ? 'text' : 'password'; b.innerHTML = sh ? IC.off : IC.eye };
+const pwField = (id, auto) => `<div class="pw"><input id="${id}" type="password" autocomplete="${auto}"><button type="button" class="eye" aria-label="Show or hide password" onclick="tp('${id}',this)">${IC.eye}</button></div>`;
+
+function nice(e) {
+  const m = String((e && e.message) || e);
+  if (/already (been )?registered/i.test(m)) return 'This number is already registered. Use Sign in.';
+  if (/invalid login/i.test(m)) return 'Wrong login details';
+  if (/password.*(at least|short|characters)/i.test(m)) return 'Password must be at least 6 characters';
+  if (/fetch|network/i.test(m)) return 'No connection. Check your internet and try again.';
+  return m;
+}
+
+function brand(b) {
+  document.documentElement.style.setProperty('--brand', b.color || '#8a4b2a');
+  document.title = b.name + ' Rewards';
+}
+const mark = b => /^https?:\/\//.test(b.logo_url || '') ? `<img src="${esc(b.logo_url)}" alt="">` : esc((b.name || '?').trim().slice(0, 1).toUpperCase());
+const head = b => `<div class="bh"><div class="logo">${mark(b)}</div><h1>${esc(b.name)}</h1><p>${esc(b.tagline)}</p></div>`;
+function socials(b) {
+  const L = [['Instagram', b.ig, 'ig'], ['Facebook', b.fb, 'fb'], ['WhatsApp', b.wa, 'wa'], ['Website', b.web, 'web']].filter(x => /^https?:\/\//.test(x[1]));
+  return L.length ? `<div class="soc">${L.map(x => `<a href="${esc(x[1])}" target="_blank" rel="noopener" aria-label="${x[0]}">${IC[x[2]]}</a>`).join('')}</div>` : '';
+}
+const notReady = () => /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !window.supabase;
+const setupMsg = '<div class="card"><h2>Almost there</h2><p class="sub">Add your Supabase URL and key in <b>assets/config.js</b>, then reload. See README.md.</p></div>';

@@ -8,12 +8,7 @@ admin/index.html      owner dashboard       assets/admin.js
 assets/config.js      per-deployment settings (the only file you edit)
 assets/common.js, style.css   shared
 supabase/schema.sql   run once        supabase/new-client.sql   run per client
-archive/              unused old code, kept for reference only (never deployed)
 ```
-
-`archive/` holds the retired Phase 1 app (`app.js`, `config.js`, `style.css`) and an old
-copy of the project. Nothing loads from it. `.vercelignore` keeps `archive/`, `supabase/`
-and the docs out of the published site.
 
 ## One-time setup (about 10 minutes)
 
@@ -65,7 +60,7 @@ git branch -M main
 git remote add origin https://github.com/YOU/loyalty-kit.git
 git push -u origin main
 ```
-Vercel -> Add New -> Project -> import the repo -> Framework Preset **Other** -> Deploy. Update later with `git add index.html admin assets supabase README.md`, `git commit -m "what changed"`, `git push`.
+Vercel -> Add New -> Project -> import the repo -> Framework Preset **Other** -> Deploy. Update later with `git add .`, `git commit -m "what changed"`, `git push`.
 
 **One client = one Vercel project** from the same code, each with its own `config.js` slug and its own domain (Project -> Settings -> Domains). They all share the one Supabase database. A branch per client keeps their `config.js` separate.
 

@@ -66,24 +66,26 @@ There is **no separate staff role** — staff use the owner login. There is **no
 | `supabase/2026-10-05-stamp-image.sql` | 25 | The one-off migration that added `stamp_url`. Applied to the live DB on 5 Oct 2026. |
 | `README.md` | 73 | Operator documentation: setup, adding a client, stamping, coupons, passwords, deploy, free-tier limits. Accurate and current. |
 
-### Dead code — deployed but never loaded
+### Retired code — moved to `archive/`, never deployed
 
-| File | Lines | Why it matters |
+| Path | Lines | Why it matters |
 |---|---:|---|
-| `app.js` | 118 | **Phase 1 app.** Entirely self-contained; runs off `window.CLIENT` in `localStorage`. Not referenced by either HTML file. Contains a client-side demo PIN (`pin: '1234'` in `config.js`) and its own auth. Confusing and a latent risk if anyone ever wires it up. |
-| `config.js` | 22 | **Phase 1 config** (`window.CLIENT`). Superseded by `assets/config.js`. |
-| `style.css` | 56 | **Phase 1 stylesheet.** An older fork of `assets/style.css`. |
+| `archive/legacy-phase1/app.js` | 118 | **Phase 1 app.** Entirely self-contained; runs off `window.CLIENT` in `localStorage`. Not referenced by either HTML file. Contains a client-side demo PIN (`pin: '1234'` in the Phase 1 `config.js`) and its own auth. Confusing and a latent risk if anyone ever wires it up. |
+| `archive/legacy-phase1/config.js` | 22 | **Phase 1 config** (`window.CLIENT`). Superseded by `assets/config.js`. |
+| `archive/legacy-phase1/style.css` | 56 | **Phase 1 stylesheet.** An older fork of `assets/style.css`. |
+| `archive/old-copy/loyalty-kit-2/` | 229 + 196 + … | **Full duplicate of the project at an older commit** (its `admin.js` predates the stamp/logo work). Was untracked; now archived. |
 
-### Repo hygiene problems
+`.vercelignore` keeps `archive/`, `supabase/`, `*.md` and `.DS_Store` out of the published site — which also means **`supabase/schema.sql` is no longer publicly downloadable** from the site.
 
-| Path | Issue |
+### Repo hygiene
+
+| Item | State |
 |---|---|
-| `loyalty-kit 2/` | Untracked **full duplicate** of the project at an older commit (229-line `admin.js`, 196-line `customer.js`, missing the stamp/logo work). Not ignored by `.gitignore`. High confusion risk. |
-| `.DS_Store` | **Committed to git** and repeatedly modified. |
-| `supabase/.temp/` | Untracked CLI artefact. |
-| `.vercel/` | Correctly gitignored. |
+| `.DS_Store` | Removed from git tracking and gitignored. |
+| `supabase/.temp/` | Gitignored. |
+| `loyalty-kit 2/` | Moved into `archive/old-copy/`. |
+| `.vercel/` | Gitignored, and **must stay in place** — it is what links this folder to the Vercel project for CLI deploys. |
 
-`.gitignore` covers `.DS_Store`, `node_modules/`, `.vercel/`, `.env` — but `.DS_Store` was committed before the rule existed.
 
 ---
 
@@ -260,13 +262,13 @@ Everything else (name, logo, colour, offers, cooldown, stamp count, card length)
 
 ### Low / cleanup
 
-12. Phase 1 files (`app.js`, `config.js`, `style.css`, 196 lines) are dead weight in production and contain a demo PIN.
-13. `loyalty-kit 2/` — untracked duplicate of an older revision; delete or gitignore it.
-14. `.DS_Store` is tracked in git.
-15. `visits` is written but never read; no analytics are derived from it.
-16. Owner password reset depends on Supabase's Site URL + Redirect URLs being configured for the production domain, and on Supabase's built-in email sender (a few emails/hour). Unverified for this deployment — worth confirming end to end.
-17. No tests, no linter, no formatter, no CI. The syntax error in `535bc9d` shipped to production and was only caught by a user report; `node --check assets/*.js` before every push would have caught it.
-18. `supabase/.temp/` is untracked and not ignored.
+12. Phase 1 files (`archive/legacy-phase1/`, 196 lines) are dead weight and contain a demo PIN. **Done** — moved to `archive/` and excluded from deploys.
+13. `loyalty-kit 2/` duplicate. **Done** — moved to `archive/old-copy/`.
+14. `.DS_Store` tracked in git, `supabase/.temp/` untracked. **Done** — untracked and gitignored.
+15. `supabase/schema.sql` was publicly readable at `/supabase/schema.sql`. **Done** — `.vercelignore` now excludes it.
+16. `visits` is written but never read; no analytics are derived from it.
+17. Owner password reset depends on Supabase's Site URL + Redirect URLs being configured for the production domain, and on Supabase's built-in email sender (a few emails/hour). Unverified for this deployment — worth confirming end to end.
+18. No tests, no linter, no formatter, no CI. The syntax error in `535bc9d` shipped to production and was only caught by a user report; `node --check assets/*.js` before every push would have caught it.
 
 ---
 
@@ -275,7 +277,7 @@ Everything else (name, logo, colour, offers, cooldown, stamp count, card length)
 **Now (hours)**
 1. Replace `Math.random()` with `crypto.getRandomValues()` in `genPw()`.
 2. Add `node --check assets/*.js` to the pre-push routine.
-3. Delete `app.js`, `config.js`, `style.css` from the repo root; `git rm --cached .DS_Store`; add `loyalty-kit 2/` and `supabase/.temp/` to `.gitignore`.
+3. ~~Delete the Phase 1 files, untrack `.DS_Store`, ignore the duplicates.~~ **Done 5 Oct 2026** — see §3.
 4. Confirm the owner's "Forgot password?" email actually returns to `/admin/` in production.
 
 **Next (days)**
@@ -304,7 +306,7 @@ npx serve .          # or: python3 -m http.server 8000
 
 ### Deploy
 ```
-git add assets supabase README.md    # explicit paths; do NOT use "git add ." (.DS_Store, loyalty-kit 2/)
+git add index.html admin assets supabase archive README.md AUDIT-HANDOFF.md .gitignore .vercelignore
 git commit -m "what changed"
 git push                              # GitHub main
 vercel deploy --prod --yes            # or let the Vercel Git integration do it
