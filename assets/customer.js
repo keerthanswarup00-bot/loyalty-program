@@ -57,6 +57,7 @@ async function reg(btn) {
       if (w && !sur) sur = { t: 'Welcome gift', x: w.text };
       if (card.member.stamps > 0) anim = Math.min(card.member.stamps, +biz.need) - 1;
     }
+    view = 'home'; form = 'new';
     render();
     if (pend) await scan();
   } catch (e) { toast(nice(e)); busy(btn, false) }
@@ -71,9 +72,20 @@ async function login(btn) {
     const { error } = await sb.auth.signInWithPassword({ email: mail(p), password: w });
     if (error) throw error;
     if (!(await ensureCard())) { await sb.auth.signOut(); throw new Error('No card found for this number. Please join first.') }
+    view = 'home'; form = 'in';
     render();
     if (pend) await scan();
-  } catch (e) { toast(e.message && /invalid login/i.test(e.message) ? 'Wrong phone or password' : nice(e)); busy(btn, false) }
+  } catch (e) {
+    const m = (e && e.message) || String(e);
+    if (/invalid login/i.test(m) || /invalid.*credentials/i.test(m) || /wrong.*password|wrong.*phone/i.test(m)) {
+      toast('Incorrect phone number or password.');
+    } else if (/no card found/i.test(m)) {
+      toast('No account found with this number. Please join the rewards club first.');
+    } else {
+      toast('Something went wrong. Please try again.');
+    }
+    busy(btn, false);
+  }
 }
 
 async function out() { await sb.auth.signOut(); card = null; view = 'home'; sur = reward = null; render() }
@@ -140,14 +152,33 @@ async function claim() {
 
 function authV() {
   const nw = form == 'new';
-  return head(biz) + `<div class="card"><div class="tabs"><button class="${nw ? 'on' : ''}" onclick="form='new';render()">New member</button><button class="${nw ? '' : 'on'}" onclick="form='in';render()">Sign in</button></div>
-  <h2>${nw ? 'Join the rewards club' : 'Welcome back'}</h2><p class="sub">${pend ? 'Sign in to collect your stamp.' : nw ? (biz.join_stamp ? 'Create your card and get your first stamp free.' : 'Create your card in under a minute.') : 'Enter your details to open your card.'}</p>
-  ${nw ? '<label class="lb">Full name</label><input id="n" autocomplete="name">' : ''}
+  return head(biz) + `<div class="card"><div class="tabs"><button class="${nw ? 'on' : ''}" onclick="form='new';render()">New member</button><button class="${nw ? '' : 'on'}" onclick="form='in';render();view='signin'">Sign in</button></div>
+  ${view == 'forgot' ? forgotV() : (nw ? joinV() : signinV())}</div>` + socials(biz);
+}
+
+function joinV() {
+  return `<h2>Join the rewards club</h2><p class="sub">${pend ? 'Sign in to collect your stamp.' : (biz.join_stamp ? 'Create your card and get your first stamp free.' : 'Create your card in under a minute.')}</p>
+  <label class="lb">Full name</label><input id="n" autocomplete="name">
   <label class="lb">Phone number</label><input id="p" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
-  <label class="lb">Password${nw ? ' <span>(6+ characters)</span>' : ''}</label>${pwField('w', nw ? 'new-password' : 'current-password')}
-  ${nw ? `<label class="lb">Birthday <span>(optional)</span></label><input id="b" type="date"><p class="hint">Your birthday offer is valid only on that day each year.</p>
-  <label class="chk"><input type="checkbox" id="cons"><span>I agree to receive offers and to ${esc(biz.name)} storing my details.</span></label>` : ''}
-  <button class="btn" onclick="${nw ? 'reg' : 'login'}(this)">${nw ? 'Join' : 'Sign in'}</button></div>` + socials(biz);
+  <label class="lb">Password <span>(6+ characters)</span></label>${pwField('w', 'new-password')}
+  <label class="lb">Birthday <span>(optional)</span></label><input id="b" type="date"><p class="hint">Your birthday offer is valid only on that day each year.</p>
+  <label class="chk"><input type="checkbox" id="cons"><span>I agree to receive offers and to ${esc(biz.name)} storing my details.</span></label>
+  <button class="btn" onclick="reg(this)">Join</button>`;
+}
+
+function signinV() {
+  return `<h2>Welcome back</h2><p class="sub">Sign in to view your rewards.</p>
+  <label class="lb">Phone number</label><input id="p" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
+  <label class="lb">Password</label>${pwField('w', 'current-password')}
+  <div style="text-align:right;margin-top:8px"><a href="#" onclick="view='forgot';render();return false" style="color:var(--mut);font-size:14px">Forgot password?</a></div>
+  <button class="btn" onclick="login(this)" onkeydown="if(event.key==='Enter'){login(this)}">Sign in</button>
+  <p class="note" style="margin:16px 0 0">New here? <a href="#" onclick="form='new';view='home';render();return false">Join the rewards club</a></p>`;
+}
+
+function forgotV() {
+  return `<h2>Forgot your password?</h2><p class="sub">Please ask the store to reset your password.</p>
+  <label class="lb">Phone number</label><input id="fp" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
+  <button class="btn alt" onclick="view='signin';render();return false">Back to sign in</button>`;
 }
 
 const onDay = x => new Date(+new Date(x.valid_from) + 12 * 36e5).toLocaleDateString(undefined, { timeZone: biz.tz || 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' });
