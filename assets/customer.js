@@ -152,7 +152,8 @@ async function claim() {
 
 function authV() {
   const nw = form == 'new';
-  return head(biz) + `<div class="card"><div class="tabs"><button class="${nw ? 'on' : ''}" onclick="form='new';render()">New member</button><button class="${nw ? '' : 'on'}" onclick="form='in';render();view='signin'">Sign in</button></div>
+  const showSignin = form == 'in' || view == 'signin';
+  return head(biz) + `<div class="card"><div class="tabs"><button class="${nw ? 'on' : ''}" onclick="form='new';view='home';render()">New member</button><button class="${showSignin ? 'on' : ''}" onclick="form='in';view='signin';render()">Sign in</button></div>
   ${view == 'forgot' ? forgotV() : (nw ? joinV() : signinV())}</div>` + socials(biz);
 }
 
