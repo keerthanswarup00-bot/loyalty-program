@@ -226,8 +226,6 @@ async function sv(btn) {
 }
 
 async function doSave({ logoUrl, stampUrl, t, btn }) {
-
-async function doSave({ logoUrl, stampUrl, t, btn }) {
   const patch = {
     name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl || '', stamp_url: stampUrl || '', color: v('cc') || biz.color,
     ig: t('ci'), fb: t('cf'), wa: t('cw'), web: t('cs'),
