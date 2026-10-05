@@ -152,9 +152,9 @@ async function claim() {
 
 function authV() {
   const nw = form == 'new';
-  const showSignin = form == 'in' || view == 'signin';
-  return head(biz) + `<div class="card"><div class="tabs"><button class="${nw ? 'on' : ''}" onclick="form='new';view='home';render()">New member</button><button class="${showSignin ? 'on' : ''}" onclick="form='in';view='signin';render()">Sign in</button></div>
-  ${view == 'forgot' ? forgotV() : (nw ? joinV() : signinV())}</div>` + socials(biz);
+  const isLoginTab = form == 'in' || view == 'signin' || view == 'forgot';
+  return head(biz) + `<div class="card"><div class="tabs"><button class="${nw && !isLoginTab ? 'on' : ''}" onclick="form='new';view='home';render()">New member</button><button class="${isLoginTab ? 'on' : ''}" onclick="form='in';view='signin';render()">Login</button></div>
+  ${view == 'forgot' ? forgotV() : (isLoginTab ? signinV() : joinV())}</div>` + socials(biz);
 }
 
 function joinV() {
@@ -168,18 +168,18 @@ function joinV() {
 }
 
 function signinV() {
-  return `<h2>Welcome back</h2><p class="sub">Sign in to view your rewards.</p>
+  return `<h2>Welcome back</h2><p class="sub">Login to view your rewards.</p>
   <label class="lb">Phone number</label><input id="p" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
   <label class="lb">Password</label>${pwField('w', 'current-password')}
-  <div style="text-align:right;margin-top:8px"><a href="#" onclick="view='forgot';render();return false" style="color:var(--mut);font-size:14px">Forgot password?</a></div>
-  <button class="btn" onclick="login(this)" onkeydown="if(event.key==='Enter'){login(this)}">Sign in</button>
+  <div style="text-align:right;margin-top:8px"><a href="#" onclick="view='forgot';form='in';render();return false" style="color:var(--mut);font-size:14px">Forgot password?</a></div>
+  <button class="btn" onclick="login(this)" onkeydown="if(event.key==='Enter'){login(this)}">Login</button>
   <p class="note" style="margin:16px 0 0">New here? <a href="#" onclick="form='new';view='home';render();return false">Join the rewards club</a></p>`;
 }
 
 function forgotV() {
   return `<h2>Forgot your password?</h2><p class="sub">Please ask the store to reset your password.</p>
   <label class="lb">Phone number</label><input id="fp" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
-  <button class="btn alt" onclick="view='signin';render();return false">Back to sign in</button>`;
+  <button class="btn alt" onclick="form='in';view='signin';render();return false">Back to login</button>`;
 }
 
 const onDay = x => new Date(+new Date(x.valid_from) + 12 * 36e5).toLocaleDateString(undefined, { timeZone: biz.tz || 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' });
