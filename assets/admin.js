@@ -198,37 +198,38 @@ async function sv(btn) {
   let stampUrl = t('st');
   const lfile = $('#clfile') && $('#clfile').files && $('#clfile').files[0];
   const sfile = $('#stfile') && $('#stfile').files && $('#stfile').files[0];
-  if (lfile) {
-    if (lfile.size > 300000) return toast('Logo too big (max 300 KB)');
-    const reader = new FileReader();
-    reader.onload = async () => {
-      logoUrl = reader.result;
-      if (sfile) {
-        const r2 = new FileReader();
-        r2.onload = async () => { stampUrl = r2.result; await saveSettings({ logoUrl, stampUrl, t, btn }); };
-        r2.readAsDataURL(sfile);
-      } else {
-        await saveSettings({ logoUrl, stampUrl, t, btn });
-      }
-    };
-    reader.readAsDataURL(lfile);
-    return;
-  }
-  if (sfile) {
-    if (sfile.size > 300000) return toast('Stamp too big (max 300 KB)');
-    const r2 = new FileReader();
-    r2.onload = async () => { stampUrl = r2.result; await saveSettings({ logoUrl, stampUrl, t, btn }); };
-    r2.readAsDataURL(sfile);
-    return;
-  }
   if (!links.every(ok)) return toast('Links must start with https://');
   if (!(!stampUrl || /^https:\/\//.test(stampUrl))) return toast('Stamp link must start with https://');
-  await saveSettings({ logoUrl, stampUrl, t, btn });
+  btn.disabled = true;
+  if (lfile || sfile) {
+    const read = file => new Promise((resolve, reject) => {
+      if (file.size > 300000) return reject('too big');
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    (async () => {
+      try {
+        if (lfile) logoUrl = await read(lfile);
+        if (sfile) stampUrl = await read(sfile);
+        await doSave({ logoUrl, stampUrl, t, btn });
+      } catch (e) {
+        btn.disabled = false;
+        if (e === 'too big') toast('Image too big (max 300 KB)');
+        else toast('Failed to read image');
+      }
+    })();
+    return;
+  }
+  await doSave({ logoUrl, stampUrl, t, btn });
 }
 
-async function saveSettings({ logoUrl, stampUrl, t, btn }) {
+async function doSave({ logoUrl, stampUrl, t, btn }) {
+
+async function doSave({ logoUrl, stampUrl, t, btn }) {
   const patch = {
-    name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl, stamp_url: stampUrl || '', color: v('cc') || biz.color,
+    name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl || '', stamp_url: stampUrl || '', color: v('cc') || biz.color,
     ig: t('ci'), fb: t('cf'), wa: t('cw'), web: t('cs'),
     need: Math.max(2, Math.min(20, Math.round(+v('cn2')) || 8)),
     cooldown_min: Math.max(0, Math.round((+v('cd') || 0) * (v('cu') == 'h' ? 60 : 1))),
@@ -236,11 +237,11 @@ async function saveSettings({ logoUrl, stampUrl, t, btn }) {
     exp_days: Math.max(0, Math.round(+v('cx')) || 0),
     join_stamp: v('js') != '0', card_months: Math.max(0, Math.min(60, Math.round(+v('cm')) || 0))
   };
-  btn.disabled = true;
   const { error } = await sb.from('businesses').update(patch).eq('id', biz.id);
   btn.disabled = false;
   if (error) return toast(nice(error));
-  Object.assign(biz, patch); brand(biz); toast('Saved'); render();
+  toast('Saved');
+  await enter();
 }
 
 async function del(id) {
