@@ -180,7 +180,7 @@ function dash() {
   if (tab == 's') {
     const f = (i, l, x, t) => `<label>${l}</label><input id="${i}" ${t || ''} value="${esc(x)}">`;
     const h = biz.cooldown_min > 0 && biz.cooldown_min % 60 == 0, cv = h ? biz.cooldown_min / 60 : biz.cooldown_min;
-    o += `<div class="card"><h2>Brand</h2>${f('cn', 'Business name', biz.name)}${f('ct', 'Tagline', biz.tagline)}${f('cl', 'Logo image link (https://…, optional)', biz.logo_url)}${f('cc', 'Brand colour', biz.color, 'type=color')}
+    o += `<div class="card"><h2>Brand</h2>${f('cn', 'Business name', biz.name)}${f('ct', 'Tagline', biz.tagline)}<label>Logo image</label><input type="file" id="clfile" accept="image/*"><p class="hint">Max 300 KB. File upload takes priority if selected.</p><label>Or use logo image link</label><input id="cl" value="${esc(biz.logo_url)}">${f('cc', 'Brand colour', biz.color, 'type=color')}
     ${f('ci', 'Instagram link', biz.ig)}${f('cf', 'Facebook link', biz.fb)}${f('cw', 'WhatsApp link (https://wa.me/…)', biz.wa)}${f('cs', 'Website link', biz.web)}</div>
     <div class="card"><h2>Rewards</h2><div class="row"><div>${f('cn2', 'Stamps needed', biz.need, 'type=number min=2 max=20')}</div><div><label>Time between stamps</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="cd" type="number" min="0" value="${cv}"><select id="cu"><option value="m"${h ? '' : ' selected'}>minutes</option><option value="h"${h ? ' selected' : ''}>hours</option></select></div></div></div>${f('cr', 'Reward when card is full', biz.reward)}</div>
     <div class="card"><h2>Stamp card</h2><div class="row"><div><label>First stamp when a customer joins</label><select id="js"><option value="1"${biz.join_stamp ? ' selected' : ''}>Yes, give a free first stamp</option><option value="0"${biz.join_stamp ? '' : ' selected'}>No</option></select></div><div>${f('cm', 'Each card lasts (months from first stamp, 0 = never)', biz.card_months, 'type=number min=0 max=60')}</div></div>
@@ -194,9 +194,25 @@ function dash() {
 async function sv(btn) {
   const t = i => v(i).trim(), ok = x => !x || /^https:\/\//.test(x);
   const links = ['ci', 'cf', 'cw', 'cs', 'cl'].map(t);
+  let logoUrl = t('cl');
+  const file = $('#clfile') && $('#clfile').files && $('#clfile').files[0];
+  if (file) {
+    if (file.size > 300000) return toast('Logo too big (max 300 KB)');
+    const reader = new FileReader();
+    reader.onload = async () => {
+      logoUrl = reader.result;
+      await saveSettings({ logoUrl, t, ok, links, btn });
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
   if (!links.every(ok)) return toast('Links must start with https://');
+  await saveSettings({ logoUrl, t, ok, links, btn });
+}
+
+async function saveSettings({ logoUrl, t, btn }) {
   const patch = {
-    name: t('cn') || biz.name, tagline: t('ct'), logo_url: t('cl'), color: v('cc') || biz.color,
+    name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl, color: v('cc') || biz.color,
     ig: t('ci'), fb: t('cf'), wa: t('cw'), web: t('cs'),
     need: Math.max(2, Math.min(20, Math.round(+v('cn2')) || 8)),
     cooldown_min: Math.max(0, Math.round((+v('cd') || 0) * (v('cu') == 'h' ? 60 : 1))),
