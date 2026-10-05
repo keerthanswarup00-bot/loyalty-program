@@ -44,6 +44,8 @@ function nice(e) {
   if (/already (been )?registered/i.test(m)) return 'This number is already registered. Use Sign in.';
   if (/invalid login/i.test(m)) return 'Wrong login details';
   if (/password.*(at least|short|characters)/i.test(m)) return 'Password must be at least 6 characters';
+  if (/not allowed/i.test(m)) return 'You are not allowed to perform this action.';
+  if (/customer not found/i.test(m) || /member.*not found/i.test(m)) return 'Customer not found.';
   if (/fetch|network/i.test(m)) return 'No connection. Check your internet and try again.';
   return m;
 }

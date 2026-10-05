@@ -57,11 +57,34 @@ const recoverV = () => `<div class="card" style="margin-top:40px"><h2>Set a new 
   <button class="btn" onclick="setPw(this)">Save password</button></div>`;
 
 // Customers have no real email, so the owner sets a temporary password for them.
+const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+
+function genPw() {
+  let s = '';
+  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
 async function resetPw(id) {
   const u = M.find(x => x.id == id);
-  const p = prompt('Set a temporary password for ' + u.name + ' (6+ characters). Tell them to sign in and change it.');
-  if (!p) return;
-  try { await rpc(sb, 'reset_member_password', { p_member: id, p_password: p }); toast('Password reset. Share it with ' + first(u) + '.') } catch (e) { toast(nice(e)) }
+  if (!u) return toast('Customer not found.');
+  if (!confirm("Reset this customer's password?\n\nAfter resetting, give the temporary password to the customer. They can change it after signing in.")) return;
+  const p = genPw();
+  try {
+    await rpc(sb, 'reset_member_password', { p_member: id, p_password: p });
+    const msg = `Password reset successfully.\n\nTemporary password\n${p}\n\nGive this temporary password to the customer.`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(p).then(() => toast('Password reset successfully. Temporary password copied.')).catch(() => alert(msg));
+    } else {
+      alert(msg);
+      toast('Password reset successfully.');
+    }
+  } catch (e) {
+    const m = String((e && e.message) || e);
+    if (/not allowed/i.test(m)) toast('You are not allowed to reset this customer.');
+    else if (/password.*(at least|short|characters)/i.test(m)) toast('Password must be at least 6 characters.');
+    else toast('Couldn\'t reset the password. Please try again.');
+  }
 }
 
 function loginV() {
