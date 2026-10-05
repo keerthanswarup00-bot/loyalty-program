@@ -179,9 +179,11 @@ function dash() {
   <div class="card"><h2>NFC tags for staff</h2><p class="sub" style="margin:0">Buy NTAG213 or NTAG215 stickers. In a free app such as NFC Tools, write the link above as a URL record. Staff then tap the customer's phone on the tag. If the link ever leaks, regenerate the code and rewrite the tags. One stamp per customer per cooldown period either way.</p></div>`;
   if (tab == 's') {
     const f = (i, l, x, t) => `<label>${l}</label><input id="${i}" ${t || ''} value="${esc(x)}">`;
+    const up = (fid, hid, cur, lbl) => `<label>${lbl}</label><div class="pv" id="${fid}pv"${cur ? '' : ' hidden'}>${cur ? `<img src="${esc(cur)}" alt=""><button type="button" class="lnk" onclick="rmImg('${hid}','${fid}pv')">Remove this image</button>` : ''}</div><input type="file" id="${fid}" accept="image/png,image/jpeg,image/webp,image/gif" onchange="pvImg('${fid}','${fid}pv','${hid}')"><input type="hidden" id="${hid}" value="0"><p class="hint">Upload a PNG, JPG, WebP or GIF, up to 300 KB.</p>`;
     const h = biz.cooldown_min > 0 && biz.cooldown_min % 60 == 0, cv = h ? biz.cooldown_min / 60 : biz.cooldown_min;
-    o += `<div class="card"><h2>Brand</h2>${f('cn', 'Business name', biz.name)}${f('ct', 'Tagline', biz.tagline)}<label>Logo image</label><input type="file" id="clfile" accept="image/*"><p class="hint">Max 300 KB. File upload takes priority if selected.</p><label>Or use logo image link</label><input id="cl" value="${esc(biz.logo_url)}">${f('cc', 'Brand colour', biz.color, 'type=color')}
+    o += `<div class="card"><h2>Brand</h2>${f('cn', 'Business name', biz.name)}${f('ct', 'Tagline', biz.tagline)}${up('clfile', 'clx', biz.logo_url, 'Logo image')}${f('cc', 'Brand colour', biz.color, 'type=color')}
     ${f('ci', 'Instagram link', biz.ig)}${f('cf', 'Facebook link', biz.fb)}${f('cw', 'WhatsApp link (https://wa.me/…)', biz.wa)}${f('cs', 'Website link', biz.web)}</div>
+    <div class="card"><h2>Stamp image</h2>${up('stfile', 'stx', biz.stamp_url, 'Stamp image')}<p class="hint" style="margin:0">Shown in place of the collected stamps on the customer's card. Leave empty to keep the normal tick stamps.</p></div>
     <div class="card"><h2>Rewards</h2><div class="row"><div>${f('cn2', 'Stamps needed', biz.need, 'type=number min=2 max=20')}</div><div><label>Time between stamps</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="cd" type="number" min="0" value="${cv}"><select id="cu"><option value="m"${h ? '' : ' selected'}>minutes</option><option value="h"${h ? ' selected' : ''}>hours</option></select></div></div></div>${f('cr', 'Reward when card is full', biz.reward)}</div>
     <div class="card"><h2>Stamp card</h2><div class="row"><div><label>First stamp when a customer joins</label><select id="js"><option value="1"${biz.join_stamp ? ' selected' : ''}>Yes, give a free first stamp</option><option value="0"${biz.join_stamp ? '' : ' selected'}>No</option></select></div><div>${f('cm', 'Each card lasts (months from first stamp, 0 = never)', biz.card_months, 'type=number min=0 max=60')}</div></div>
     <p class="hint">An unfinished card that passes its end date starts again from zero. A full card never expires, so the customer can always claim the reward.</p></div>
@@ -191,36 +193,41 @@ function dash() {
   return o;
 }
 
+const readImg = file => new Promise((resolve, reject) => {
+  if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type || '')) return reject('type');
+  if (file.size > 300000) return reject('too big');
+  const r = new FileReader();
+  r.onload = () => resolve(r.result);
+  r.onerror = () => reject('read');
+  r.readAsDataURL(file);
+});
+function pvImg(fid, pvid, hid) {
+  const f = $('#' + fid).files[0];
+  if (!f) return;
+  const p = $('#' + pvid);
+  p.hidden = false;
+  p.innerHTML = `<img src="${esc(URL.createObjectURL(f))}" alt=""><button type="button" class="lnk" onclick="rmImg('${hid}','${pvid}')">Remove this image</button>`;
+  $('#' + hid).value = '0';
+}
+function rmImg(hid, pvid) {
+  $('#' + hid).value = '1';
+  const p = $('#' + pvid);
+  p.hidden = true;
+  p.innerHTML = '';
+}
 async function sv(btn) {
   const t = i => v(i).trim(), ok = x => !x || /^https:\/\//.test(x);
-  const links = ['ci', 'cf', 'cw', 'cs', 'cl'].map(t);
-  let logoUrl = t('cl');
-  let stampUrl = t('st');
-  const lfile = $('#clfile') && $('#clfile').files && $('#clfile').files[0];
-  const sfile = $('#stfile') && $('#stfile').files && $('#stfile').files[0];
-  if (!links.every(ok)) return toast('Links must start with https://');
-  if (!(!stampUrl || /^https:\/\//.test(stampUrl))) return toast('Stamp link must start with https://');
+  if (!['ci', 'cf', 'cw', 'cs'].map(t).every(ok)) return toast('Links must start with https://');
+  let logoUrl = v('clx') == '1' ? '' : biz.logo_url || '';
+  let stampUrl = v('stx') == '1' ? '' : biz.stamp_url || '';
+  const lfile = $('#clfile').files[0], sfile = $('#stfile').files[0];
   btn.disabled = true;
-  if (lfile || sfile) {
-    const read = file => new Promise((resolve, reject) => {
-      if (file.size > 300000) return reject('too big');
-      const r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.onerror = reject;
-      r.readAsDataURL(file);
-    });
-    (async () => {
-      try {
-        if (lfile) logoUrl = await read(lfile);
-        if (sfile) stampUrl = await read(sfile);
-        await doSave({ logoUrl, stampUrl, t, btn });
-      } catch (e) {
-        btn.disabled = false;
-        if (e === 'too big') toast('Image too big (max 300 KB)');
-        else toast('Failed to read image');
-      }
-    })();
-    return;
+  try {
+    if (lfile) logoUrl = await readImg(lfile);
+    if (sfile) stampUrl = await readImg(sfile);
+  } catch (e) {
+    btn.disabled = false;
+    return toast(e == 'too big' ? 'Image too big (max 300 KB)' : e == 'type' ? 'Use a PNG, JPG, WebP or GIF image' : 'Could not read that image');
   }
   await doSave({ logoUrl, stampUrl, t, btn });
 }
