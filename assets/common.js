@@ -23,6 +23,19 @@ const toast = m => { $('#t').innerHTML = '<div class="toast">' + esc(m) + '</div
 const fd = t => t ? new Date(t).toLocaleDateString() : '—';
 const fbd = b => b ? new Date(b + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 const isExp = x => !!x.expires_at && new Date(x.expires_at) < Date.now();
+const daysTo = iso => Math.ceil((new Date(iso) - Date.now()) / 864e5);
+// Phone numbers: accept "+91 98765 43210", "098765-43210", "919876543210" etc. and reduce to exactly 10 digits (or null).
+const PHONE_MSG = 'Enter a valid 10-digit mobile number (without +91 or spaces)';
+function normPhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '').replace(/^0+/, '');
+  if (d.length == 12 && d.slice(0, 2) == '91') d = d.slice(2);
+  if (!/^\d{10}$/.test(d)) return null;
+  if ((CFG.countryCode || '91') == '91' && !/^[6-9]/.test(d)) return null;
+  return d;
+}
+const isEarly = x => !!x.valid_from && new Date(x.valid_from) > Date.now();
+const fdt = t => t ? new Date(t).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '—';
+const waLink = (phone, text) => { const d = normPhone(phone) || String(phone).replace(/\D/g, ''); const p = d.length == 10 ? (CFG.countryCode || '') + d : d; return 'https://wa.me/' + p + '?text=' + encodeURIComponent(text) };
 const tp = (id, b) => { const i = $('#' + id), sh = i.type == 'password'; i.type = sh ? 'text' : 'password'; b.innerHTML = sh ? IC.off : IC.eye };
 const pwField = (id, auto) => `<div class="pw"><input id="${id}" type="password" autocomplete="${auto}"><button type="button" class="eye" aria-label="Show or hide password" onclick="tp('${id}',this)">${IC.eye}</button></div>`;
 
