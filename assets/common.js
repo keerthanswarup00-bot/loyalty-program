@@ -54,7 +54,7 @@ function brand(b) {
   document.documentElement.style.setProperty('--brand', b.color || '#8a4b2a');
   document.title = b.name + ' Rewards';
 }
-const mark = b => /^https?:\/\//.test(b.logo_url || '') ? `<img src="${esc(b.logo_url)}" alt="">` : esc((b.name || '?').trim().slice(0, 1).toUpperCase());
+const mark = b => (b.logo_url && (b.logo_url.startsWith('http') || b.logo_url.startsWith('data:'))) ? `<img src="${esc(b.logo_url)}" alt="">` : esc((b.name || '?').trim().slice(0, 1).toUpperCase());
 const head = b => `<div class="bh"><div class="logo">${mark(b)}</div><h1>${esc(b.name)}</h1><p>${esc(b.tagline)}</p></div>`;
 function socials(b) {
   const L = [['Instagram', b.ig, 'ig'], ['Facebook', b.fb, 'fb'], ['WhatsApp', b.wa, 'wa'], ['Website', b.web, 'web']].filter(x => /^https?:\/\//.test(x[1]));
