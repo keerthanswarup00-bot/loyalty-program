@@ -11,6 +11,7 @@ create table if not exists public.businesses (
   tagline text not null default '',
   color text not null default '#8a4b2a',
   logo_url text not null default '',
+  stamp_url text not null default '',
   ig text not null default '',
   fb text not null default '',
   wa text not null default '',
@@ -31,6 +32,7 @@ create table if not exists public.businesses (
 );
 alter table public.businesses add column if not exists join_stamp boolean not null default true;
 alter table public.businesses add column if not exists card_months int not null default 6 check (card_months >= 0);
+alter table public.businesses add column if not exists stamp_url text not null default '';
 
 create table if not exists public.members (
   id uuid primary key default gen_random_uuid(),
@@ -113,7 +115,7 @@ create policy visit_owner_select on public.visits for select to authenticated
 -- Table privileges: read-only for members/offers/visits; owners may edit only these business columns.
 revoke all on public.businesses, public.members, public.offers, public.visits from anon, authenticated;
 grant select on public.businesses, public.members, public.offers, public.visits to authenticated;
-grant update (name, tagline, color, logo_url, ig, fb, wa, web, need, reward, cooldown_min,
+grant update (name, tagline, color, logo_url, stamp_url, ig, fb, wa, web, need, reward, cooldown_min,
               sur_stamps, sur_offer, welcome_offer, bday_offer, exp_days, join_stamp, card_months, scan_token)
   on public.businesses to authenticated;
 
@@ -128,6 +130,7 @@ create or replace function public.get_business(p_slug text) returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
     'name', name, 'tagline', tagline, 'color', color, 'logo_url', logo_url,
+    'stamp_url', stamp_url,
     'ig', ig, 'fb', fb, 'wa', wa, 'web', web, 'need', need, 'reward', reward,
     'cooldown_min', cooldown_min, 'sur_stamps', sur_stamps, 'sur_offer', sur_offer,
     'welcome_offer', welcome_offer, 'bday_offer', bday_offer, 'exp_days', exp_days,

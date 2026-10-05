@@ -190,7 +190,7 @@ function homeV() {
   const live = of.filter(x => !x.used_at && !isExp(x)), past = of.filter(x => x.used_at || isExp(x));
   const soon = live.filter(x => !isEarly(x) && x.expires_at && daysTo(x.expires_at) <= 3);
   const left = m.card_ends_at && !ready ? daysTo(m.card_ends_at) : null;
-  let g = ''; for (let i = 0; i < need; i++) g += i < s ? `<div class="st f ${i == anim ? 'pop' : ''}">${IC.chk}</div>` : `<div class="st">${i + 1}</div>`;
+  let g = ''; for (let i = 0; i < need; i++) g += i < s ? `<div class="st f ${i == anim ? 'pop' : ''}">${biz.stamp_url ? `<img src="${esc(biz.stamp_url)}" alt="stamp" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : IC.chk}</div>` : `<div class="st">${i + 1}</div>`;
   let o = head(biz) + `<div class="card"><div class="eyebrow">Hello, ${esc(m.name.split(' ')[0])}</div><div class="count"><b>${Math.min(s, need)}</b><span>of ${need} stamps</span></div><div class="prog"><i style="width:${Math.min(100, s / need * 100)}%"></i></div><div class="grid">${g}</div>
   <p class="rule">Collect ${need} stamps to earn <b>${esc(biz.reward)}</b>.</p>`;
   if (m.card_ends_at && !ready) o += `<p class="mut sm">${left <= 14 ? '<span class="expiry">Card ends in ' + Math.max(left, 0) + (left == 1 ? ' day' : ' days') + '</span> · finish it before ' + fd(m.card_ends_at) : 'Card valid until ' + fd(m.card_ends_at)}</p>`;

@@ -195,24 +195,40 @@ async function sv(btn) {
   const t = i => v(i).trim(), ok = x => !x || /^https:\/\//.test(x);
   const links = ['ci', 'cf', 'cw', 'cs', 'cl'].map(t);
   let logoUrl = t('cl');
-  const file = $('#clfile') && $('#clfile').files && $('#clfile').files[0];
-  if (file) {
-    if (file.size > 300000) return toast('Logo too big (max 300 KB)');
+  let stampUrl = t('st');
+  const lfile = $('#clfile') && $('#clfile').files && $('#clfile').files[0];
+  const sfile = $('#stfile') && $('#stfile').files && $('#stfile').files[0];
+  if (lfile) {
+    if (lfile.size > 300000) return toast('Logo too big (max 300 KB)');
     const reader = new FileReader();
     reader.onload = async () => {
       logoUrl = reader.result;
-      await saveSettings({ logoUrl, t, ok, links, btn });
+      if (sfile) {
+        const r2 = new FileReader();
+        r2.onload = async () => { stampUrl = r2.result; await saveSettings({ logoUrl, stampUrl, t, btn }); };
+        r2.readAsDataURL(sfile);
+      } else {
+        await saveSettings({ logoUrl, stampUrl, t, btn });
+      }
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(lfile);
+    return;
+  }
+  if (sfile) {
+    if (sfile.size > 300000) return toast('Stamp too big (max 300 KB)');
+    const r2 = new FileReader();
+    r2.onload = async () => { stampUrl = r2.result; await saveSettings({ logoUrl, stampUrl, t, btn }); };
+    r2.readAsDataURL(sfile);
     return;
   }
   if (!links.every(ok)) return toast('Links must start with https://');
-  await saveSettings({ logoUrl, t, ok, links, btn });
+  if (!(!stampUrl || /^https:\/\//.test(stampUrl))) return toast('Stamp link must start with https://');
+  await saveSettings({ logoUrl, stampUrl, t, btn });
 }
 
-async function saveSettings({ logoUrl, t, btn }) {
+async function saveSettings({ logoUrl, stampUrl, t, btn }) {
   const patch = {
-    name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl, color: v('cc') || biz.color,
+    name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl, stamp_url: stampUrl || '', color: v('cc') || biz.color,
     ig: t('ci'), fb: t('cf'), wa: t('cw'), web: t('cs'),
     need: Math.max(2, Math.min(20, Math.round(+v('cn2')) || 8)),
     cooldown_min: Math.max(0, Math.round((+v('cd') || 0) * (v('cu') == 'h' ? 60 : 1))),
