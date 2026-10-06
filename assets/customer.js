@@ -197,7 +197,8 @@ async function ensureCard() {
   const { data } = await sb.auth.getUser();
   const m = (data && data.user && data.user.user_metadata) || {};
   if (m.name && m.phone) {
-    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: m.name, p_phone: m.phone, p_bday: m.bday || null, p_consent: true, p_join_token: m.jt || null, p_ref: m.rf || null });
+    const j = ref => rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: m.name, p_phone: m.phone, p_bday: m.bday || null, p_consent: true, p_join_token: m.jt || null, p_ref: ref });
+    try { await j(m.rf || null) } catch (e) { if (m.rf) await j(null); else throw e }
     await load();
   }
   return !!card;
@@ -246,7 +247,15 @@ async function reg(btn) {
     view = 'home'; form = 'new';
     render(); burst(); buzz();
     if (pend) await scan();
-  } catch (e) { toast(nice(e)); busy(btn, false) }
+  } catch (e) {
+    const msg = String((e && e.message) || e);
+    // signUp may have worked while join failed on a rule: remove the half-made login so they can retry
+    if (/friend code|sign-up QR|Consent|full name|10-digit/i.test(msg)) {
+      try { await rpc(sb, 'delete_me') } catch (x) { }
+      try { await sb.auth.signOut() } catch (x) { }
+    }
+    toast(nice(e)); busy(btn, false)
+  }
 }
 
 async function login(btn) {
@@ -365,9 +374,8 @@ function signinV() {
 }
 
 function forgotV() {
-  return `<h2>Forgot your password?</h2><p class="sub">Please ask the store to reset your password.</p>
-  <label class="lb">Phone number</label><input id="fp" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
-  <button class="btn alt" onclick="form='in';view='signin';render();return false">Back to login</button>`;
+  const w = /^https?:\/\//.test(biz.wa || '') ? `<a class="btn" href="${esc(biz.wa)}" target="_blank" rel="noopener">Message the store on WhatsApp</a>` : '';
+  return `<h2>Forgot your password?</h2><p class="sub">Ask the store to reset it. Staff give you a temporary password. Sign in with it, then change it under Profile.</p>${w}<button class="btn alt" onclick="form='in';view='signin';render()">Back to login</button>`;
 }
 
 const onDay = x => new Date(+new Date(x.valid_from) + 12 * 36e5).toLocaleDateString(undefined, { timeZone: biz.tz || 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' });
@@ -408,6 +416,11 @@ async function waPref() {
   catch (e) { toast(nice(e)) }
 }
 async function reload() { try { await load(); render(); toast('Up to date') } catch (e) { toast(nice(e)) } }
+addEventListener('hashchange', () => {
+  const s = location.hash.match(/scan=([\w-]+)/), j = location.hash.match(/join=([\w-]+)/);
+  if (j) { joinTok = j[1]; try { sessionStorage.setItem('lk-join', j[1]) } catch (e) { } render() }
+  if (s) { pend = s[1]; if (card) scan(); else render() }
+});
 // Coming back to the page (e.g. after staff taps the tag, or a day later) shows fresh stamps and offers.
 document.addEventListener('visibilitychange', () => { if (!document.hidden && card && view == 'home' && !pend) load().then(render).catch(() => { }) });
 
