@@ -259,13 +259,8 @@ async function resetPw(id) {
   const p = genPw();
   try {
     await rpc(sb, 'reset_member_password', { p_member: id, p_password: p });
-    const msg = `Password reset successfully.\n\nTemporary password\n${p}\n\nGive this temporary password to the customer.`;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(p).then(() => toast('Password reset successfully. Temporary password copied.')).catch(() => alert(msg));
-    } else {
-      alert(msg);
-      toast('Password reset successfully.');
-    }
+    try { await navigator.clipboard.writeText(p) } catch (e) { }
+    prompt('Password reset for ' + u.name + '.\nTemporary password (copied if your browser allowed it):', p);
   } catch (e) {
     const m = String((e && e.message) || e);
     if (/not allowed/i.test(m)) toast('You are not allowed to reset this customer.');
@@ -500,12 +495,22 @@ async function dropOld(u) {
 }
 async function readImg(file, kind) {
   if (!IMG_OK.test(file.type || '')) throw 'type';
+  file = await shrink(file);
   if (file.size > 2e6) throw 'too big';
   const path = biz.id + '/' + kind + '-' + Date.now().toString(36) + '.' + EXT[file.type.toLowerCase()];
   const { error } = await sb.storage.from('brand').upload(path, file, { contentType: file.type, cacheControl: '31536000' });
   if (!error) return sb.storage.from('brand').getPublicUrl(path).data.publicUrl;
   if (file.size > 300000) throw 'no bucket';
   return toDataUrl(file);
+}
+// Down-scale large images before upload so customers aren't served megabytes on mobile data.
+async function shrink(file) {
+  if (file.type == 'image/gif' || file.size < 150000) return file;
+  const bm = await createImageBitmap(file), k = Math.min(1, 640 / Math.max(bm.width, bm.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
+  c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
+  const blob = await new Promise(r => c.toBlob(r, 'image/webp', .85));
+  return blob ? new File([blob], 'img.webp', { type: 'image/webp' }) : file;
 }
 // One-click: move images that are still stored inside the database into the storage bucket.
 async function moveImgs(btn) {
@@ -687,12 +692,14 @@ function view() {
   return moreV();
 }
 function render() {
+  const y = window.scrollY;
   const sg = signed && !recover && biz;
   $('#top').innerHTML = sg ? hero() + nav() : '';
   const m = $('#app'); m.className = sg ? 'a' : '';
   m.innerHTML = recover ? recoverV() : !signed ? loginV() : !biz ? deniedV() : view();
   if (sg && tab == 'h') drawQR();
   if (sg && tab == 'o' && ov == 'stamp') pvStamps();
+  if (y) window.scrollTo(0, y);
 }
 
 (async () => {

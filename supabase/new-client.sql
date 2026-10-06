@@ -8,7 +8,7 @@ insert into public.businesses
   (slug, name, tagline, color, owner_id, need, reward, cooldown_min,
    sur_stamps, sur_offer, welcome_offer, bday_offer, exp_days)
 select
-  'cheesora-bliss', 'Cheesora Bliss', 'Every cup counts.', '#8a4b2a', id, 8, 'Free coffee of your choice', 1,
+  'cheesora-bliss', 'Cheesora Bliss', 'Every cup counts.', '#8a4b2a', id, 8, 'Free coffee of your choice', 240,
   '3', '20% off your next order', '10% off your next visit', 'Free dessert on your birthday', 30
 from auth.users
 where email = 'keerthanswarup00@gmail.com';

@@ -321,7 +321,7 @@ begin
   today := (now() at time zone b.tz)::date;
   if b.bday_offer <> '' and m.bday is not null then
     nb := _next_bday(m.bday, today);
-    if nb - today <= 7 and coalesce(m.bday_year, 0) <> extract(year from nb)::int then
+    if nb - today <= 7 and coalesce(m.bday_year, 0) <> extract(year from nb)::int and m.joined < now() - interval '14 days' then
       -- Reserved up to 7 days ahead, but only usable from the start to the end of the birthday itself.
       perform _give(m.id, b.id, 'Birthday', b.bday_offer, 0,
                     nb::timestamp at time zone b.tz, (nb + 1)::timestamp at time zone b.tz);
