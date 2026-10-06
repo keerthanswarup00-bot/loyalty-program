@@ -1,0 +1,77 @@
+/* Owner dashboard v2. Loaded after style.css, only by /admin. Uses the same variables (--brand, --card, --line…). */
+main.a{max-width:560px;margin:0 auto;padding:18px 16px calc(110px + env(safe-area-inset-bottom,0px))}
+.a-in{max-width:560px;margin:0 auto;padding:0 16px}
+body:has(.a-nav) .toast{bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+
+/* hero */
+.a-hero{background:linear-gradient(160deg,var(--brand),color-mix(in srgb,var(--brand) 55%,#000));color:#fff;border-radius:0 0 34px 34px;padding:calc(18px + env(safe-area-inset-top,0px)) 0 24px;box-shadow:0 18px 40px -24px color-mix(in srgb,var(--brand) 70%,#000)}
+.a-hero.slim{padding-bottom:16px;border-radius:0 0 26px 26px}
+.a-brand{display:flex;align-items:center;gap:12px}
+.a-logo{width:46px;height:46px;border-radius:14px;background:#fff;color:var(--brand);display:grid;place-items:center;font:600 21px Fraunces,Georgia,serif;overflow:hidden;flex:none}.a-logo img{width:100%;height:100%;object-fit:cover}
+.a-bt{flex:1;min-width:0}.a-bt b{display:block;font:600 19px/1.2 Fraunces,Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.a-bt span{font-size:12.5px;opacity:.78}
+.a-ib{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;cursor:pointer}.a-ib svg{width:19px;height:19px}
+.a-chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:20px}
+.a-chip{background:rgba(255,255,255,.13);border-radius:18px;padding:12px 4px 10px;text-align:center}
+.a-chip svg{width:18px;height:18px;opacity:.8;display:block;margin:0 auto 6px}
+.a-chip b{display:block;font:600 22px/1.1 Fraunces,Georgia,serif}.a-chip span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.75;margin-top:3px}
+
+/* bottom nav */
+.a-nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.a-nav .a-in{display:flex;padding:0 6px}
+.a-nav button{flex:1;border:0;background:none;color:var(--mut);padding:8px 2px 9px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;font:500 11.5px Inter,system-ui,sans-serif}
+.a-nav button i{width:52px;height:30px;border-radius:15px;display:grid;place-items:center;transition:background .2s}.a-nav button svg{width:21px;height:21px}
+.a-nav button.on{color:var(--brand);font-weight:600}.a-nav button.on i{background:color-mix(in srgb,var(--brand) 14%,transparent)}
+
+/* cards and bits */
+.a-card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(28,25,23,.04),0 14px 32px -22px rgba(28,25,23,.2)}
+.a-card.flush{padding:4px 0;overflow:hidden}
+.a-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:2px}.a-h h2{margin:0}
+.a-tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);background:color-mix(in srgb,var(--brand) 11%,transparent);padding:4px 10px;border-radius:99px}
+.a-empty{margin:14px 0 4px;color:var(--mut);font-size:14px;text-align:center}
+.a-title{margin:6px 0 12px;font:600 26px/1.15 Fraunces,Georgia,serif}
+.a-quick{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.a-quick button{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;cursor:pointer;color:var(--tx);font:inherit;display:flex;flex-direction:column;gap:2px}
+.a-quick svg{width:26px;height:26px;color:var(--brand);margin-bottom:8px}.a-quick b{font-size:15px}.a-quick span{font-size:12.5px;color:var(--mut)}
+.a-sts{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:12px}
+.a-st{background:var(--bg);border-radius:14px;padding:12px}.a-st b{display:block;font:600 24px/1.1 Fraunces,Georgia,serif}.a-st span{font-size:12px;color:var(--mut)}
+
+/* customers */
+.a-bar2{display:flex;gap:10px;margin-bottom:12px;align-items:center}.a-bar2 input{flex:1}.a-bar2 .btn.sm{flex:none}
+.a-cu+.a-cu{border-top:1px solid var(--line)}
+.a-cr{width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.a-av{width:40px;height:40px;border-radius:50%;background:color-mix(in srgb,var(--brand) 14%,transparent);color:var(--brand);display:grid;place-items:center;font-weight:700;flex:none}
+.a-cm{flex:1;min-width:0;display:block}.a-cm b{display:block;font-weight:600}.a-cm small{display:block;color:var(--mut);font-size:12.5px;margin-top:1px}
+.a-bar{display:block;height:5px;background:var(--line);border-radius:9px;overflow:hidden;margin-top:8px}.a-bar span{display:block;height:100%;background:var(--brand);border-radius:9px}
+.a-sc{font:600 15px ui-monospace,monospace;color:var(--brand);flex:none}
+.a-cu.on{background:color-mix(in srgb,var(--brand) 4%,transparent)}
+.a-det{padding:0 16px 16px}
+.a-facts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}.a-facts div{background:var(--bg);border-radius:12px;padding:10px}.a-facts span{display:block;font-size:11px;color:var(--mut);letter-spacing:.05em;text-transform:uppercase}.a-facts b{font-size:14px}
+.a-det .row{gap:8px}.a-det .row>*{min-width:0}
+.btn.sm.a-del{color:#b91c1c;border-color:color-mix(in srgb,#b91c1c 35%,var(--line))}
+a.btn.sm{display:inline-block}
+
+/* steppers */
+.a-step{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:14px;background:var(--bg);padding:5px}
+.a-step button{width:40px;height:40px;border-radius:50%;border:0;background:var(--card);color:var(--tx);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 1px 3px rgba(28,25,23,.12);flex:none}
+.a-step button:last-child{background:var(--brand);color:#fff}
+.a-step input{border:0;background:none;text-align:center;font:600 18px Inter,system-ui,sans-serif;padding:8px 0;min-width:0;-moz-appearance:textfield}.a-step input:focus{box-shadow:none}
+.a-step input::-webkit-outer-spin-button,.a-step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+/* offers */
+.a-tiles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.a-tile{position:relative;aspect-ratio:1/1.08;border:0;border-radius:26px;padding:16px;color:#fff;text-align:left;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-end;box-shadow:0 14px 28px -16px rgba(0,0,0,.5);font-family:inherit;overflow:hidden}
+.a-tile:active{transform:scale(.98)}
+.a-tile .a-ti{position:absolute;top:18px;left:18px;width:46px;height:46px;border-radius:15px;background:rgba(255,255,255,.18);display:grid;place-items:center}.a-ti svg{width:26px;height:26px}
+.a-tile b{font:600 17px/1.2 Fraunces,Georgia,serif}.a-tile small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin-top:3px}
+.a-tile em{position:absolute;top:18px;right:16px;font-style:normal;font-size:11px;font-weight:700;padding:4px 9px;border-radius:99px;background:rgba(255,255,255,.22)}
+.a-tile .a-off{background:rgba(0,0,0,.25)}
+.ts-brand{background:linear-gradient(145deg,var(--brand),color-mix(in srgb,var(--brand) 55%,#000))}
+.ts-green{background:linear-gradient(145deg,#1fa774,#0f6b4a)}
+.ts-gold{background:linear-gradient(145deg,#d49a2a,#8f5f12)}
+.ts-violet{background:linear-gradient(145deg,#7a5ad0,#463088)}
+.a-back{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--mut);font:500 14px Inter,system-ui,sans-serif;cursor:pointer;padding:4px 0}.a-back svg{width:18px;height:18px}
+.a-pvs{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.a-pvs span{aspect-ratio:1;border-radius:50%;border:1.5px dashed var(--line);display:grid;place-items:center;color:var(--mut);font-size:12px;overflow:hidden}
+.a-pvs span.f{border:0;background:var(--brand);color:#fff}.a-pvs svg{width:48%;height:48%;stroke-width:2.4}.a-pvs img{width:100%;height:100%;object-fit:cover}
+.a-det2{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.a-det2 summary{cursor:pointer;font-weight:600;font-size:14px}
+.btn+.a-card,.a-card+.btn{margin-top:4px}
