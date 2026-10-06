@@ -1,6 +1,6 @@
 // Customer app: sign up / sign in, stamp card, offers.
 const sb = notReady() ? null : mkClient('lk-customer');
-let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, intro = true, joinTok = null, refTok = '';
+let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
 
 const mail = p => `${p}.${CFG.slug}@${CFG.emailDomain}`;
 const fmtWait = s => s < 60 ? 'under a minute' : s < 5400 ? Math.ceil(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
@@ -79,7 +79,7 @@ const NI = {
   user: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>'),
   tap: ico('<path d="M7 9a6 6 0 0 1 0 6M11 6.5a10 10 0 0 1 0 11M15 4a14 14 0 0 1 0 16"/>')
 };
-function goTo(p) { pg = p; view = 'home'; render(); window.scrollTo(0, 0) }
+function goTo(p) { pg = p; view = 'home'; fx = true; render(); window.scrollTo(0, 0) }
 
 
 function ctx() {
@@ -399,7 +399,9 @@ function refV() {
 
 function render() {
   const app = $('#app');
-  app.className = card ? 'has-nav' : '';
+  const y = window.scrollY;
+  if (wasCard !== !!card) { fx = true; wasCard = !!card }
+  app.className = (card ? 'has-nav' : '') + (fx ? ' fx' : ''); fx = false;
   app.innerHTML = !card ? authV() : heroV() + (view == 'pw' ? pwV() : pg == 'offers' ? offersPgV() : pg == 'rewards' ? rewardsPgV() : pg == 'profile' ? profilePgV() : homePgV()) + navV();
   if (card) intro = false;
   if (card) {
@@ -408,6 +410,7 @@ function render() {
     if (p) { const to = +p.dataset.to; requestAnimationFrame(() => requestAnimationFrame(() => { p.style.width = to + '%' })); prevPct = to }
   }
   if (anim >= 0) setTimeout(() => anim = -1, 900);
+  if (y) window.scrollTo(0, y);
 }
 
 async function waPref() {
@@ -422,7 +425,14 @@ addEventListener('hashchange', () => {
   if (s) { pend = s[1]; if (card) scan(); else render() }
 });
 // Coming back to the page (e.g. after staff taps the tag, or a day later) shows fresh stamps and offers.
-document.addEventListener('visibilitychange', () => { if (!document.hidden && card && view == 'home' && !pend) load().then(render).catch(() => { }) });
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden || !card || view != 'home' || pend) return;
+  try {
+    const before = JSON.stringify(card);
+    await load();
+    if (JSON.stringify(card) !== before && !document.querySelector('.scr-cv:not(.gone)')) render();
+  } catch (e) { }
+});
 
 (async () => {
   if (notReady()) { $('#app').innerHTML = setupMsg; return }
