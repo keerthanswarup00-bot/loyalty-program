@@ -1,6 +1,6 @@
 // Customer app: sign up / sign in, stamp card, offers.
 const sb = notReady() ? null : mkClient('lk-customer');
-let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, intro = true, joinTok = null;
+let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, intro = true, joinTok = null, refTok = '';
 
 const mail = p => `${p}.${CFG.slug}@${CFG.emailDomain}`;
 const fmtWait = s => s < 60 ? 'under a minute' : s < 5400 ? Math.ceil(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
@@ -18,7 +18,7 @@ async function ensureCard() {
   const { data } = await sb.auth.getUser();
   const m = (data && data.user && data.user.user_metadata) || {};
   if (m.name && m.phone) {
-    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: m.name, p_phone: m.phone, p_bday: m.bday || null, p_consent: true, p_join_token: m.jt || null });
+    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: m.name, p_phone: m.phone, p_bday: m.bday || null, p_consent: true, p_join_token: m.jt || null, p_ref: m.rf || null });
     await load();
   }
   return !!card;
@@ -50,10 +50,10 @@ async function reg(btn) {
   if (!$('#cons').checked) return toast('Please tick the consent box to join');
   busy(btn, true);
   try {
-    const { data, error } = await sb.auth.signUp({ email: mail(p), password: w, options: { data: { name: n, phone: p, bday: b || null, consent: true, jt: joinTok } } });
+    const { data, error } = await sb.auth.signUp({ email: mail(p), password: w, options: { data: { name: n, phone: p, bday: b || null, consent: true, jt: joinTok, rf: v('rf').trim() || null } } });
     if (error) throw error;
     if (!data.session) throw new Error('Sign-ups are paused: turn off "Confirm email" in Supabase (see README).');
-    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: n, p_phone: p, p_bday: b || null, p_consent: true, p_join_token: joinTok });
+    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: n, p_phone: p, p_bday: b || null, p_consent: true, p_join_token: joinTok, p_ref: v('rf').trim() || null });
     await load();
     if (card) {
       const w = card.offers.find(o => o.type == 'Welcome');
@@ -167,6 +167,7 @@ function joinV() {
   <label class="lb">Phone number</label><input id="p" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
   <label class="lb">Password <span>(6+ characters)</span></label>${pwField('w', 'new-password')}
   <label class="lb">Birthday <span>(optional)</span></label><input id="b" type="date"><p class="hint">Your birthday offer is valid only on that day each year.</p>
+  ${biz.ref_on ? `<label class="lb">Friend's code <span>(optional, for ${esc(biz.ref_offer)})</span></label><input id="rf" autocapitalize="characters" placeholder="e.g. ASHA-4K7">` : ''}
   <label class="chk"><input type="checkbox" id="cons"><span>I agree to receive offers and to ${esc(biz.name)} storing my details.</span></label>
   <button class="btn" data-go onclick="reg(this)">Join</button>`;
 }
@@ -197,6 +198,14 @@ function newsV() {
 }
 function hideNews() { try { localStorage.setItem(newsKey(), '1') } catch (e) { biz.news_text = '' } render() }
 
+function refV() {
+  const m = card.member; if (!biz.ref_on || !m.ref_code) return '';
+  const msg = `Join the ${biz.name} rewards club! Scan the sign-up QR at the counter and enter my friend code ${m.ref_code} to get ${biz.ref_offer}.`;
+  return `<div class="card"><h2>Refer a friend</h2><p class="sub">Your friend gets <b>${esc(biz.ref_offer)}</b> when they join with your code, and you get it too after their next visit.${m.ref_count ? ' <b>' + m.ref_count + (m.ref_count == 1 ? ' friend has' : ' friends have') + ' joined.</b>' : ''}</p>
+  <div class="code" role="button" tabindex="0" onclick="copyText('${esc(m.ref_code)}','Code copied')">${esc(m.ref_code)}</div>
+  <a class="btn" style="margin-top:12px" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Share on WhatsApp</a></div>`;
+}
+
 function homeV() {
   const m = card.member, need = +biz.need, s = m.stamps, ready = s >= need, of = card.offers || [];
   const live = of.filter(x => !x.used_at && !isExp(x)), past = of.filter(x => x.used_at || isExp(x));
@@ -217,7 +226,7 @@ function homeV() {
     `<div class="of"><div><div class="tag">${esc(x.type)}</div><b>${esc(x.text)}</b><div class="mut sm">${when(x)}</div></div>${x.code ? `<button type="button" class="cd" aria-label="Coupon code ${esc(x.code)}, tap to copy" onclick="copyText('${esc(x.code)}','Code copied')">${esc(x.code)}</button>` : ''}</div>`
   ).join('') + '<p class="hint">Show the code to staff at the counter (tap a code to copy it).</p>' : '<p class="sub" style="margin:0">Welcome, birthday and surprise offers will appear here.</p>'}</div>`
     + (past.length ? `<div class="card"><h2>History</h2>${past.map(x => `<div class="of u"><div><div class="tag">${esc(x.type)}</div><b>${esc(x.text)}</b><div class="mut sm">${x.used_at ? 'Used ' + fd(x.used_at) : 'Expired ' + fd(x.expires_at)}</div></div></div>`).join('')}</div>` : '')
-    + a2hsV() + socials(biz) + `<p class="note"><a href="#" onclick="reload();return false">Refresh</a> &nbsp;·&nbsp; <a href="#" onclick="waPref();return false">${m.wa_optout ? 'Turn WhatsApp offers on' : 'Stop WhatsApp offers'}</a> &nbsp;·&nbsp; <a href="#" onclick="view='pw';render();return false">Change password</a> &nbsp;·&nbsp; <a href="#" onclick="out();return false">Sign out</a> &nbsp;·&nbsp; <a href="#" onclick="delMe();return false">Delete my account</a></p>`;
+    + refV() + a2hsV() + socials(biz) + `<p class="note"><a href="#" onclick="reload();return false">Refresh</a> &nbsp;·&nbsp; <a href="#" onclick="waPref();return false">${m.wa_optout ? 'Turn WhatsApp offers on' : 'Stop WhatsApp offers'}</a> &nbsp;·&nbsp; <a href="#" onclick="view='pw';render();return false">Change password</a> &nbsp;·&nbsp; <a href="#" onclick="out();return false">Sign out</a> &nbsp;·&nbsp; <a href="#" onclick="delMe();return false">Delete my account</a></p>`;
   return o;
 }
 

@@ -38,6 +38,10 @@ alter table public.businesses add column if not exists join_token text not null 
 -- "What's new" note shown on every customer's card.
 alter table public.businesses add column if not exists news_text text not null default '';
 alter table public.businesses add column if not exists news_at timestamptz;
+-- Refer a friend: both people get a coupon. The referrer's coupon is given when the friend collects a real stamp at the tag.
+alter table public.businesses add column if not exists ref_on boolean not null default false;
+alter table public.businesses add column if not exists ref_offer text not null default '20% off your next bill';
+alter table public.businesses add column if not exists ref_cap int not null default 5 check (ref_cap between 1 and 100);
 
 create table if not exists public.members (
   id uuid primary key default gen_random_uuid(),
@@ -61,6 +65,10 @@ alter table public.members add column if not exists card_started_at timestamptz;
 -- WhatsApp opt-out: set when the customer turns offers off themselves, or when the owner records a STOP reply.
 alter table public.members add column if not exists wa_optout boolean not null default false;
 alter table public.members add column if not exists wa_optout_at timestamptz;
+alter table public.members add column if not exists ref_code text;
+alter table public.members add column if not exists referred_by uuid references public.members(id) on delete set null;
+alter table public.members add column if not exists ref_rewarded boolean not null default false;
+create unique index if not exists members_refcode_idx on public.members (business_id, ref_code);
 create index if not exists members_business_idx on public.members (business_id);
 
 -- Customers imported from a CSV (e.g. a paper stamp book). They are claimed when that phone number joins.
@@ -140,7 +148,7 @@ revoke all on public.businesses, public.members, public.offers, public.visits fr
 grant select on public.businesses, public.members, public.offers, public.visits to authenticated;
 grant update (name, tagline, color, logo_url, stamp_url, ig, fb, wa, web, need, reward, cooldown_min,
               sur_stamps, sur_offer, welcome_offer, bday_offer, exp_days, join_stamp, card_months, scan_token,
-              join_token, news_text, news_at)
+              join_token, news_text, news_at, ref_on, ref_offer, ref_cap)
   on public.businesses to authenticated;
 
 -- ---------- Functions ----------
@@ -159,7 +167,7 @@ language sql stable security definer set search_path = public as $$
     'cooldown_min', cooldown_min, 'sur_stamps', sur_stamps, 'sur_offer', sur_offer,
     'welcome_offer', welcome_offer, 'bday_offer', bday_offer, 'exp_days', exp_days,
     'join_stamp', join_stamp, 'card_months', card_months, 'tz', tz,
-    'news_text', news_text, 'news_at', news_at)
+    'news_text', news_text, 'news_at', news_at, 'ref_on', ref_on, 'ref_offer', ref_offer)
   from businesses where slug = p_slug;
 $$;
 
@@ -185,6 +193,23 @@ begin
   insert into offers (member_id, business_id, type, text, code, valid_from, expires_at)
   values (p_member, p_biz, p_type, p_text, c, p_from,
           coalesce(p_until, case when p_days > 0 then now() + make_interval(days => p_days) end));
+  return c;
+end $$;
+
+-- Internal: a unique friend code for a member (name prefix + 4 characters).
+create or replace function public._refcode(p_member uuid) returns text
+language plpgsql security definer set search_path = public as $$
+declare chars constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; m members; c text; i int; pre text;
+begin
+  select * into m from members where id = p_member;
+  if m.ref_code is not null then return m.ref_code; end if;
+  pre := left(upper(regexp_replace(m.name, '[^A-Za-z]', '', 'g')), 4);
+  loop
+    c := pre || '-';
+    for i in 1..4 loop c := c || substr(chars, 1 + floor(random() * length(chars))::int, 1); end loop;
+    exit when not exists (select 1 from members where business_id = m.business_id and ref_code = c);
+  end loop;
+  update members set ref_code = c where id = m.id;
   return c;
 end $$;
 
@@ -229,6 +254,13 @@ begin
          card_started_at = coalesce(card_started_at, now())
    where id = m.id returning * into m;
   insert into visits (member_id, business_id) values (m.id, b.id);
+  -- Referral reward for whoever invited this member: only once the friend has really visited (a stamp after the sign-up one).
+  if b.ref_on and m.referred_by is not null and not m.ref_rewarded and m.total >= case when b.join_stamp then 2 else 1 end then
+    update members set ref_rewarded = true where id = m.id;
+    if (select count(*) from offers where member_id = m.referred_by and type = 'Referral reward' and created_at > now() - interval '30 days') < b.ref_cap then
+      perform _give(m.referred_by, b.id, 'Referral reward', b.ref_offer, b.exp_days);
+    end if;
+  end if;
   pos := (m.stamps - 1) % b.need + 1;
   if b.sur_offer <> '' and exists (
        select 1 from unnest(string_to_array(regexp_replace(b.sur_stamps, '\s', '', 'g'), ',')) s
@@ -241,9 +273,10 @@ end $$;
 
 -- Create the member row for the signed-in customer, give the welcome offer and (if switched on) the first stamp.
 drop function if exists public.join_business(text, text, text, date, boolean);
-create or replace function public.join_business(p_slug text, p_name text, p_phone text, p_bday date, p_consent boolean, p_join_token text default null)
+drop function if exists public.join_business(text, text, text, date, boolean, text);
+create or replace function public.join_business(p_slug text, p_name text, p_phone text, p_bday date, p_consent boolean, p_join_token text default null, p_ref text default null)
 returns void language plpgsql security definer set search_path = public as $$
-declare b businesses; m uuid; im imports; claimed boolean := false;
+declare b businesses; m uuid; im imports; claimed boolean := false; rf uuid := null; rc text := upper(trim(coalesce(p_ref, '')));
 begin
   if auth.uid() is null then raise exception 'Not signed in'; end if;
   if not coalesce(p_consent, false) then raise exception 'Consent is required to join'; end if;
@@ -252,9 +285,15 @@ begin
   if b.join_token <> coalesce(p_join_token, '') then raise exception 'Please scan the sign-up QR code at the counter to join'; end if;
   if length(trim(coalesce(p_name, ''))) < 2 then raise exception 'Please enter your full name'; end if;
   if coalesce(p_phone, '') !~ '^[0-9]{10}$' then raise exception 'Enter a valid 10-digit mobile number'; end if;
-  insert into members (business_id, user_id, name, phone, bday, consent)
-  values (b.id, auth.uid(), trim(p_name), p_phone, p_bday, true)
+  if b.ref_on and rc <> '' then
+    select id into rf from members where business_id = b.id and ref_code = rc and phone <> p_phone;
+    if rf is null then raise exception 'That friend code was not found'; end if;
+  end if;
+  insert into members (business_id, user_id, name, phone, bday, consent, referred_by)
+  values (b.id, auth.uid(), trim(p_name), p_phone, p_bday, true, rf)
   returning id into m;
+  perform _refcode(m);
+  if rf is not null then perform _give(m, b.id, 'Referral', b.ref_offer, b.exp_days); end if;
   select * into im from imports where business_id = b.id and phone = p_phone;
   if found then
     claimed := true;
@@ -296,7 +335,8 @@ begin
     'granted', granted, 'lost', lost,
     'member', json_build_object('name', m.name, 'phone', m.phone, 'bday', m.bday,
               'stamps', m.stamps, 'total', m.total, 'redeemed', m.redeemed, 'last_stamp', m.last_stamp,
-              'card_started_at', m.card_started_at, 'card_ends_at', ends, 'wa_optout', m.wa_optout),
+              'card_started_at', m.card_started_at, 'card_ends_at', ends, 'wa_optout', m.wa_optout,
+              'ref_code', _refcode(m.id), 'ref_count', (select count(*) from members x where x.referred_by = m.id)),
     'offers', coalesce((select json_agg(json_build_object(
                 'id', o.id, 'type', o.type, 'text', o.text, 'valid_from', o.valid_from,
                 'expires_at', o.expires_at, 'used_at', o.used_at,
@@ -468,7 +508,7 @@ end $$;
 -- ---------- Who may call what ----------
 revoke execute on all functions in schema public from public, anon, authenticated;
 grant execute on function public.get_business(text) to anon, authenticated;
-grant execute on function public.join_business(text, text, text, date, boolean, text) to authenticated;
+grant execute on function public.join_business(text, text, text, date, boolean, text, text) to authenticated;
 grant execute on function public.import_members(text, json) to authenticated;
 grant execute on function public.my_card(text) to authenticated;
 grant execute on function public.add_stamp(text, text) to authenticated;

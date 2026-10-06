@@ -373,6 +373,9 @@ function dash() {
     ${f('ci', 'Instagram link', biz.ig)}${f('cf', 'Facebook link', biz.fb)}${f('cw', 'WhatsApp link (https://wa.me/…)', biz.wa)}${f('cs', 'Website link', biz.web)}</div>
     <div class="card"><h2>Stamp image</h2>${up('stfile', 'stx', biz.stamp_url, 'Stamp image')}<p class="hint" style="margin:0">Shown in place of the collected stamps on the customer's card. Leave empty to keep the normal tick stamps.</p>${dbImgs() ? `<p class="hint">Your ${dbImgs() == 1 ? 'image is' : 'images are'} still stored inside the database. <button type="button" class="lnk" onclick="moveImgs(this)">Move to storage</button> to make the app load faster.</p>` : ''}</div>
     <div class="card"><h2>What's new</h2><p class="sub">A short note shown at the top of every customer's card (an event, new menu item, holiday hours). Leave blank to hide it.</p><textarea id="nw" rows="3" maxlength="280">${esc(biz.news_text || '')}</textarea><p class="hint">Up to 280 characters. Customers who already closed the old note see the new one.</p></div>
+    <div class="card"><h2>Refer a friend</h2><p class="sub">Each customer gets a personal code. A friend who enters it when joining gets this offer, and the customer gets it too after the friend's next stamp.</p>
+    <label>Referrals</label><select id="rfon"><option value="1"${biz.ref_on ? ' selected' : ''}>On</option><option value="0"${biz.ref_on ? '' : ' selected'}>Off</option></select>
+    ${f('rfo', 'Offer for both', biz.ref_offer)}${f('rfc', 'Most referral rewards per customer in 30 days', biz.ref_cap, 'type=number min=1 max=100')}</div>
     <div class="card"><h2>Rewards</h2><div class="row"><div>${f('cn2', 'Stamps needed', biz.need, 'type=number min=2 max=20')}</div><div><label>Time between stamps</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="cd" type="number" min="0" value="${cv}"><select id="cu"><option value="m"${h ? '' : ' selected'}>minutes</option><option value="h"${h ? ' selected' : ''}>hours</option></select></div></div></div>${f('cr', 'Reward when card is full', biz.reward)}</div>
     <div class="card"><h2>Stamp card</h2><div class="row"><div><label>First stamp when a customer joins</label><select id="js"><option value="1"${biz.join_stamp ? ' selected' : ''}>Yes, give a free first stamp</option><option value="0"${biz.join_stamp ? '' : ' selected'}>No</option></select></div><div>${f('cm', 'Each card lasts (months from first stamp, 0 = never)', biz.card_months, 'type=number min=0 max=60')}</div></div>
     <p class="hint">An unfinished card that passes its end date starts again from zero. A full card never expires, so the customer can always claim the reward.</p></div>
@@ -458,6 +461,7 @@ async function doSave({ logoUrl, stampUrl, t, btn }) {
     cooldown_min: Math.max(0, Math.round((+v('cd') || 0) * (v('cu') == 'h' ? 60 : 1))),
     reward: t('cr'), welcome_offer: t('wo'), bday_offer: t('bo'), sur_stamps: t('ca'), sur_offer: t('co'),
     news_text: t('nw').slice(0, 280), news_at: t('nw') ? (t('nw') == (biz.news_text || '') && biz.news_at ? biz.news_at : new Date().toISOString()) : null,
+    ref_on: v('rfon') == '1', ref_offer: t('rfo') || '20% off your next bill', ref_cap: Math.max(1, Math.min(100, Math.round(+v('rfc')) || 5)),
     exp_days: Math.max(0, Math.round(+v('cx')) || 0),
     join_stamp: v('js') != '0', card_months: Math.max(0, Math.min(60, Math.round(+v('cm')) || 0))
   };

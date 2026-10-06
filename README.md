@@ -52,6 +52,10 @@ Branding, offers, cooldown, expiry, first stamp and card length are then edited 
 - **What's new:** Settings -> What's new. A short note appears at the top of every customer's card until they press Got it. Editing it shows it again.
 - **Import CSV:** Customers -> Import CSV (columns Name, Phone, Birthday, Current stamps, Total visits, Rewards redeemed; the Export CSV file works as a template). Imported customers wait until they join with that phone number through the sign-up QR, then get their stamps. Existing members are skipped.
 
+## Refer a friend
+
+Settings -> Refer a friend (off by default). Every customer gets a personal code (e.g. ASHA-4K7) on their card with a WhatsApp share button. A friend scans the sign-up QR at the counter, enters the code in "Friend's code" and gets the offer as a coupon. The customer gets the same coupon after the friend's next stamp at the NFC tag, so fake sign-ups earn nothing. Referrals never add stamps. A cap limits rewards per customer per 30 days. Customers who joined before you switched it on get a code automatically.
+
 ## Messaging customers on WhatsApp (admin -> Message)
 
 - **Pick who:** a group (everyone, joined this week, visited this week, not visited in 30+ days, birthday this month, has an unused offer, card ending soon) or hand-pick. You can also tick customers in **Customers** and press **Message selected**.
