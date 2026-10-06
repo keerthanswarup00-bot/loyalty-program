@@ -53,6 +53,9 @@ create table if not exists public.members (
   unique (business_id, phone)
 );
 alter table public.members add column if not exists card_started_at timestamptz;
+-- WhatsApp opt-out: set when the customer turns offers off themselves, or when the owner records a STOP reply.
+alter table public.members add column if not exists wa_optout boolean not null default false;
+alter table public.members add column if not exists wa_optout_at timestamptz;
 create index if not exists members_business_idx on public.members (business_id);
 
 create table if not exists public.offers (
@@ -262,7 +265,7 @@ begin
     'granted', granted, 'lost', lost,
     'member', json_build_object('name', m.name, 'phone', m.phone, 'bday', m.bday,
               'stamps', m.stamps, 'total', m.total, 'redeemed', m.redeemed, 'last_stamp', m.last_stamp,
-              'card_started_at', m.card_started_at, 'card_ends_at', ends),
+              'card_started_at', m.card_started_at, 'card_ends_at', ends, 'wa_optout', m.wa_optout),
     'offers', coalesce((select json_agg(json_build_object(
                 'id', o.id, 'type', o.type, 'text', o.text, 'valid_from', o.valid_from,
                 'expires_at', o.expires_at, 'used_at', o.used_at,
@@ -378,6 +381,26 @@ begin
   update auth.users set encrypted_password = crypt(p_password, gen_salt('bf')), updated_at = now() where id = uid;
 end $$;
 
+-- Owner records that a customer replied STOP (or asked to hear from them again).
+create or replace function public.set_wa_optout(p_member uuid, p_optout boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update members m set wa_optout = coalesce(p_optout, false),
+         wa_optout_at = case when coalesce(p_optout, false) then now() end
+   where m.id = p_member and exists (select 1 from businesses b where b.id = m.business_id and b.owner_id = auth.uid());
+  if not found then raise exception 'Not allowed'; end if;
+end $$;
+
+-- Customer turns WhatsApp offers on or off for themselves.
+create or replace function public.set_my_wa_optout(p_slug text, p_optout boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'Not signed in'; end if;
+  update members m set wa_optout = coalesce(p_optout, false),
+         wa_optout_at = case when coalesce(p_optout, false) then now() end
+   where m.user_id = auth.uid() and m.business_id = (select id from businesses where slug = p_slug);
+end $$;
+
 -- Customer deletes their own account.
 create or replace function public.delete_me() returns void
 language plpgsql security definer set search_path = public as $$
@@ -398,3 +421,26 @@ grant execute on function public.redeem_code(text, text, text, boolean) to authe
 grant execute on function public.delete_member(uuid) to authenticated;
 grant execute on function public.delete_me() to authenticated;
 grant execute on function public.reset_member_password(uuid, text) to authenticated;
+grant execute on function public.set_wa_optout(uuid, boolean) to authenticated;
+grant execute on function public.set_my_wa_optout(text, boolean) to authenticated;
+
+-- ---------- Image storage (logos and stamp images) ----------
+-- A public bucket "brand": anyone can view the images, only the business owner can write inside their own folder
+-- (<business id>/<file>). Max 2 MB per image; PNG, JPG, WebP or GIF only.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('brand', 'brand', true, 2097152, array['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+on conflict (id) do update set public = true, file_size_limit = 2097152,
+  allowed_mime_types = array['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+drop policy if exists brand_owner_insert on storage.objects;
+create policy brand_owner_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'brand' and exists (
+    select 1 from public.businesses b where b.owner_id = auth.uid() and b.id::text = (storage.foldername(name))[1]));
+drop policy if exists brand_owner_update on storage.objects;
+create policy brand_owner_update on storage.objects for update to authenticated
+  using (bucket_id = 'brand' and exists (
+    select 1 from public.businesses b where b.owner_id = auth.uid() and b.id::text = (storage.foldername(name))[1]));
+drop policy if exists brand_owner_delete on storage.objects;
+create policy brand_owner_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'brand' and exists (
+    select 1 from public.businesses b where b.owner_id = auth.uid() and b.id::text = (storage.foldername(name))[1]));

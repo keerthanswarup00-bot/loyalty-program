@@ -175,7 +175,7 @@ function remList() {
 }
 function reminders(L) {
   return `<div class="card" style="margin-top:16px"><h2>Reminders</h2><p class="sub">Birthdays this week, offers ending soon and cards about to run out. Tap WhatsApp to send a ready-made message.</p>`
-    + (L.map(r => `<div class="of"><div><div class="tag">${r.tag} · ${r.when}</div><b>${esc(r.u.name)}</b><div class="mut sm">${esc(r.u.phone)}</div></div><a class="btn sm" href="${esc(waLink(r.u.phone, r.msg))}" target="_blank" rel="noopener">WhatsApp</a></div>`).join('')
+    + (L.map(r => `<div class="of"><div><div class="tag">${r.tag} · ${r.when}</div><b>${esc(r.u.name)}</b><div class="mut sm">${esc(r.u.phone)}</div></div>${optedOut(r.u) ? '<span class="mut sm">Opted out</span>' : `<a class="btn sm" href="${esc(waLink(r.u.phone, r.msg))}" target="_blank" rel="noopener">WhatsApp</a>`}</div>`).join('')
       || '<p class="sub" style="margin:0">Nothing due right now.</p>') + '</div>';
 }
 const deniedV = () => `<div class="card" style="margin-top:40px"><h2>No access</h2><p class="sub">This account doesn't manage this business. Sign in with the owner account, or ask for access.</p></div>`;
@@ -200,11 +200,17 @@ function sorted(L) {
 const filtered = () => { const s = q.toLowerCase(); return sorted(M.filter(u => (u.name + u.phone).toLowerCase().includes(s))) };
 function rows() {
   const L = filtered();
-  return L.map(u => `<tr><td><input type="checkbox" aria-label="Select ${esc(u.name)}" ${sel.has(u.id) ? 'checked' : ''} onchange="tg('${u.id}',this.checked)"></td><td>${esc(u.name)}</td><td>${esc(u.phone)}</td><td>${fbd(u.bday)}</td><td>${u.stamps}</td><td>${cardEnd(u) ? fd(cardEnd(u)) : '—'}</td><td>${u.total}</td><td>${u.redeemed}</td><td>${heldOffers(u)}</td><td>${fd(u.joined)}</td><td>${fd(u.last_stamp)}</td><td><a href="${esc(waLink(u.phone, 'Hi ' + first(u) + '! '))}" target="_blank" rel="noopener">WhatsApp</a> &nbsp;·&nbsp; <a href="#" onclick="resetPw('${u.id}');return false">Reset password</a> &nbsp;·&nbsp; <a href="#" onclick="del('${u.id}');return false" style="color:#c33">Delete</a></td></tr>`).join('') || '<tr><td colspan="12" class="mut">No customers found</td></tr>';
+  return L.map(u => `<tr><td><input type="checkbox" aria-label="Select ${esc(u.name)}" ${sel.has(u.id) ? 'checked' : ''} onchange="tg('${u.id}',this.checked)"></td><td>${esc(u.name)}${optedOut(u) ? ' <span class="pill" title="Will not be sent bulk WhatsApp messages">Opted out</span>' : ''}</td><td>${esc(u.phone)}</td><td>${fbd(u.bday)}</td><td>${u.stamps}</td><td>${cardEnd(u) ? fd(cardEnd(u)) : '—'}</td><td>${u.total}</td><td>${u.redeemed}</td><td>${heldOffers(u)}</td><td>${fd(u.joined)}</td><td>${fd(u.last_stamp)}</td><td><a href="${esc(waLink(u.phone, 'Hi ' + first(u) + '! '))}" target="_blank" rel="noopener">WhatsApp</a> &nbsp;·&nbsp; <a href="#" onclick="optOut('${u.id}');return false">${optedOut(u) ? 'Opted out (undo)' : 'Mark opted out'}</a> &nbsp;·&nbsp; <a href="#" onclick="resetPw('${u.id}');return false">Reset password</a> &nbsp;·&nbsp; <a href="#" onclick="del('${u.id}');return false" style="color:#c33">Delete</a></td></tr>`).join('') || '<tr><td colspan="12" class="mut">No customers found</td></tr>';
 }
 function selBtn() { const b = $('#selb'); if (b) { b.textContent = sel.size ? `Message selected (${sel.size})` : 'Message selected'; b.disabled = !sel.size } }
 function tg(id, on) { on ? sel.add(id) : sel.delete(id); selBtn() }
 function tgAll(on) { filtered().forEach(u => on ? sel.add(u.id) : sel.delete(u.id)); $('#tb').innerHTML = rows(); selBtn() }
+async function optOut(id) {
+  const u = M.find(x => x.id == id); if (!u) return;
+  const on = !optedOut(u);
+  try { await rpc(sb, 'set_wa_optout', { p_member: id, p_optout: on }); u.wa_optout = on; bsel.delete(id); $('#tb').innerHTML = rows(); toast(on ? u.name + ' will not get WhatsApp messages' : u.name + ' can get messages again') }
+  catch (e) { toast(/function|schema cache/i.test(String(e && e.message || e)) ? 'Run the latest supabase/schema.sql first' : nice(e)) }
+}
 function msgSel() { if (!sel.size) return; bsel = new Set(sel); bseg = 'custom'; binit = true; go('b') }
 
 // ---- Message tab: WhatsApp to many customers ----
@@ -221,9 +227,10 @@ const SEGF = {
   ending: u => { const e = cardEnd(u); return e && daysTo(e) <= 14 && daysTo(e) >= 0 },
   custom: u => bsel.has(u.id)
 };
-const segPool = () => bseg == 'custom' ? M : M.filter(SEGF[bseg] || (() => false));
+const optedOut = u => !!u.wa_optout;
+const segPool = () => (bseg == 'custom' ? M : M.filter(SEGF[bseg] || (() => false))).filter(u => !optedOut(u));
 function bpick() { if (bseg != 'custom') bsel = new Set(segPool().map(u => u.id)) }
-const bto = () => M.filter(u => bsel.has(u.id) && u.phone);
+const bto = () => M.filter(u => bsel.has(u.id) && u.phone && !optedOut(u));
 const BT = () => [
   ['We miss you', `Hi {name}, we miss you at ${biz.name}! Come by this week and collect a stamp. You are closer to ${biz.reward} than you think.`],
   ['New offer', `Hi {name}! A little something for our rewards members at ${biz.name}: `],
@@ -279,8 +286,8 @@ function bsendV() {
 function msgV() {
   if (bq) return queueV();
   const n = bto().length;
-  return `<div class="card"><h2>Who to message</h2><p class="sub">Everyone here agreed to receive offers when they joined.</p>
-  <label class="lb">Group</label><select onchange="bseg=this.value;bpick();render()">${SEGS.map(s => `<option value="${s[0]}"${bseg == s[0] ? ' selected' : ''}>${s[1]} (${s[0] == 'custom' ? bsel.size : M.filter(SEGF[s[0]]).length})</option>`).join('')}</select>
+  return `<div class="card"><h2>Who to message</h2><p class="sub">Everyone here agreed to receive offers when they joined.${M.some(optedOut) ? ` <b>${M.filter(optedOut).length}</b> ${M.filter(optedOut).length == 1 ? 'customer has' : 'customers have'} opted out and ${M.filter(optedOut).length == 1 ? 'is' : 'are'} left out automatically.` : ''}</p>
+  <label class="lb">Group</label><select onchange="bseg=this.value;bpick();render()">${SEGS.map(s => `<option value="${s[0]}"${bseg == s[0] ? ' selected' : ''}>${s[1]} (${s[0] == 'custom' ? bto().length : M.filter(u => !optedOut(u) && SEGF[s[0]](u)).length})</option>`).join('')}</select>
   <div class="row2" style="margin-top:12px"><span class="mut sm" id="bcount">${n} ${n == 1 ? 'customer' : 'customers'} selected</span><span><button class="lnk" onclick="bAll(true)">Select all</button> &nbsp;·&nbsp; <button class="lnk" onclick="bAll(false)">Clear</button></span></div>
   <div class="plist" id="pl">${plistV()}</div></div>
   <div class="card"><h2>Your message</h2>
@@ -290,7 +297,7 @@ function msgV() {
   <label class="lb">Image link <span>(optional, https://…)</span></label><input id="bi" value="${esc(bimg)}" placeholder="https://…" oninput="bimg=this.value.trim();bpv()">
   <label class="lb">Or an image from this device <span>(optional)</span></label><input type="file" id="bf" accept="image/png,image/jpeg,image/webp" onchange="bpickImg(this)"><div id="bfn">${imgNote()}</div>
   <label class="chk"><input type="checkbox" ${blink ? 'checked' : ''} onchange="blink=this.checked;bpv()"><span>Add a link to the rewards card</span></label>
-  <label class="chk"><input type="checkbox" ${bstop ? 'checked' : ''} onchange="bstop=this.checked;bpv()"><span>Add "Reply STOP to opt out" (if someone replies STOP, delete them in Customers)</span></label>
+  <label class="chk"><input type="checkbox" ${bstop ? 'checked' : ''} onchange="bstop=this.checked;bpv()"><span>Add "Reply STOP to opt out" (when someone replies STOP, tick Opted out for them in Customers and they are never messaged again)</span></label>
   <div class="lb" style="margin-top:18px">Preview</div><div class="bubble" id="bpv">${esc(bText(bto()[0] || { name: 'Priya' }))}</div></div>
   <div class="card" id="bsend">${bsendV()}</div>`;
 }
@@ -356,11 +363,11 @@ function dash() {
   <div class="card"><h2>NFC tags for staff</h2><p class="sub" style="margin:0">Buy NTAG213 or NTAG215 stickers. In a free app such as NFC Tools, write the link above as a URL record. Staff then tap the customer's phone on the tag. If the link ever leaks, regenerate the code and rewrite the tags. One stamp per customer per cooldown period either way.</p></div>`;
   if (tab == 's') {
     const f = (i, l, x, t) => `<label>${l}</label><input id="${i}" ${t || ''} value="${esc(x)}">`;
-    const up = (fid, hid, cur, lbl) => `<label>${lbl}</label><div class="pv" id="${fid}pv"${cur ? '' : ' hidden'}>${cur ? `<img src="${esc(cur)}" alt=""><button type="button" class="lnk" onclick="rmImg('${hid}','${fid}pv')">Remove this image</button>` : ''}</div><input type="file" id="${fid}" accept="image/png,image/jpeg,image/webp,image/gif" onchange="pvImg('${fid}','${fid}pv','${hid}')"><input type="hidden" id="${hid}" value="0"><p class="hint">Upload a PNG, JPG, WebP or GIF, up to 300 KB.</p>`;
+    const up = (fid, hid, cur, lbl) => `<label>${lbl}</label><div class="pv" id="${fid}pv"${cur ? '' : ' hidden'}>${cur ? `<img src="${esc(cur)}" alt=""><button type="button" class="lnk" onclick="rmImg('${hid}','${fid}pv')">Remove this image</button>` : ''}</div><input type="file" id="${fid}" accept="image/png,image/jpeg,image/webp,image/gif" onchange="pvImg('${fid}','${fid}pv','${hid}')"><input type="hidden" id="${hid}" value="0"><p class="hint">Upload a PNG, JPG, WebP or GIF, up to 2 MB.</p>`;
     const h = biz.cooldown_min > 0 && biz.cooldown_min % 60 == 0, cv = h ? biz.cooldown_min / 60 : biz.cooldown_min;
     o += `<div class="card"><h2>Brand</h2>${f('cn', 'Business name', biz.name)}${f('ct', 'Tagline', biz.tagline)}${up('clfile', 'clx', biz.logo_url, 'Logo image')}${f('cc', 'Brand colour', biz.color, 'type=color')}
     ${f('ci', 'Instagram link', biz.ig)}${f('cf', 'Facebook link', biz.fb)}${f('cw', 'WhatsApp link (https://wa.me/…)', biz.wa)}${f('cs', 'Website link', biz.web)}</div>
-    <div class="card"><h2>Stamp image</h2>${up('stfile', 'stx', biz.stamp_url, 'Stamp image')}<p class="hint" style="margin:0">Shown in place of the collected stamps on the customer's card. Leave empty to keep the normal tick stamps.</p></div>
+    <div class="card"><h2>Stamp image</h2>${up('stfile', 'stx', biz.stamp_url, 'Stamp image')}<p class="hint" style="margin:0">Shown in place of the collected stamps on the customer's card. Leave empty to keep the normal tick stamps.</p>${dbImgs() ? `<p class="hint">Your ${dbImgs() == 1 ? 'image is' : 'images are'} still stored inside the database. <button type="button" class="lnk" onclick="moveImgs(this)">Move to storage</button> to make the app load faster.</p>` : ''}</div>
     <div class="card"><h2>Rewards</h2><div class="row"><div>${f('cn2', 'Stamps needed', biz.need, 'type=number min=2 max=20')}</div><div><label>Time between stamps</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="cd" type="number" min="0" value="${cv}"><select id="cu"><option value="m"${h ? '' : ' selected'}>minutes</option><option value="h"${h ? ' selected' : ''}>hours</option></select></div></div></div>${f('cr', 'Reward when card is full', biz.reward)}</div>
     <div class="card"><h2>Stamp card</h2><div class="row"><div><label>First stamp when a customer joins</label><select id="js"><option value="1"${biz.join_stamp ? ' selected' : ''}>Yes, give a free first stamp</option><option value="0"${biz.join_stamp ? '' : ' selected'}>No</option></select></div><div>${f('cm', 'Each card lasts (months from first stamp, 0 = never)', biz.card_months, 'type=number min=0 max=60')}</div></div>
     <p class="hint">An unfinished card that passes its end date starts again from zero. A full card never expires, so the customer can always claim the reward.</p></div>
@@ -370,14 +377,43 @@ function dash() {
   return o;
 }
 
-const readImg = file => new Promise((resolve, reject) => {
-  if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type || '')) return reject('type');
-  if (file.size > 300000) return reject('too big');
-  const r = new FileReader();
-  r.onload = () => resolve(r.result);
-  r.onerror = () => reject('read');
-  r.readAsDataURL(file);
-});
+// Images live in the public Supabase Storage bucket "brand" (folder = business id). If the bucket is not set up yet
+// (schema.sql not re-run), small images fall back to being stored inside the database as before.
+const IMG_OK = /^image\/(png|jpeg|webp|gif)$/i, EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
+const toDataUrl = file => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject('read'); r.readAsDataURL(file) });
+const inBucket = u => typeof u == 'string' && u.includes('/storage/v1/object/public/brand/' + biz.id + '/');
+async function dropOld(u) {
+  if (!inBucket(u)) return;
+  try { await sb.storage.from('brand').remove([decodeURIComponent(u.split('/brand/')[1].split('?')[0])]) } catch (e) { }
+}
+async function readImg(file, kind) {
+  if (!IMG_OK.test(file.type || '')) throw 'type';
+  if (file.size > 2e6) throw 'too big';
+  const path = biz.id + '/' + kind + '-' + Date.now().toString(36) + '.' + EXT[file.type.toLowerCase()];
+  const { error } = await sb.storage.from('brand').upload(path, file, { contentType: file.type, cacheControl: '31536000' });
+  if (!error) return sb.storage.from('brand').getPublicUrl(path).data.publicUrl;
+  if (file.size > 300000) throw 'no bucket';
+  return toDataUrl(file);
+}
+// One-click: move images that are still stored inside the database into the storage bucket.
+async function moveImgs(btn) {
+  btn.disabled = true;
+  try {
+    const patch = {};
+    for (const [col, kind] of [['logo_url', 'logo'], ['stamp_url', 'stamp']]) {
+      const u = biz[col]; if (!u || !u.startsWith('data:')) continue;
+      const blob = await (await fetch(u)).blob();
+      patch[col] = await readImg(new File([blob], kind, { type: blob.type }), kind);
+      if (patch[col].startsWith('data:')) throw 'no bucket';
+    }
+    if (!Object.keys(patch).length) return toast('Nothing to move');
+    const { error } = await sb.from('businesses').update(patch).eq('id', biz.id);
+    if (error) throw error;
+    Object.assign(biz, patch); toast('Images moved to storage'); render();
+  } catch (e) { toast(e == 'no bucket' ? 'Storage is not set up yet. Run the latest supabase/schema.sql.' : nice(e)) }
+  finally { btn.disabled = false }
+}
+const dbImgs = () => ['logo_url', 'stamp_url'].filter(c => (biz[c] || '').startsWith('data:')).length;
 function pvImg(fid, pvid, hid) {
   const f = $('#' + fid).files[0];
   if (!f) return;
@@ -400,11 +436,11 @@ async function sv(btn) {
   const lfile = $('#clfile').files[0], sfile = $('#stfile').files[0];
   btn.disabled = true;
   try {
-    if (lfile) logoUrl = await readImg(lfile);
-    if (sfile) stampUrl = await readImg(sfile);
+    if (lfile) logoUrl = await readImg(lfile, 'logo');
+    if (sfile) stampUrl = await readImg(sfile, 'stamp');
   } catch (e) {
     btn.disabled = false;
-    return toast(e == 'too big' ? 'Image too big (max 300 KB)' : e == 'type' ? 'Use a PNG, JPG, WebP or GIF image' : 'Could not read that image');
+    return toast(e == 'too big' ? 'Image too big (max 2 MB)' : e == 'no bucket' ? 'Storage is not set up yet: run the latest supabase/schema.sql, or use an image under 300 KB' : e == 'type' ? 'Use a PNG, JPG, WebP or GIF image' : 'Could not read that image');
   }
   await doSave({ logoUrl, stampUrl, t, btn });
 }
@@ -422,6 +458,8 @@ async function doSave({ logoUrl, stampUrl, t, btn }) {
   const { error } = await sb.from('businesses').update(patch).eq('id', biz.id);
   btn.disabled = false;
   if (error) return toast(nice(error));
+  if (logoUrl != biz.logo_url) await dropOld(biz.logo_url);
+  if (stampUrl != biz.stamp_url) await dropOld(biz.stamp_url);
   toast('Saved');
   await enter();
 }
@@ -447,8 +485,8 @@ const slug = () => biz.name.replace(/\W+/g, '-');
 function dlQR() { const x = qrSvg(); if (x) dl(slug() + '-QR.svg', x, 'image/svg+xml') }
 function exp() {
   const cell = x => { let s = String(x == null ? '' : x); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"' };
-  const rows = [['Name', 'Phone', 'Birthday', 'Current stamps', 'Card ends', 'Total visits', 'Rewards redeemed', 'Joined', 'Last visit']]
-    .concat(M.map(u => [u.name, u.phone, u.bday || '', u.stamps, cardEnd(u) ? fd(cardEnd(u)) : '', u.total, u.redeemed, fd(u.joined), fd(u.last_stamp)]));
+  const rows = [['Name', 'Phone', 'Birthday', 'Current stamps', 'Card ends', 'Total visits', 'Rewards redeemed', 'Joined', 'Last visit', 'WhatsApp opted out']]
+    .concat(M.map(u => [u.name, u.phone, u.bday || '', u.stamps, cardEnd(u) ? fd(cardEnd(u)) : '', u.total, u.redeemed, fd(u.joined), fd(u.last_stamp), optedOut(u) ? 'yes' : '']));
   dl(slug() + '-customers.csv', '﻿' + rows.map(r => r.map(cell).join(',')).join('\n'), 'text/csv');
 }
 

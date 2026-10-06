@@ -208,7 +208,7 @@ function homeV() {
     `<div class="of"><div><div class="tag">${esc(x.type)}</div><b>${esc(x.text)}</b><div class="mut sm">${when(x)}</div></div>${x.code ? `<button type="button" class="cd" aria-label="Coupon code ${esc(x.code)}, tap to copy" onclick="copyText('${esc(x.code)}','Code copied')">${esc(x.code)}</button>` : ''}</div>`
   ).join('') + '<p class="hint">Show the code to staff at the counter (tap a code to copy it).</p>' : '<p class="sub" style="margin:0">Welcome, birthday and surprise offers will appear here.</p>'}</div>`
     + (past.length ? `<div class="card"><h2>History</h2>${past.map(x => `<div class="of u"><div><div class="tag">${esc(x.type)}</div><b>${esc(x.text)}</b><div class="mut sm">${x.used_at ? 'Used ' + fd(x.used_at) : 'Expired ' + fd(x.expires_at)}</div></div></div>`).join('')}</div>` : '')
-    + a2hsV() + socials(biz) + `<p class="note"><a href="#" onclick="reload();return false">Refresh</a> &nbsp;·&nbsp; <a href="#" onclick="view='pw';render();return false">Change password</a> &nbsp;·&nbsp; <a href="#" onclick="out();return false">Sign out</a> &nbsp;·&nbsp; <a href="#" onclick="delMe();return false">Delete my account</a></p>`;
+    + a2hsV() + socials(biz) + `<p class="note"><a href="#" onclick="reload();return false">Refresh</a> &nbsp;·&nbsp; <a href="#" onclick="waPref();return false">${m.wa_optout ? 'Turn WhatsApp offers on' : 'Stop WhatsApp offers'}</a> &nbsp;·&nbsp; <a href="#" onclick="view='pw';render();return false">Change password</a> &nbsp;·&nbsp; <a href="#" onclick="out();return false">Sign out</a> &nbsp;·&nbsp; <a href="#" onclick="delMe();return false">Delete my account</a></p>`;
   return o;
 }
 
@@ -218,6 +218,11 @@ function render() {
   if (anim >= 0) setTimeout(() => anim = -1, 900);
 }
 
+async function waPref() {
+  const on = !card.member.wa_optout;
+  try { await rpc(sb, 'set_my_wa_optout', { p_slug: CFG.slug, p_optout: on }); card.member.wa_optout = on; render(); toast(on ? 'Done. You will not get WhatsApp offers.' : 'WhatsApp offers are back on') }
+  catch (e) { toast(nice(e)) }
+}
 async function reload() { try { await load(); render(); toast('Up to date') } catch (e) { toast(nice(e)) } }
 // Coming back to the page (e.g. after staff taps the tag, or a day later) shows fresh stamps and offers.
 document.addEventListener('visibilitychange', () => { if (!document.hidden && card && view == 'home' && !pend) load().then(render).catch(() => { }) });
