@@ -33,7 +33,7 @@ async function load() {
     biz = data;
     if (biz) {
       brand(biz); document.title = 'Owner dashboard · ' + biz.name;
-      M = await pages(() => sb.from('members').select('*,offers(id,type,text,code,valid_from,used_at,expires_at)').eq('business_id', biz.id).order('joined', { ascending: false }).order('id'));
+      M = await pages(() => sb.from('members').select('*,offers(id,type,text,code,valid_from,used_at,expires_at,created_at)').eq('business_id', biz.id).order('joined', { ascending: false }).order('id'));
       try {
         const since = new Date(Date.now() - 14 * 864e5).toISOString();
         V = (await pages(() => sb.from('visits').select('id,created_at').eq('business_id', biz.id).gte('created_at', since).order('id'))).map(x => x.created_at);
@@ -201,7 +201,32 @@ function sorted(L) {
 const filtered = () => { const s = q.toLowerCase(); return sorted(M.filter(u => (u.name + u.phone).toLowerCase().includes(s))) };
 function rows() {
   const L = filtered();
-  return L.map(u => `<tr><td><input type="checkbox" aria-label="Select ${esc(u.name)}" ${sel.has(u.id) ? 'checked' : ''} onchange="tg('${u.id}',this.checked)"></td><td>${esc(u.name)}${optedOut(u) ? ' <span class="pill" title="Will not be sent bulk WhatsApp messages">Opted out</span>' : ''}</td><td>${esc(u.phone)}</td><td>${fbd(u.bday)}</td><td>${u.stamps}</td><td>${cardEnd(u) ? fd(cardEnd(u)) : '—'}</td><td>${u.total}</td><td>${u.redeemed}</td><td>${heldOffers(u)}</td><td>${fd(u.joined)}</td><td>${fd(u.last_stamp)}</td><td><a href="${esc(waLink(u.phone, 'Hi ' + first(u) + '! '))}" target="_blank" rel="noopener">WhatsApp</a> &nbsp;·&nbsp; <a href="#" onclick="optOut('${u.id}');return false">${optedOut(u) ? 'Opted out (undo)' : 'Mark opted out'}</a> &nbsp;·&nbsp; <a href="#" onclick="resetPw('${u.id}');return false">Reset password</a> &nbsp;·&nbsp; <a href="#" onclick="del('${u.id}');return false" style="color:#c33">Delete</a></td></tr>`).join('') || '<tr><td colspan="12" class="mut">No customers found</td></tr>';
+  return L.map(u => `<tr><td><input type="checkbox" aria-label="Select ${esc(u.name)}" ${sel.has(u.id) ? 'checked' : ''} onchange="tg('${u.id}',this.checked)"></td><td><a href="#" class="nm" onclick="openCust('${u.id}');return false">${esc(u.name)}</a>${optedOut(u) ? ' <span class="pill" title="Will not be sent bulk WhatsApp messages">Opted out</span>' : ''}</td><td>${esc(u.phone)}</td><td>${fbd(u.bday)}</td><td>${u.stamps}</td><td>${cardEnd(u) ? fd(cardEnd(u)) : '—'}</td><td>${u.total}</td><td>${u.redeemed}</td><td>${heldOffers(u)}</td><td>${fd(u.joined)}</td><td>${fd(u.last_stamp)}</td><td><a href="${esc(waLink(u.phone, 'Hi ' + first(u) + '! '))}" target="_blank" rel="noopener">WhatsApp</a> &nbsp;·&nbsp; <a href="#" onclick="optOut('${u.id}');return false">${optedOut(u) ? 'Opted out (undo)' : 'Mark opted out'}</a> &nbsp;·&nbsp; <a href="#" onclick="resetPw('${u.id}');return false">Reset password</a> &nbsp;·&nbsp; <a href="#" onclick="del('${u.id}');return false" style="color:#c33">Delete</a></td></tr>`).join('') || '<tr><td colspan="12" class="mut">No customers found</td></tr>';
+}
+// ---- Customer drawer: everything about one customer in one place ----
+function closeCust() { const d = $('#drw'); if (d) d.remove(); document.removeEventListener('keydown', drwKey) }
+const drwKey = e => { if (e.key == 'Escape') closeCust() };
+function drwBody(u, vis) {
+  const ce = cardEnd(u), of = (u.offers || []).slice().sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  const st = x => x.used_at ? 'Used ' + fd(x.used_at) : isExp(x) ? 'Expired ' + fd(x.expires_at) : x.valid_from && new Date(x.valid_from) > Date.now() ? 'Valid on ' + fd(x.valid_from) : x.expires_at ? 'Until ' + fd(x.expires_at) : 'No expiry';
+  const line = (k, x) => `<div class="of"><span class="mut">${k}</span><b>${x}</b></div>`;
+  return `<div class="row2"><h2>${esc(u.name)}${optedOut(u) ? ' <span class="pill">Opted out</span>' : ''}</h2><button class="lnk" onclick="closeCust()" aria-label="Close">Close</button></div>
+  <div class="prog"><i style="width:${Math.min(100, u.stamps / biz.need * 100)}%"></i></div><p class="mut sm" style="margin:6px 0 12px">${u.stamps} of ${biz.need} stamps</p>
+  ${line('Phone', esc(u.phone))}${line('Birthday', fbd(u.bday) || '—')}${line('Joined', fd(u.joined))}${line('Last visit', fd(u.last_stamp) || '—')}${line('Card ends', ce ? fd(ce) : '—')}${line('Total visits', u.total)}${line('Rewards redeemed', u.redeemed)}${u.ref_code ? line('Friend code', esc(u.ref_code)) : ''}
+  <div class="row" style="margin:14px 0"><a class="btn sm" href="${esc(waLink(u.phone, 'Hi ' + first(u) + '! '))}" target="_blank" rel="noopener">WhatsApp</a><button class="btn sm alt" onclick="optOut('${u.id}');closeCust()">${optedOut(u) ? 'Allow messages' : 'Mark opted out'}</button><button class="btn sm alt" onclick="closeCust();resetPw('${u.id}')">Reset password</button><button class="btn sm alt" style="color:#c33" onclick="closeCust();del('${u.id}')">Delete</button></div>
+  <div class="lb">Offers</div>${of.map(x => `<div class="of"><div><div class="tag">${esc(x.type)}${x.code ? ' · ' + esc(x.code) : ''}</div><b>${esc(x.text)}</b></div><span class="mut sm">${st(x)}</span></div>`).join('') || '<p class="sub" style="margin:4px 0">No offers yet.</p>'}
+  <div class="lb" style="margin-top:14px">Recent visits</div>${vis == null ? '<p class="sub" style="margin:4px 0">Loading…</p>' : vis.length ? vis.map(v => `<div class="of"><span>${fdt(v.created_at)}</span></div>`).join('') : '<p class="sub" style="margin:4px 0">No visits recorded.</p>'}`;
+}
+async function openCust(id) {
+  const u = M.find(x => x.id == id); if (!u) return; closeCust();
+  const d = document.createElement('div'); d.id = 'drw'; d.className = 'drw'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+  d.innerHTML = `<div class="bk" onclick="closeCust()"></div><div class="sheet">${drwBody(u, null)}</div>`;
+  document.body.appendChild(d); document.addEventListener('keydown', drwKey);
+  try {
+    const { data, error } = await sb.from('visits').select('created_at').eq('member_id', id).order('created_at', { ascending: false }).limit(30);
+    if (error) throw error;
+    const sh = document.querySelector('#drw .sheet'); if (sh) sh.innerHTML = drwBody(u, data);
+  } catch (e) { const sh = document.querySelector('#drw .sheet'); if (sh) sh.innerHTML = drwBody(u, []) }
 }
 function selBtn() { const b = $('#selb'); if (b) { b.textContent = sel.size ? `Message selected (${sel.size})` : 'Message selected'; b.disabled = !sel.size } }
 function tg(id, on) { on ? sel.add(id) : sel.delete(id); selBtn() }
