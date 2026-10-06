@@ -33,6 +33,15 @@ create table if not exists public.businesses (
 alter table public.businesses add column if not exists join_stamp boolean not null default true;
 alter table public.businesses add column if not exists card_months int not null default 6 check (card_months >= 0);
 alter table public.businesses add column if not exists stamp_url text not null default '';
+-- join_token: in the sign-up QR (join + first stamp only). scan_token: written to the NFC tag (every later stamp).
+alter table public.businesses add column if not exists join_token text not null default substr(md5(random()::text || clock_timestamp()::text), 1, 12);
+-- "What's new" note shown on every customer's card.
+alter table public.businesses add column if not exists news_text text not null default '';
+alter table public.businesses add column if not exists news_at timestamptz;
+-- Refer a friend: both people get a coupon. The referrer's coupon is given when the friend collects a real stamp at the tag.
+alter table public.businesses add column if not exists ref_on boolean not null default false;
+alter table public.businesses add column if not exists ref_offer text not null default '20% off your next bill';
+alter table public.businesses add column if not exists ref_cap int not null default 5 check (ref_cap between 1 and 100);
 
 create table if not exists public.members (
   id uuid primary key default gen_random_uuid(),
@@ -53,7 +62,29 @@ create table if not exists public.members (
   unique (business_id, phone)
 );
 alter table public.members add column if not exists card_started_at timestamptz;
+-- WhatsApp opt-out: set when the customer turns offers off themselves, or when the owner records a STOP reply.
+alter table public.members add column if not exists wa_optout boolean not null default false;
+alter table public.members add column if not exists wa_optout_at timestamptz;
+alter table public.members add column if not exists ref_code text;
+alter table public.members add column if not exists referred_by uuid references public.members(id) on delete set null;
+alter table public.members add column if not exists ref_rewarded boolean not null default false;
+create unique index if not exists members_refcode_idx on public.members (business_id, ref_code);
 create index if not exists members_business_idx on public.members (business_id);
+
+-- Customers imported from a CSV (e.g. a paper stamp book). They are claimed when that phone number joins.
+create table if not exists public.imports (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  name text not null default '',
+  phone text not null,
+  bday date,
+  stamps int not null default 0 check (stamps between 0 and 1000),
+  total int not null default 0 check (total >= 0),
+  redeemed int not null default 0 check (redeemed >= 0),
+  unique (business_id, phone)
+);
+alter table public.imports enable row level security;
+revoke all on public.imports from anon, authenticated;
 
 create table if not exists public.offers (
   id uuid primary key default gen_random_uuid(),
@@ -116,7 +147,8 @@ create policy visit_owner_select on public.visits for select to authenticated
 revoke all on public.businesses, public.members, public.offers, public.visits from anon, authenticated;
 grant select on public.businesses, public.members, public.offers, public.visits to authenticated;
 grant update (name, tagline, color, logo_url, stamp_url, ig, fb, wa, web, need, reward, cooldown_min,
-              sur_stamps, sur_offer, welcome_offer, bday_offer, exp_days, join_stamp, card_months, scan_token)
+              sur_stamps, sur_offer, welcome_offer, bday_offer, exp_days, join_stamp, card_months, scan_token,
+              join_token, news_text, news_at, ref_on, ref_offer, ref_cap)
   on public.businesses to authenticated;
 
 -- ---------- Functions ----------
@@ -134,7 +166,8 @@ language sql stable security definer set search_path = public as $$
     'ig', ig, 'fb', fb, 'wa', wa, 'web', web, 'need', need, 'reward', reward,
     'cooldown_min', cooldown_min, 'sur_stamps', sur_stamps, 'sur_offer', sur_offer,
     'welcome_offer', welcome_offer, 'bday_offer', bday_offer, 'exp_days', exp_days,
-    'join_stamp', join_stamp, 'card_months', card_months, 'tz', tz)
+    'join_stamp', join_stamp, 'card_months', card_months, 'tz', tz,
+    'news_text', news_text, 'news_at', news_at, 'ref_on', ref_on, 'ref_offer', ref_offer)
   from businesses where slug = p_slug;
 $$;
 
@@ -160,6 +193,23 @@ begin
   insert into offers (member_id, business_id, type, text, code, valid_from, expires_at)
   values (p_member, p_biz, p_type, p_text, c, p_from,
           coalesce(p_until, case when p_days > 0 then now() + make_interval(days => p_days) end));
+  return c;
+end $$;
+
+-- Internal: a unique friend code for a member (name prefix + 4 characters).
+create or replace function public._refcode(p_member uuid) returns text
+language plpgsql security definer set search_path = public as $$
+declare chars constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; m members; c text; i int; pre text;
+begin
+  select * into m from members where id = p_member;
+  if m.ref_code is not null then return m.ref_code; end if;
+  pre := left(upper(regexp_replace(m.name, '[^A-Za-z]', '', 'g')), 4);
+  loop
+    c := pre || '-';
+    for i in 1..4 loop c := c || substr(chars, 1 + floor(random() * length(chars))::int, 1); end loop;
+    exit when not exists (select 1 from members where business_id = m.business_id and ref_code = c);
+  end loop;
+  update members set ref_code = c where id = m.id;
   return c;
 end $$;
 
@@ -195,7 +245,7 @@ end $$;
 -- Internal: add one stamp (no cooldown check), start the card clock on the first stamp, give the surprise offer if due.
 create or replace function public._do_stamp(p_member uuid) returns json
 language plpgsql security definer set search_path = public as $$
-declare b businesses; m members; pos int; surprise text := null; lost int;
+declare b businesses; m members; pos int; surprise text := null; lost int; need_visits int;
 begin
   select * into m from members where id = p_member;
   select * into b from businesses where id = m.business_id;
@@ -204,6 +254,14 @@ begin
          card_started_at = coalesce(card_started_at, now())
    where id = m.id returning * into m;
   insert into visits (member_id, business_id) values (m.id, b.id);
+  -- Referral reward for whoever invited this member: only once the friend has really visited (a stamp after the sign-up one).
+  need_visits := (case when b.join_stamp then 2 else 1 end);
+  if b.ref_on and m.referred_by is not null and not m.ref_rewarded and m.total >= need_visits then
+    update members set ref_rewarded = true where id = m.id;
+    if (select count(*) from offers where member_id = m.referred_by and type = 'Referral reward' and created_at > now() - interval '30 days') < b.ref_cap then
+      perform _give(m.referred_by, b.id, 'Referral reward', b.ref_offer, b.exp_days);
+    end if;
+  end if;
   pos := (m.stamps - 1) % b.need + 1;
   if b.sur_offer <> '' and exists (
        select 1 from unnest(string_to_array(regexp_replace(b.sur_stamps, '\s', '', 'g'), ',')) s
@@ -215,21 +273,37 @@ begin
 end $$;
 
 -- Create the member row for the signed-in customer, give the welcome offer and (if switched on) the first stamp.
-create or replace function public.join_business(p_slug text, p_name text, p_phone text, p_bday date, p_consent boolean)
+drop function if exists public.join_business(text, text, text, date, boolean);
+drop function if exists public.join_business(text, text, text, date, boolean, text);
+create or replace function public.join_business(p_slug text, p_name text, p_phone text, p_bday date, p_consent boolean, p_join_token text default null, p_ref text default null)
 returns void language plpgsql security definer set search_path = public as $$
-declare b businesses; m uuid;
+declare b businesses; m uuid; im imports; claimed boolean := false; rf uuid := null; rc text := upper(trim(coalesce(p_ref, '')));
 begin
   if auth.uid() is null then raise exception 'Not signed in'; end if;
   if not coalesce(p_consent, false) then raise exception 'Consent is required to join'; end if;
   select * into b from businesses where slug = p_slug;
   if not found then raise exception 'Unknown business'; end if;
+  if b.join_token <> coalesce(p_join_token, '') then raise exception 'Please scan the sign-up QR code at the counter to join'; end if;
   if length(trim(coalesce(p_name, ''))) < 2 then raise exception 'Please enter your full name'; end if;
   if coalesce(p_phone, '') !~ '^[0-9]{10}$' then raise exception 'Enter a valid 10-digit mobile number'; end if;
-  insert into members (business_id, user_id, name, phone, bday, consent)
-  values (b.id, auth.uid(), trim(p_name), p_phone, p_bday, true)
+  if b.ref_on and rc <> '' then
+    select id into rf from members where business_id = b.id and ref_code = rc and phone <> p_phone;
+    if rf is null then raise exception 'That friend code was not found'; end if;
+  end if;
+  insert into members (business_id, user_id, name, phone, bday, consent, referred_by)
+  values (b.id, auth.uid(), trim(p_name), p_phone, p_bday, true, rf)
   returning id into m;
+  perform _refcode(m);
+  if rf is not null then perform _give(m, b.id, 'Referral', b.ref_offer, b.exp_days); end if;
+  select * into im from imports where business_id = b.id and phone = p_phone;
+  if found then
+    claimed := true;
+    update members set stamps = im.stamps, total = greatest(im.total, im.stamps), redeemed = im.redeemed,
+           card_started_at = case when im.stamps > 0 then now() end, bday = coalesce(bday, im.bday) where id = m;
+    delete from imports where id = im.id;
+  end if;
   if b.welcome_offer <> '' then perform _give(m, b.id, 'Welcome', b.welcome_offer, b.exp_days); end if;
-  if b.join_stamp then perform _do_stamp(m); end if;
+  if b.join_stamp and not claimed then perform _do_stamp(m); end if;
 end $$;
 
 -- The customer's card: stats, coupons and card validity. Also reserves the birthday coupon (valid only on the birthday).
@@ -262,7 +336,8 @@ begin
     'granted', granted, 'lost', lost,
     'member', json_build_object('name', m.name, 'phone', m.phone, 'bday', m.bday,
               'stamps', m.stamps, 'total', m.total, 'redeemed', m.redeemed, 'last_stamp', m.last_stamp,
-              'card_started_at', m.card_started_at, 'card_ends_at', ends),
+              'card_started_at', m.card_started_at, 'card_ends_at', ends, 'wa_optout', m.wa_optout,
+              'ref_code', _refcode(m.id), 'ref_count', (select count(*) from members x where x.referred_by = m.id)),
     'offers', coalesce((select json_agg(json_build_object(
                 'id', o.id, 'type', o.type, 'text', o.text, 'valid_from', o.valid_from,
                 'expires_at', o.expires_at, 'used_at', o.used_at,
@@ -378,6 +453,50 @@ begin
   update auth.users set encrypted_password = crypt(p_password, gen_salt('bf')), updated_at = now() where id = uid;
 end $$;
 
+-- Owner imports customers from a CSV. p_rows: [{name, phone, bday, stamps, total, redeemed}]. Existing members are skipped.
+create or replace function public.import_members(p_slug text, p_rows json) returns json
+language plpgsql security definer set search_path = public as $$
+declare b businesses; r json; ph text; added int := 0; skipped int := 0; bd date;
+begin
+  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  if not found then raise exception 'Not allowed'; end if;
+  if json_array_length(p_rows) > 1000 then raise exception 'Import at most 1000 rows at a time'; end if;
+  for r in select * from json_array_elements(p_rows) loop
+    ph := coalesce(r->>'phone', '');
+    if ph !~ '^[0-9]{10}$' or exists (select 1 from members where business_id = b.id and phone = ph) then skipped := skipped + 1; continue; end if;
+    begin bd := nullif(r->>'bday', '')::date; exception when others then bd := null; end;
+    insert into imports (business_id, name, phone, bday, stamps, total, redeemed)
+    values (b.id, left(coalesce(r->>'name', ''), 100), ph, bd,
+            least(greatest(coalesce(nullif(r->>'stamps', '')::int, 0), 0), 1000),
+            least(greatest(coalesce(nullif(r->>'total', '')::int, 0), 0), 100000),
+            least(greatest(coalesce(nullif(r->>'redeemed', '')::int, 0), 0), 100000))
+    on conflict (business_id, phone) do update set name = excluded.name, bday = excluded.bday,
+      stamps = excluded.stamps, total = excluded.total, redeemed = excluded.redeemed;
+    added := added + 1;
+  end loop;
+  return json_build_object('added', added, 'skipped', skipped);
+end $$;
+
+-- Owner records that a customer replied STOP (or asked to hear from them again).
+create or replace function public.set_wa_optout(p_member uuid, p_optout boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update members m set wa_optout = coalesce(p_optout, false),
+         wa_optout_at = case when coalesce(p_optout, false) then now() end
+   where m.id = p_member and exists (select 1 from businesses b where b.id = m.business_id and b.owner_id = auth.uid());
+  if not found then raise exception 'Not allowed'; end if;
+end $$;
+
+-- Customer turns WhatsApp offers on or off for themselves.
+create or replace function public.set_my_wa_optout(p_slug text, p_optout boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'Not signed in'; end if;
+  update members m set wa_optout = coalesce(p_optout, false),
+         wa_optout_at = case when coalesce(p_optout, false) then now() end
+   where m.user_id = auth.uid() and m.business_id = (select id from businesses where slug = p_slug);
+end $$;
+
 -- Customer deletes their own account.
 create or replace function public.delete_me() returns void
 language plpgsql security definer set search_path = public as $$
@@ -390,7 +509,8 @@ end $$;
 -- ---------- Who may call what ----------
 revoke execute on all functions in schema public from public, anon, authenticated;
 grant execute on function public.get_business(text) to anon, authenticated;
-grant execute on function public.join_business(text, text, text, date, boolean) to authenticated;
+grant execute on function public.join_business(text, text, text, date, boolean, text, text) to authenticated;
+grant execute on function public.import_members(text, json) to authenticated;
 grant execute on function public.my_card(text) to authenticated;
 grant execute on function public.add_stamp(text, text) to authenticated;
 grant execute on function public.claim_reward(text) to authenticated;
@@ -398,3 +518,26 @@ grant execute on function public.redeem_code(text, text, text, boolean) to authe
 grant execute on function public.delete_member(uuid) to authenticated;
 grant execute on function public.delete_me() to authenticated;
 grant execute on function public.reset_member_password(uuid, text) to authenticated;
+grant execute on function public.set_wa_optout(uuid, boolean) to authenticated;
+grant execute on function public.set_my_wa_optout(text, boolean) to authenticated;
+
+-- ---------- Image storage (logos and stamp images) ----------
+-- A public bucket "brand": anyone can view the images, only the business owner can write inside their own folder
+-- (<business id>/<file>). Max 2 MB per image; PNG, JPG, WebP or GIF only.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('brand', 'brand', true, 2097152, array['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+on conflict (id) do update set public = true, file_size_limit = 2097152,
+  allowed_mime_types = array['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+drop policy if exists brand_owner_insert on storage.objects;
+create policy brand_owner_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'brand' and exists (
+    select 1 from public.businesses b where b.owner_id = auth.uid() and b.id::text = (storage.foldername(name))[1]));
+drop policy if exists brand_owner_update on storage.objects;
+create policy brand_owner_update on storage.objects for update to authenticated
+  using (bucket_id = 'brand' and exists (
+    select 1 from public.businesses b where b.owner_id = auth.uid() and b.id::text = (storage.foldername(name))[1]));
+drop policy if exists brand_owner_delete on storage.objects;
+create policy brand_owner_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'brand' and exists (
+    select 1 from public.businesses b where b.owner_id = auth.uid() and b.id::text = (storage.foldername(name))[1]));

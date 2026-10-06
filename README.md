@@ -4,9 +4,10 @@ Customer app at `/`, owner dashboard at `/admin`. One free Supabase database ser
 
 ```
 index.html            customer app          assets/customer.js
-admin/index.html      owner dashboard       assets/admin.js
+admin/index.html      owner dashboard       assets/admin.js + assets/admin.css
 assets/config.js      per-deployment settings (the only file you edit)
 assets/common.js, style.css   shared
+assets/vendor/        supabase-js and qrcode-generator, served from this site (no CDN)
 supabase/schema.sql   run once        supabase/new-client.sql   run per client
 archive/              unused old code, kept for reference only (never deployed)
 ```
@@ -29,21 +30,48 @@ and the docs out of the published site.
 3. In `assets/config.js` set `supabaseUrl`, `supabaseKey` and `slug` (same slug as step 2).
 4. Test locally (VS Code Live Server, open the folder root). Customer app: `/`. Owner: `/admin`.
 
-Branding, offers, cooldown, expiry, first stamp and card length are then edited by the owner in **/admin -> Settings** and apply to everyone instantly. No redeploy needed.
+Branding, offers, cooldown, expiry, first stamp and card length are then edited by the owner in **/admin -> Offers and More** and apply to everyone instantly. No redeploy needed.
 
 ## Stamps, coupons and card validity
 
-- **Stamping:** Owner -> **QR & NFC** gives one link. Put it on a QR code or write it to NFC tags (NTAG213/215, free app "NFC Tools", URL record). Staff tap the customer's phone on the tag and a stamp is added after sign-in. One stamp per customer per cooldown period. If the link leaks, press **Regenerate code** and rewrite the tags.
-- **Free first stamp:** a new member gets a stamp when they join (switch off in Settings -> Stamp card).
+- **Joining:** **Home -> Sign-up QR** is the only way to join. Customers scan it, create their card and get the free first stamp. The page without the QR shows "scan the sign-up QR at the counter". The QR cannot add any later stamp, so photographing or enlarging it gains nothing.
+- **Stamping:** every later stamp comes from the **NFC stamp tag** (NTAG213/215, free app "NFC Tools", URL record). Staff tap the customer's phone on the tag and a stamp is added after sign-in. One stamp per customer per cooldown period. If a tag link leaks, press **Regenerate stamp code** and rewrite the tags. Regenerate the sign-up code the same way if the QR leaks.
+- **Free first stamp:** a new member gets a stamp when they join (switch off in Offers -> Stamp card).
 - **Coupon codes:** welcome, surprise and birthday offers and the full-card reward each get a unique 6-character code on the customer's card. Customers cannot use them by themselves.
 - **Redeeming:** owner/staff open `/admin` -> **Redeem**, type the code (optionally the customer's phone to confirm it is theirs), press **Check coupon**, then **Confirm and mark as used**. A used code is dead for good and moves to the customer's History. The Redeem tab keeps a searchable log.
 - **Full card:** the customer taps **Get my reward code**, which uses up the stamps and creates a Reward coupon. Staff redeem it the same way.
 - **Birthday:** the coupon appears up to 7 days early but works only on the birthday date (business time zone), then expires.
-- **Card validity:** Settings -> Stamp card -> "Each card lasts" (default 6 months from the customer's first stamp, 0 = never). An unfinished card past its end date restarts at zero and the customer is told. A full card never expires. Owners see "Card ends" per customer and get "Card ending" reminders.
+- **Card validity:** Offers -> Stamp card -> "Each card lasts" (default 6 months from the customer's first stamp, 0 = never). An unfinished card past its end date restarts at zero and the customer is told. A full card never expires. Owners see "Card ends" per customer and get "Card ending" reminders.
 - **Phone numbers:** exactly 10 digits. Spaces, dashes, `+91`, `91` and a leading `0` (including phone autofill) are cleaned automatically. Indian numbers must start with 6-9. Change `countryCode` in `config.js` for other countries.
 - **Staff:** there are no separate staff logins yet. Staff use the owner login on the counter device.
 
 **Updating an existing database:** just run `supabase/schema.sql` again. It is safe to re-run and keeps all data. Numbers saved earlier in `+91` or 12-digit form will not match the new 10-digit rule, so delete test accounts and sign up again.
+
+## What's new and CSV import
+
+- **What's new:** More -> What's new. A short note appears at the top of every customer's card until they press Got it. Editing it shows it again.
+- **Import CSV:** Customers -> Import CSV (columns Name, Phone, Birthday, Current stamps, Total visits, Rewards redeemed; the Export CSV file works as a template). Imported customers wait until they join with that phone number through the sign-up QR, then get their stamps. Existing members are skipped.
+
+## Refer a friend
+
+More -> Refer a friend (off by default). Every customer gets a personal code (e.g. ASHA-4K7) on their card with a WhatsApp share button. A friend scans the sign-up QR at the counter, enters the code in "Friend's code" and gets the offer as a coupon. The customer gets the same coupon after the friend's next stamp at the NFC tag, so fake sign-ups earn nothing. Referrals never add stamps. A cap limits rewards per customer per 30 days. Customers who joined before you switched it on get a code automatically.
+
+## Messaging customers on WhatsApp (admin -> Message)
+
+- **Pick who:** a group (everyone, joined this week, visited this week, not visited in 30+ days, birthday this month, has an unused offer, card ending soon) or hand-pick. You can also tick customers in **Customers** and press **Message selected**.
+- **Write once:** `{name}` becomes each customer's first name. Optional image link, rewards-card link and a "Reply STOP" line.
+- **Opt-outs:** if someone replies STOP, press **Mark opted out** on their row in Customers. They are then left out of every group, the send queue, the contact export and the reminder buttons, and can be undone any time. Customers can also tap **Stop WhatsApp offers** at the bottom of their own card.
+- **Send:** WhatsApp does not allow one web page to message many people, so **Start sending** opens each customer's chat with the message already typed. Press send in WhatsApp, come back, tap next. Nothing is sent without you pressing send.
+- **One image to everyone at once:** download the contacts (.vcf), import them on your phone, create a WhatsApp **Broadcast list**, and send the image there. "Share image" and "Copy image" help when you attach a picture from your device.
+- Fully automatic sending (no tapping) needs the paid WhatsApp Business Cloud API with approved templates. It is a separate integration.
+
+## Images (logo and stamp)
+
+Images are stored in a public Supabase Storage bucket called `brand` (one folder per business, up to 2 MB each), not inside the database. Re-run `supabase/schema.sql` once to create the bucket and its rules (only the business owner can write to their folder). Images saved earlier as inline data keep working; in **Offers -> Stamp image** (or **More -> Brand**) press **Move to storage** to convert them.
+
+## Libraries
+
+`assets/vendor/` holds supabase-js 2.117.2 and qrcode-generator 1.4.4, copied from npm, so the site loads no third-party scripts. To update one: download the new file from npm, put it in `assets/vendor/`, and change the `<script>` line in `index.html` / `admin/index.html`.
 
 ## Passwords
 
@@ -52,7 +80,7 @@ Branding, offers, cooldown, expiry, first stamp and card length are then edited 
 
 ## Reminders and home screen
 
-- `/admin` -> Overview -> **Reminders** lists birthdays in the next 7 days and offers ending within 3 days. Each row has a **WhatsApp** button that opens a ready-made message to that customer. Set `countryCode` in `config.js` (10-digit numbers get it added).
+- `/admin` -> Home -> **Reminders** lists birthdays in the next 7 days and offers ending within 3 days. Each row has a **WhatsApp** button that opens a ready-made message to that customer. Set `countryCode` in `config.js` (10-digit numbers get it added).
 - Customers see an "Expires in N days" notice on their card, plus an **Add to home screen** card (Android button, iPhone Share steps). On iPhone the installed app keeps its own login, so they sign in once more inside it.
 
 ## Deploy (GitHub + Vercel)
@@ -75,4 +103,4 @@ Vercel -> Add New -> Project -> import the repo -> Framework Preset **Other** ->
 - The anon key in `config.js` is public by design. The database rules in `schema.sql` are what keep each customer and owner to their own data.
 - Passwords are handled by Supabase Auth (hashed, rate-limited). Supabase's built-in email sender is limited to a few emails per hour, which is plenty for owner resets.
 - Reminders are manual (the owner taps WhatsApp). Automatic sending needs a paid WhatsApp/SMS service or web push, which is a later step.
-- The admin table loads the first 1,000 customers.
+- The admin loads all customers, 1,000 at a time.
