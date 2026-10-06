@@ -120,3 +120,27 @@ a.nm{color:inherit;font-weight:600;text-decoration:underline dotted}
 .scr-cv.gone{opacity:0;pointer-events:none}
 @keyframes thump{0%{transform:none}30%{transform:translateY(3px) scale(.995)}100%{transform:none}}
 #app>.card.thump{animation:up .38s cubic-bezier(.2,.8,.2,1) both,thump .3s .2s ease-out}
+
+/* ---- Top card, bottom nav, pages ---- */
+main.has-nav{padding-bottom:150px}
+.c-hero{background:linear-gradient(160deg,var(--brand),color-mix(in srgb,var(--brand) 55%,#000));color:#fff;margin:-18px -18px 18px;padding:22px 22px 26px;border-radius:0 0 34px 34px;box-shadow:0 18px 40px -24px color-mix(in srgb,var(--brand) 70%,#000)}
+.c-hero.slim{padding-bottom:18px;border-radius:0 0 26px 26px}
+.c-brand{display:flex;align-items:center;gap:12px}
+.c-logo{width:50px;height:50px;border-radius:50%;background:#fff;color:var(--brand);display:grid;place-items:center;font:600 22px Fraunces,Georgia,serif;overflow:hidden;flex:none}.c-logo img{width:100%;height:100%;object-fit:cover}
+.c-bt{min-width:0}.c-bt b{display:block;font:600 22px/1.15 Fraunces,Georgia,serif}.c-bt span{font-size:13px;opacity:.8}
+.c-count{font:600 34px/1.1 Fraunces,Georgia,serif;margin:20px 0 12px}.c-count small{font:500 14px Inter,system-ui,sans-serif;opacity:.8;margin-left:8px}
+.c-hero.slim .c-count{font-size:22px;margin:12px 0 10px}
+.c-hero .prog{background:rgba(255,255,255,.25)}.c-hero .prog i{background:#fff}
+.c-nav{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:0 14px calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none}
+.c-nav>div{pointer-events:auto;max-width:452px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 76px 1fr 1fr;align-items:center;background:color-mix(in srgb,var(--card) 94%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:30px;box-shadow:0 14px 34px -14px rgba(0,0,0,.35);padding:6px 4px}
+.c-nav .t{position:relative;border:0;background:none;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0 6px;font:600 10px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
+.c-nav .t svg{width:22px;height:22px}.c-nav .t.on{color:var(--brand)}
+.c-nav .bd{position:absolute;top:2px;left:calc(50% + 6px);font-style:normal;background:var(--brand);color:#fff;border-radius:99px;font-size:10px;line-height:1;padding:3px 6px;letter-spacing:0}
+.c-nav .go{width:62px;height:62px;border-radius:50%;border:4px solid var(--bg);background:var(--brand);color:#fff;display:grid;place-items:center;margin:-30px auto 0;box-shadow:0 10px 24px -8px var(--brand);cursor:pointer;transition:transform .12s}
+.c-nav .go:active{transform:scale(.94)}.c-nav .go svg{width:28px;height:28px}
+body:has(.c-nav) .toast{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+.st-chip{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-radius:99px;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand);white-space:nowrap}
+.st-chip.ok{background:#dcf5e7;color:#15803d}
+.pf{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 4px}
+.pf div{background:var(--bg);border-radius:14px;padding:12px;text-align:center;color:var(--mut);font-size:12px}
+.pf b{display:block;font:600 22px/1.2 Fraunces,Georgia,serif;color:var(--tx)}

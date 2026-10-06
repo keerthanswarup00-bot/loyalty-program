@@ -41,6 +41,7 @@ function scrReveal(id) {
   scrMem.add(id); try { localStorage.setItem('lk-scr-' + id, '1') } catch (e) { }
   sur = { t: 'Surprise unlocked', x: x.text };   // no .scratch flag, so the normal banner shows
   render(); burst(); buzz();
+  toast('Saved to your offers');
 }
 function initScratch() {
   document.querySelectorAll('.scr-cv').forEach(cv => {
@@ -66,6 +67,122 @@ function initScratch() {
     cv.onpointermove = e => { if (!down || fin) return; const [x, y] = pt(e); g.beginPath(); g.moveTo(lx, ly); g.lineTo(x, y); g.stroke(); lx = x; ly = y; if (++n % 6 == 0) check() };
     cv.onpointerup = cv.onpointercancel = () => { down = false; check() };
   });
+}
+
+
+// ---------- Pages, top card, bottom nav ----------
+let pg = 'home', nfcRd = null;
+const NI = {
+  home: ico('<path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>'),
+  gift: ico('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2 0-4-1-4-3s3-2.5 4 3c1-5.5 4-5 4-3s-2 3-4 3"/>'),
+  star: ico('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'),
+  user: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>'),
+  tap: ico('<path d="M7 9a6 6 0 0 1 0 6M11 6.5a10 10 0 0 1 0 11M15 4a14 14 0 0 1 0 16"/>')
+};
+function goTo(p) { pg = p; view = 'home'; render(); window.scrollTo(0, 0) }
+
+
+function ctx() {
+  const m = card.member, need = +biz.need, s = m.stamps, ready = s >= need, of = card.offers || [];
+  const liveAll = of.filter(x => !x.used_at && !isExp(x)), past = of.filter(x => x.used_at || isExp(x));
+  const locked = liveAll.filter(scrLocked), live = liveAll.filter(x => !scrLocked(x));
+  return { m, need, s, ready, past, locked, live };
+}
+
+
+function heroV() {
+  const { need, s } = ctx();
+  const pct = Math.min(100, s / need * 100), from = anim >= 0 ? prevPct : pct;
+  const slim = pg != 'home' || view == 'pw';
+  return `<header class="c-hero${slim ? ' slim' : ''}"><div class="c-brand"><div class="c-logo">${mark(biz)}</div><div class="c-bt"><b>${esc(biz.name)}</b><span>${esc(biz.tagline)}</span></div></div>
+  <div class="c-count">${Math.min(s, need)} of ${need} Stamps${s < need ? '<small>' + (need - s) + ' to go</small>' : ''}</div>
+  <div class="prog"><i style="width:${from}%" data-to="${pct}"></i></div></header>`;
+}
+
+
+function navV() {
+  const { live, locked } = ctx(), n = live.length + locked.length, cur = view == 'pw' ? 'profile' : pg;
+  const t = (id, lab, ic, badge) => `<button type="button" class="t${cur == id ? ' on' : ''}" onclick="goTo('${id}')">${ic}<span>${lab}</span>${badge ? `<i class="bd">${badge}</i>` : ''}</button>`;
+  return `<nav class="c-nav"><div>${t('home', 'Home', NI.home)}${t('offers', 'Offers', NI.gift, n)}
+  <button type="button" class="go" aria-label="Collect a stamp" onclick="tapStamp()">${NI.tap}</button>
+  ${t('rewards', 'Rewards', NI.star)}${t('profile', 'Profile', NI.user)}</div></nav>`;
+}
+
+
+// Centre button. Android Chrome can read the NFC tag inside the page (needs this button press as the gesture).
+// iPhone has no Web NFC, so it can only tell the customer to tap the tag.
+async function tapStamp() {
+  if (!('NDEFReader' in window)) return toast('Hold the top of your phone on the stamp tag at the counter. Your stamp is added when the page opens.');
+  if (nfcRd) return toast('Ready. Hold your phone near the stamp tag.');
+  try {
+    nfcRd = new NDEFReader(); await nfcRd.scan();
+    toast('Hold your phone near the stamp tag');
+    nfcRd.onreading = e => {
+      for (const rec of e.message.records) {
+        let t = ''; try { t = new TextDecoder().decode(rec.data) } catch (x) { }
+        const m = t.match(/scan=([\w-]+)/);
+        if (m) { pend = m[1]; scan(); return }
+      }
+      toast('That is not a stamp tag');
+    };
+  } catch (e) { nfcRd = null; toast('NFC is off or blocked. Turn it on in phone settings, or just tap the tag.') }
+}
+
+
+const offerRow = x => `<div class="of"><div><div class="tag">${esc(x.type)}</div><b>${esc(x.text)}</b><div class="mut sm">${when(x)}</div></div>${x.code ? `<button type="button" class="cd" aria-label="Coupon code ${esc(x.code)}, tap to copy" onclick="copyText('${esc(x.code)}','Code copied')">${esc(x.code)}</button>` : ''}</div>`;
+const pastRow = x => `<div class="of u"><div><div class="tag">${esc(x.type)}</div><b>${esc(x.text)}</b><div class="mut sm">${x.used_at ? 'Used ' + fd(x.used_at) : 'Expired ' + fd(x.expires_at)}</div></div></div>`;
+
+
+function homePgV() {
+  const { m, need, s, ready, live, locked } = ctx();
+  const soon = live.filter(x => !isEarly(x) && x.expires_at && daysTo(x.expires_at) <= 3);
+  const left = m.card_ends_at && !ready ? daysTo(m.card_ends_at) : null;
+  const wait = m.last_stamp && biz.cooldown_min > 0 ? Math.ceil((new Date(m.last_stamp).getTime() + biz.cooldown_min * 6e4 - Date.now()) / 1000) : 0;
+  const img = biz.stamp_url && (biz.stamp_url.startsWith('http') || biz.stamp_url.startsWith('data:'));
+  let g = ''; for (let i = 0; i < need; i++) g += i < s ? `<div class="st f ${i == anim ? 'pop' : ''} ${intro ? 'in' : ''}" style="--i:${i}">${img ? `<img src="${esc(biz.stamp_url)}" alt="stamp" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : IC.chk}</div>` : `<div class="st">${i + 1}</div>`;
+  let o = newsV() + `<div class="card${anim >= 0 ? ' thump' : ''}"><div class="eyebrow">Hello, ${esc(m.name.split(' ')[0])}</div><div class="grid">${g}</div>
+  <p class="rule">Collect ${need} stamps to earn <b>${esc(biz.reward)}</b>.</p>`;
+  if (m.card_ends_at && !ready) o += `<p class="mut sm">${left <= 14 ? '<span class="expiry">Card ends in ' + Math.max(left, 0) + (left == 1 ? ' day' : ' days') + '</span> · finish it before ' + fd(m.card_ends_at) : 'Card valid until ' + fd(m.card_ends_at)}</p>`;
+  if (card.lost > 0) o += `<div class="rw"><small>Card expired</small><b>${card.lost} ${card.lost == 1 ? 'stamp was' : 'stamps were'} reset</b><span class="mut">Your last card ran out of time. A fresh card starts with your next stamp.</span></div>`;
+  if (sur && !sur.scratch) o += `<div class="rw"><small>${esc(sur.t)}</small><b>${esc(sur.x)}</b><button type="button" class="lnk" onclick="goTo('offers')">View in Offers</button></div>`;
+  if (locked.length) o += scrV(locked[0], locked.length - 1);
+  if (reward) o += `<div class="rw"><small>Show this code to staff</small><div class="code" role="button" tabindex="0" onclick="copyText('${esc(reward)}','Code copied')">${esc(reward)}</div><span class="mut">Tap the code to copy it.</span></div>`;
+  if (soon.length) o += `<div class="rw"><small>Expiring soon</small><b>${soon.length == 1 ? '1 offer ends' : soon.length + ' offers end'} within 3 days</b><button type="button" class="lnk" onclick="goTo('offers')">See offers</button></div>`;
+  if (ready) o += `<div class="rw"><small>Reward unlocked</small><b>${esc(biz.reward)}</b></div><button class="btn" onclick="claim()">Get my reward code</button>`;
+  o += `<p class="hint" style="text-align:center;margin-top:18px">Tap your phone on the stamp tag at the counter to collect a stamp.${wait > 0 ? ' <b>Next stamp in ' + fmtWait(wait) + '.</b>' : ''}</p></div>`;
+  return o + a2hsV() + socials(biz);
+}
+
+
+function offersPgV() {
+  const { live, locked, past } = ctx();
+  let o = '';
+  if (locked.length) o += `<div class="card"><h2>Scratch to reveal</h2>${scrV(locked[0], locked.length - 1)}</div>`;
+  o += `<div class="card"><div class="row2"><h2>Your offers</h2><span class="pill">${live.length}</span></div>${live.length ? live.map(offerRow).join('') + '<p class="hint">Show the code to staff at the counter (tap a code to copy it).</p>' : '<p class="sub" style="margin:0">Welcome, birthday and surprise offers will appear here.</p>'}</div>`;
+  if (past.length) o += `<div class="card"><h2>History</h2>${past.map(pastRow).join('')}</div>`;
+  return o;
+}
+
+
+function rewardsPgV() {
+  const { m, need, s, ready } = ctx();
+  let o = `<div class="card"><div class="row2"><h2>${esc(biz.reward)}</h2><span class="st-chip${ready ? ' ok' : ''}">${ready ? 'Achieved' : (need - s) + ' to go'}</span></div>
+  <p class="sub">Collect ${need} stamps to earn this reward.${m.redeemed ? ' You have earned it ' + m.redeemed + (m.redeemed == 1 ? ' time.' : ' times.') : ''}</p>`;
+  if (reward) o += `<div class="rw"><small>Show this code to staff</small><div class="code" role="button" tabindex="0" onclick="copyText('${esc(reward)}','Code copied')">${esc(reward)}</div><span class="mut">Tap the code to copy it. It is also saved in Offers.</span></div>`;
+  if (ready) o += `<button class="btn" onclick="claim()">Get my reward code</button>`;
+  return o + '</div>' + (refV() || '<div class="card"><p class="sub" style="margin:0">More ways to earn rewards are coming soon.</p></div>');
+}
+
+
+function profilePgV() {
+  const { m, live, locked } = ctx();
+  return `<div class="card"><div class="eyebrow">Member</div><h2>${esc(m.name)}</h2><p class="sub">${esc(m.phone)}</p>
+  <div class="pf"><div><b>${m.total}</b>Visits</div><div><b>${m.redeemed}</b>Rewards</div><div><b>${live.length + locked.length}</b>Offers</div></div>
+  <button class="btn alt" onclick="reload()">Refresh my card</button>
+  <button class="btn alt" onclick="waPref()">${m.wa_optout ? 'Turn WhatsApp offers on' : 'Stop WhatsApp offers'}</button>
+  <button class="btn alt" onclick="view='pw';render()">Change password</button>
+  <button class="btn alt" onclick="out()">Sign out</button>
+  <p class="note"><a href="#" onclick="delMe();return false" style="color:#b91c1c">Delete my account</a></p></div>`;
 }
 
 async function load() {
@@ -157,13 +274,13 @@ async function login(btn) {
   }
 }
 
-async function out() { await sb.auth.signOut(); card = null; view = 'home'; sur = reward = null; render() }
+async function out() { await sb.auth.signOut(); card = null; view = 'home'; pg = 'home'; sur = reward = null; render() }
 
 // Change password (customers have no real email, so there is no emailed reset: the owner can set a temporary one).
 function pwV() {
-  return head(biz) + `<div class="card"><h2>Change password</h2><p class="sub">Choose a new password for your card.</p>
+  return `<div class="card"><h2>Change password</h2><p class="sub">Choose a new password for your card.</p>
   <label class="lb">New password <span>(6+ characters)</span></label>${pwField('np', 'new-password')}
-  <button class="btn" onclick="savePw(this)">Save password</button><button class="btn alt" onclick="view='home';render()">Cancel</button></div>`;
+  <button class="btn" data-go onclick="savePw(this)">Save password</button><button class="btn alt" onclick="view='home';render()">Cancel</button></div>`;
 }
 async function savePw(btn) {
   const p = v('np');
@@ -212,7 +329,7 @@ function pwa() {
 
 async function delMe() {
   if (!confirm('Delete your account, card and offers permanently?')) return;
-  try { await rpc(sb, 'delete_me'); await sb.auth.signOut(); card = null; sur = reward = null; form = 'new'; render(); toast('Your account was deleted') } catch (e) { toast(nice(e)) }
+  try { await rpc(sb, 'delete_me'); await sb.auth.signOut(); card = null; sur = reward = null; form = 'new'; view = 'home'; pg = 'home'; render(); toast('Your account was deleted') } catch (e) { toast(nice(e)) }
 }
 
 async function claim() {
@@ -272,37 +389,12 @@ function refV() {
   <a class="btn" style="margin-top:12px" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Share on WhatsApp</a></div>`;
 }
 
-function homeV() {
-  const m = card.member, need = +biz.need, s = m.stamps, ready = s >= need, of = card.offers || [];
-  const liveAll = of.filter(x => !x.used_at && !isExp(x)), past = of.filter(x => x.used_at || isExp(x));
-  const locked = liveAll.filter(scrLocked), live = liveAll.filter(x => !scrLocked(x));
-  const soon = live.filter(x => !isEarly(x) && x.expires_at && daysTo(x.expires_at) <= 3);
-  const left = m.card_ends_at && !ready ? daysTo(m.card_ends_at) : null;
-  const wait = m.last_stamp && biz.cooldown_min > 0 ? Math.ceil((new Date(m.last_stamp).getTime() + biz.cooldown_min * 6e4 - Date.now()) / 1000) : 0;
-  const pct = Math.min(100, s / need * 100), from = anim >= 0 ? prevPct : pct;
-  let g = ''; for (let i = 0; i < need; i++) g += i < s ? `<div class="st f ${i == anim ? 'pop' : ''} ${intro ? 'in' : ''}" style="--i:${i}">${(biz.stamp_url && (biz.stamp_url.startsWith('http') || biz.stamp_url.startsWith('data:'))) ? `<img src="${esc(biz.stamp_url)}" alt="stamp" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : IC.chk}</div>` : `<div class="st">${i + 1}</div>`;
-  let o = head(biz) + newsV() + `<div class="card${anim >= 0 ? ' thump' : ''}"><div class="eyebrow">Hello, ${esc(m.name.split(' ')[0])}</div><div class="count"><b>${Math.min(s, need)}</b><span>of ${need} stamps${s < need ? ' · ' + (need - s) + ' to go' : ''}</span></div><div class="prog"><i style="width:${from}%" data-to="${pct}"></i></div><div class="grid">${g}</div>
-  <p class="rule">Collect ${need} stamps to earn <b>${esc(biz.reward)}</b>.</p>`;
-  if (m.card_ends_at && !ready) o += `<p class="mut sm">${left <= 14 ? '<span class="expiry">Card ends in ' + Math.max(left, 0) + (left == 1 ? ' day' : ' days') + '</span> · finish it before ' + fd(m.card_ends_at) : 'Card valid until ' + fd(m.card_ends_at)}</p>`;
-  if (card.lost > 0) o += `<div class="rw"><small>Card expired</small><b>${card.lost} ${card.lost == 1 ? 'stamp was' : 'stamps were'} reset</b><span class="mut">Your last card ran out of time. A fresh card starts with your next stamp.</span></div>`;
-  if (sur && !sur.scratch) o += `<div class="rw"><small>${esc(sur.t)}</small><b>${esc(sur.x)}</b><span class="mut">Saved in Your offers below.</span></div>`;
-  if (locked.length) o += scrV(locked[0], locked.length - 1);
-  if (reward) o += `<div class="rw"><small>Show this code to staff</small><div class="code" role="button" tabindex="0" onclick="copyText('${esc(reward)}','Code copied')">${esc(reward)}</div><span class="mut">Tap the code to copy it.</span></div>`;
-  if (soon.length) o += `<div class="rw"><small>Expiring soon</small><b>${soon.length == 1 ? '1 offer ends' : soon.length + ' offers end'} within 3 days</b><span class="mut">See Your offers below.</span></div>`;
-  if (ready) o += `<div class="rw"><small>Reward unlocked</small><b>${esc(biz.reward)}</b></div><button class="btn" onclick="claim()">Get my reward code</button>`;
-  o += `<p class="hint" style="text-align:center;margin-top:18px">Tap your phone on the stamp tag at the counter to collect a stamp.${wait > 0 ? ' <b>Next stamp in ' + fmtWait(wait) + '.</b>' : ''}</p></div>
-  <div class="card"><div class="row2"><h2>Your offers</h2><span class="pill">${live.length}</span></div>${live.length ? live.map(x =>
-    `<div class="of"><div><div class="tag">${esc(x.type)}</div><b>${esc(x.text)}</b><div class="mut sm">${when(x)}</div></div>${x.code ? `<button type="button" class="cd" aria-label="Coupon code ${esc(x.code)}, tap to copy" onclick="copyText('${esc(x.code)}','Code copied')">${esc(x.code)}</button>` : ''}</div>`
-  ).join('') + '<p class="hint">Show the code to staff at the counter (tap a code to copy it).</p>' : '<p class="sub" style="margin:0">Welcome, birthday and surprise offers will appear here.</p>'}</div>`
-    + (past.length ? `<div class="card"><h2>History</h2>${past.map(x => `<div class="of u"><div><div class="tag">${esc(x.type)}</div><b>${esc(x.text)}</b><div class="mut sm">${x.used_at ? 'Used ' + fd(x.used_at) : 'Expired ' + fd(x.expires_at)}</div></div></div>`).join('')}</div>` : '')
-    + refV() + a2hsV() + socials(biz) + `<p class="note"><a href="#" onclick="reload();return false">Refresh</a> &nbsp;·&nbsp; <a href="#" onclick="waPref();return false">${m.wa_optout ? 'Turn WhatsApp offers on' : 'Stop WhatsApp offers'}</a> &nbsp;·&nbsp; <a href="#" onclick="view='pw';render();return false">Change password</a> &nbsp;·&nbsp; <a href="#" onclick="out();return false">Sign out</a> &nbsp;·&nbsp; <a href="#" onclick="delMe();return false">Delete my account</a></p>`;
-  return o;
-}
-
 function render() {
-  $('#app').innerHTML = !card ? authV() : view == 'pw' ? pwV() : homeV();
+  const app = $('#app');
+  app.className = card ? 'has-nav' : '';
+  app.innerHTML = !card ? authV() : heroV() + (view == 'pw' ? pwV() : pg == 'offers' ? offersPgV() : pg == 'rewards' ? rewardsPgV() : pg == 'profile' ? profilePgV() : homePgV()) + navV();
   if (card) intro = false;
-  if (card && view == 'home') {
+  if (card) {
     initScratch();
     const p = $('.prog i');
     if (p) { const to = +p.dataset.to; requestAnimationFrame(() => requestAnimationFrame(() => { p.style.width = to + '%' })); prevPct = to }
