@@ -6,6 +6,7 @@ let sel = new Set(), bsel = new Set(), sortBy = 'joined', bseg = 'all', bmsg = '
 const first = u => (u.name || '').split(' ')[0];
 
 const scanUrl = () => location.origin + '/#scan=' + biz.scan_token;
+const joinUrl = () => location.origin + '/#join=' + biz.join_token;
 const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).length;
 // When this customer's current card runs out (null = no deadline: no stamps yet, full card, or the owner set no limit).
 const cardEnd = u => { if (!biz.card_months || !u.card_started_at || !(u.stamps > 0) || u.stamps >= biz.need) return null; const d = new Date(u.card_started_at); d.setMonth(d.getMonth() + biz.card_months); return d };
@@ -353,14 +354,17 @@ function dash() {
     <div class="card" style="margin-top:16px"><h2>Latest sign-ups</h2>${M.slice(0, 5).map(u => `<div class="of"><b>${esc(u.name)}</b><span class="mut sm">${esc(u.phone)} · ${fd(u.joined)}</span></div>`).join('') || '<p class="sub" style="margin:0">No members yet. Share your customer page to get started.</p>'}</div>`;
   }
   if (tab == 'r') o += redeemV();
-  if (tab == 'c') o += `<div class="row"><input placeholder="Search name or phone" value="${esc(q)}" oninput="q=this.value;$('#tb').innerHTML=rows()"><select aria-label="Sort" onchange="sortBy=this.value;$('#tb').innerHTML=rows()">${Object.keys(SORTS).map(k => `<option value="${k}"${sortBy == k ? ' selected' : ''}>${SORTS[k]}</option>`).join('')}</select><button class="btn sm" id="selb" ${sel.size ? '' : 'disabled'} onclick="msgSel()">${sel.size ? `Message selected (${sel.size})` : 'Message selected'}</button><button class="btn sm alt" onclick="exp()">Export CSV</button></div>
+  if (tab == 'c') o += `<div class="row"><input placeholder="Search name or phone" value="${esc(q)}" oninput="q=this.value;$('#tb').innerHTML=rows()"><select aria-label="Sort" onchange="sortBy=this.value;$('#tb').innerHTML=rows()">${Object.keys(SORTS).map(k => `<option value="${k}"${sortBy == k ? ' selected' : ''}>${SORTS[k]}</option>`).join('')}</select><button class="btn sm" id="selb" ${sel.size ? '' : 'disabled'} onclick="msgSel()">${sel.size ? `Message selected (${sel.size})` : 'Message selected'}</button><button class="btn sm alt" onclick="exp()">Export CSV</button><button class="btn sm alt" onclick="$('#impf').click()">Import CSV</button><input type="file" id="impf" accept=".csv,text/csv" hidden onchange="impPick(this)"></div><div id="imp"></div>
   <div class="card tw" style="margin-top:12px"><table><thead><tr><th><input type="checkbox" aria-label="Select all shown" onchange="tgAll(this.checked)"></th><th>Name</th><th>Phone</th><th>Birthday</th><th>Stamps</th><th>Card ends</th><th>Visits</th><th>Rewards</th><th>Offers held</th><th>Joined</th><th>Last visit</th><th></th></tr></thead><tbody id="tb">${rows()}</tbody></table></div>`;
   if (tab == 'b') { if (!binit) { bpick(); binit = true } o += msgV() }
-  if (tab == 'q') o += `<div class="card"><h2>Stamp link</h2><p class="sub">Opening this link on a customer's phone adds a stamp (after sign-in). Put it on a QR code or write it to NFC tags for your staff.</p>
-  <label>Link for the QR code or NFC tag</label><input readonly class="ro" value="${esc(scanUrl())}" onclick="this.select()">
+  if (tab == 'q') o += `<div class="card"><h2>Sign-up QR</h2><p class="sub">Print this QR for the counter or door. Scanning it lets a new customer join and get their first stamp. It cannot add any later stamps, so a photo of it is of no use for stamping.</p>
+  <label>Sign-up link</label><input readonly class="ro" value="${esc(joinUrl())}" onclick="this.select()">
   <div class="qr" id="qrb"></div>
-  <div class="row"><button class="btn sm" onclick="dlQR()">Download QR (SVG)</button><button class="btn sm alt" onclick="cpL()">Copy link</button><button class="btn sm alt" onclick="regen()">Regenerate code</button></div></div>
-  <div class="card"><h2>NFC tags for staff</h2><p class="sub" style="margin:0">Buy NTAG213 or NTAG215 stickers. In a free app such as NFC Tools, write the link above as a URL record. Staff then tap the customer's phone on the tag. If the link ever leaks, regenerate the code and rewrite the tags. One stamp per customer per cooldown period either way.</p></div>`;
+  <div class="row"><button class="btn sm" onclick="dlQR()">Download QR (SVG)</button><button class="btn sm alt" onclick="cpL('j')">Copy link</button><button class="btn sm alt" onclick="regen('join_token')">Regenerate sign-up code</button></div></div>
+  <div class="card"><h2>NFC stamp tag</h2><p class="sub">Every stamp after the first comes from this tap-only link. Write it to an NTAG213 or NTAG215 sticker (free app "NFC Tools", URL record) and keep the sticker at the counter. Do not print it as a QR. One stamp per customer per cooldown period either way.</p>
+  <label>Link for the NFC tag</label><input readonly class="ro" value="${esc(scanUrl())}" onclick="this.select()">
+  <div class="row"><button class="btn sm alt" onclick="cpL('s')">Copy link</button><button class="btn sm alt" onclick="regen('scan_token')">Regenerate stamp code</button></div>
+  <p class="hint">If you printed the old QR with the stamp link, press Regenerate stamp code and rewrite your tags: the old QR then stops adding stamps.</p></div>`;
   if (tab == 's') {
     const f = (i, l, x, t) => `<label>${l}</label><input id="${i}" ${t || ''} value="${esc(x)}">`;
     const up = (fid, hid, cur, lbl) => `<label>${lbl}</label><div class="pv" id="${fid}pv"${cur ? '' : ' hidden'}>${cur ? `<img src="${esc(cur)}" alt=""><button type="button" class="lnk" onclick="rmImg('${hid}','${fid}pv')">Remove this image</button>` : ''}</div><input type="file" id="${fid}" accept="image/png,image/jpeg,image/webp,image/gif" onchange="pvImg('${fid}','${fid}pv','${hid}')"><input type="hidden" id="${hid}" value="0"><p class="hint">Upload a PNG, JPG, WebP or GIF, up to 2 MB.</p>`;
@@ -368,6 +372,7 @@ function dash() {
     o += `<div class="card"><h2>Brand</h2>${f('cn', 'Business name', biz.name)}${f('ct', 'Tagline', biz.tagline)}${up('clfile', 'clx', biz.logo_url, 'Logo image')}${f('cc', 'Brand colour', biz.color, 'type=color')}
     ${f('ci', 'Instagram link', biz.ig)}${f('cf', 'Facebook link', biz.fb)}${f('cw', 'WhatsApp link (https://wa.me/…)', biz.wa)}${f('cs', 'Website link', biz.web)}</div>
     <div class="card"><h2>Stamp image</h2>${up('stfile', 'stx', biz.stamp_url, 'Stamp image')}<p class="hint" style="margin:0">Shown in place of the collected stamps on the customer's card. Leave empty to keep the normal tick stamps.</p>${dbImgs() ? `<p class="hint">Your ${dbImgs() == 1 ? 'image is' : 'images are'} still stored inside the database. <button type="button" class="lnk" onclick="moveImgs(this)">Move to storage</button> to make the app load faster.</p>` : ''}</div>
+    <div class="card"><h2>What's new</h2><p class="sub">A short note shown at the top of every customer's card (an event, new menu item, holiday hours). Leave blank to hide it.</p><textarea id="nw" rows="3" maxlength="280">${esc(biz.news_text || '')}</textarea><p class="hint">Up to 280 characters. Customers who already closed the old note see the new one.</p></div>
     <div class="card"><h2>Rewards</h2><div class="row"><div>${f('cn2', 'Stamps needed', biz.need, 'type=number min=2 max=20')}</div><div><label>Time between stamps</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input id="cd" type="number" min="0" value="${cv}"><select id="cu"><option value="m"${h ? '' : ' selected'}>minutes</option><option value="h"${h ? ' selected' : ''}>hours</option></select></div></div></div>${f('cr', 'Reward when card is full', biz.reward)}</div>
     <div class="card"><h2>Stamp card</h2><div class="row"><div><label>First stamp when a customer joins</label><select id="js"><option value="1"${biz.join_stamp ? ' selected' : ''}>Yes, give a free first stamp</option><option value="0"${biz.join_stamp ? '' : ' selected'}>No</option></select></div><div>${f('cm', 'Each card lasts (months from first stamp, 0 = never)', biz.card_months, 'type=number min=0 max=60')}</div></div>
     <p class="hint">An unfinished card that passes its end date starts again from zero. A full card never expires, so the customer can always claim the reward.</p></div>
@@ -452,6 +457,7 @@ async function doSave({ logoUrl, stampUrl, t, btn }) {
     need: Math.max(2, Math.min(20, Math.round(+v('cn2')) || 8)),
     cooldown_min: Math.max(0, Math.round((+v('cd') || 0) * (v('cu') == 'h' ? 60 : 1))),
     reward: t('cr'), welcome_offer: t('wo'), bday_offer: t('bo'), sur_stamps: t('ca'), sur_offer: t('co'),
+    news_text: t('nw').slice(0, 280), news_at: t('nw') ? (t('nw') == (biz.news_text || '') && biz.news_at ? biz.news_at : new Date().toISOString()) : null,
     exp_days: Math.max(0, Math.round(+v('cx')) || 0),
     join_stamp: v('js') != '0', card_months: Math.max(0, Math.min(60, Math.round(+v('cm')) || 0))
   };
@@ -469,25 +475,83 @@ async function del(id) {
   try { await rpc(sb, 'delete_member', { p_member: id }); M = M.filter(u => u.id != id); sel.delete(id); render() } catch (e) { toast(nice(e)) }
 }
 
-async function regen() {
-  if (!confirm('Old printed QR codes and NFC tags will stop working. Continue?')) return;
+async function regen(col) {
+  if (!confirm(col == 'join_token' ? 'The old sign-up QR will stop working and you will need to print the new one. Continue?' : 'Old NFC tags and any printed stamp QR will stop adding stamps. Continue?')) return;
   const tok = [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
-  const { error } = await sb.from('businesses').update({ scan_token: tok }).eq('id', biz.id);
+  const { error } = await sb.from('businesses').update({ [col]: tok }).eq('id', biz.id);
   if (error) return toast(nice(error));
-  biz.scan_token = tok; render(); toast('New code created. Rewrite your tags.');
+  biz[col] = tok; render(); toast(col == 'join_token' ? 'New sign-up code created. Print the new QR.' : 'New stamp code created. Rewrite your tags.');
 }
 
-function qrSvg() { if (typeof qrcode == 'undefined') return ''; const z = qrcode(0, 'M'); z.addData(scanUrl()); z.make(); return z.createSvgTag({ cellSize: 6, margin: 2, scalable: true }) }
+function qrSvg() { if (typeof qrcode == 'undefined') return ''; const z = qrcode(0, 'M'); z.addData(joinUrl()); z.make(); return z.createSvgTag({ cellSize: 6, margin: 2, scalable: true }) }
 function drawQR() { const b = $('#qrb'); if (b) b.innerHTML = qrSvg() || '<p class="mut">QR library could not load.</p>' }
-async function cpL() { try { await navigator.clipboard.writeText(scanUrl()); toast('Link copied') } catch (e) { toast('Tap the link box and copy it') } }
+async function cpL(k) { try { await navigator.clipboard.writeText(k == 'j' ? joinUrl() : scanUrl()); toast('Link copied') } catch (e) { toast('Tap the link box and copy it') } }
 function dl(name, data, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove() }
 const slug = () => biz.name.replace(/\W+/g, '-');
-function dlQR() { const x = qrSvg(); if (x) dl(slug() + '-QR.svg', x, 'image/svg+xml') }
+function dlQR() { const x = qrSvg(); if (x) dl(slug() + '-signup-QR.svg', x, 'image/svg+xml') }
 function exp() {
   const cell = x => { let s = String(x == null ? '' : x); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"' };
   const rows = [['Name', 'Phone', 'Birthday', 'Current stamps', 'Card ends', 'Total visits', 'Rewards redeemed', 'Joined', 'Last visit', 'WhatsApp opted out']]
     .concat(M.map(u => [u.name, u.phone, u.bday || '', u.stamps, cardEnd(u) ? fd(cardEnd(u)) : '', u.total, u.redeemed, fd(u.joined), fd(u.last_stamp), optedOut(u) ? 'yes' : '']));
   dl(slug() + '-customers.csv', '﻿' + rows.map(r => r.map(cell).join(',')).join('\n'), 'text/csv');
+}
+
+// ---- CSV import (e.g. a paper stamp book): saved as "waiting" cards that are claimed when that phone number joins ----
+function parseCsv(t) {
+  const out = []; let row = [], c = '', q = false;
+  t = t.replace(/^\uFEFF/, '');
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) { if (ch == '"') { if (t[i + 1] == '"') { c += '"'; i++ } else q = false } else c += ch }
+    else if (ch == '"') q = true;
+    else if (ch == ',') { row.push(c); c = '' }
+    else if (ch == '\n' || ch == '\r') { if (ch == '\r' && t[i + 1] == '\n') i++; row.push(c); c = ''; if (row.some(x => x.trim())) out.push(row); row = [] }
+    else c += ch;
+  }
+  row.push(c); if (row.some(x => x.trim())) out.push(row);
+  return out;
+}
+function csvBday(x) {
+  x = (x || '').trim(); let m;
+  if ((m = x.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  if ((m = x.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return '';
+}
+let impRows = null;
+function impParse(text) {
+  const R = parseCsv(text); if (R.length < 2) return null;
+  const H = R[0].map(h => h.trim().toLowerCase()), col = (...n) => H.findIndex(h => n.some(x => h == x || h.startsWith(x)));
+  const ci = { name: col('name'), phone: col('phone', 'mobile'), bday: col('birth'), stamps: col('current stamps', 'stamps'), total: col('total', 'visits'), red: col('rewards', 'redeemed') };
+  if (ci.phone < 0) return null;
+  const have = new Set(M.map(u => u.phone)), seen = new Set(), good = []; let bad = 0, dup = 0;
+  R.slice(1).forEach(x => {
+    const phone = normPhone(x[ci.phone] || ''), n = i => i < 0 ? 0 : Math.max(0, Math.round(+(x[i] || 0)) || 0);
+    if (!phone) { bad++; return }
+    if (have.has(phone) || seen.has(phone)) { dup++; return }
+    seen.add(phone);
+    good.push({ name: ci.name < 0 ? '' : (x[ci.name] || '').trim(), phone, bday: ci.bday < 0 ? '' : csvBday(x[ci.bday]), stamps: n(ci.stamps), total: n(ci.total), redeemed: n(ci.red) });
+  });
+  return { good, bad, dup };
+}
+function impPick(inp) {
+  const f = inp.files[0]; if (!f) return; inp.value = '';
+  if (f.size > 2e6) return toast('File too big (max 2 MB)');
+  const rd = new FileReader();
+  rd.onload = () => {
+    const r = impParse(String(rd.result)), box = $('#imp');
+    if (!r) return toast('Could not find a Phone column. Use the exported CSV as a template.');
+    impRows = r.good;
+    box.innerHTML = `<div class="card" style="margin-top:12px"><h2>Import ${r.good.length} customer${r.good.length == 1 ? '' : 's'}?</h2><p class="sub">${r.dup} already ${r.dup == 1 ? 'is a member' : 'are members'} (skipped), ${r.bad} without a valid 10-digit phone (skipped). Imported customers become real members, with their stamps, when they join with that phone number. They are not messaged and cannot log in until then.</p>
+    <div class="row"><button class="btn sm" ${r.good.length ? '' : 'disabled'} onclick="impGo(this)">Import</button><button class="btn sm alt" onclick="impRows=null;$('#imp').innerHTML=''">Cancel</button></div></div>`;
+  };
+  rd.readAsText(f);
+}
+async function impGo(btn) {
+  btn.disabled = true; let added = 0;
+  try {
+    for (let i = 0; i < impRows.length; i += 500) { const r = await rpc(sb, 'import_members', { p_slug: CFG.slug, p_rows: impRows.slice(i, i + 500) }); added += r.added }
+    $('#imp').innerHTML = ''; impRows = null; toast(added + ' customers imported. They join with their phone number.'); burst();
+  } catch (e) { btn.disabled = false; toast(/function|schema cache/i.test(String(e && e.message || e)) ? 'Run the latest supabase/schema.sql first' : nice(e)) }
 }
 
 function render() {

@@ -100,3 +100,6 @@ textarea:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 3px color-mi
 .pr{display:flex;gap:12px;align-items:center;margin:0;padding:11px 0;border-top:1px solid var(--line);font-weight:400;font-size:14px;cursor:pointer}
 .plist .pr:first-child{border-top:0}.pr span{display:flex;flex-direction:column}.pr small{color:var(--mut);font-size:12.5px}
 .bubble{background:color-mix(in srgb,#25d366 14%,var(--card));border:1px solid color-mix(in srgb,#25d366 35%,var(--line));border-radius:14px 14px 4px 14px;padding:12px 14px;white-space:pre-wrap;word-break:break-word;font-size:14.5px;margin-top:6px}
+
+/* What's new note */
+.news{border-left:4px solid var(--brand,#8a4b2a);animation:up .4s both}

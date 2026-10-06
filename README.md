@@ -34,7 +34,8 @@ Branding, offers, cooldown, expiry, first stamp and card length are then edited 
 
 ## Stamps, coupons and card validity
 
-- **Stamping:** Owner -> **QR & NFC** gives one link. Put it on a QR code or write it to NFC tags (NTAG213/215, free app "NFC Tools", URL record). Staff tap the customer's phone on the tag and a stamp is added after sign-in. One stamp per customer per cooldown period. If the link leaks, press **Regenerate code** and rewrite the tags.
+- **Joining:** **QR & NFC** -> **Sign-up QR** is the only way to join. Customers scan it, create their card and get the free first stamp. The page without the QR shows "scan the sign-up QR at the counter". The QR cannot add any later stamp, so photographing or enlarging it gains nothing.
+- **Stamping:** every later stamp comes from the **NFC stamp tag** (NTAG213/215, free app "NFC Tools", URL record). Staff tap the customer's phone on the tag and a stamp is added after sign-in. One stamp per customer per cooldown period. If a tag link leaks, press **Regenerate stamp code** and rewrite the tags. Regenerate the sign-up code the same way if the QR leaks.
 - **Free first stamp:** a new member gets a stamp when they join (switch off in Settings -> Stamp card).
 - **Coupon codes:** welcome, surprise and birthday offers and the full-card reward each get a unique 6-character code on the customer's card. Customers cannot use them by themselves.
 - **Redeeming:** owner/staff open `/admin` -> **Redeem**, type the code (optionally the customer's phone to confirm it is theirs), press **Check coupon**, then **Confirm and mark as used**. A used code is dead for good and moves to the customer's History. The Redeem tab keeps a searchable log.
@@ -45,6 +46,11 @@ Branding, offers, cooldown, expiry, first stamp and card length are then edited 
 - **Staff:** there are no separate staff logins yet. Staff use the owner login on the counter device.
 
 **Updating an existing database:** just run `supabase/schema.sql` again. It is safe to re-run and keeps all data. Numbers saved earlier in `+91` or 12-digit form will not match the new 10-digit rule, so delete test accounts and sign up again.
+
+## What's new and CSV import
+
+- **What's new:** Settings -> What's new. A short note appears at the top of every customer's card until they press Got it. Editing it shows it again.
+- **Import CSV:** Customers -> Import CSV (columns Name, Phone, Birthday, Current stamps, Total visits, Rewards redeemed; the Export CSV file works as a template). Imported customers wait until they join with that phone number through the sign-up QR, then get their stamps. Existing members are skipped.
 
 ## Messaging customers on WhatsApp (admin -> Message)
 

@@ -1,6 +1,6 @@
 // Customer app: sign up / sign in, stamp card, offers.
 const sb = notReady() ? null : mkClient('lk-customer');
-let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, intro = true;
+let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, intro = true, joinTok = null;
 
 const mail = p => `${p}.${CFG.slug}@${CFG.emailDomain}`;
 const fmtWait = s => s < 60 ? 'under a minute' : s < 5400 ? Math.ceil(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
@@ -18,7 +18,7 @@ async function ensureCard() {
   const { data } = await sb.auth.getUser();
   const m = (data && data.user && data.user.user_metadata) || {};
   if (m.name && m.phone) {
-    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: m.name, p_phone: m.phone, p_bday: m.bday || null, p_consent: true });
+    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: m.name, p_phone: m.phone, p_bday: m.bday || null, p_consent: true, p_join_token: m.jt || null });
     await load();
   }
   return !!card;
@@ -50,10 +50,10 @@ async function reg(btn) {
   if (!$('#cons').checked) return toast('Please tick the consent box to join');
   busy(btn, true);
   try {
-    const { data, error } = await sb.auth.signUp({ email: mail(p), password: w, options: { data: { name: n, phone: p, bday: b || null, consent: true } } });
+    const { data, error } = await sb.auth.signUp({ email: mail(p), password: w, options: { data: { name: n, phone: p, bday: b || null, consent: true, jt: joinTok } } });
     if (error) throw error;
     if (!data.session) throw new Error('Sign-ups are paused: turn off "Confirm email" in Supabase (see README).');
-    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: n, p_phone: p, p_bday: b || null, p_consent: true });
+    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: n, p_phone: p, p_bday: b || null, p_consent: true, p_join_token: joinTok });
     await load();
     if (card) {
       const w = card.offers.find(o => o.type == 'Welcome');
@@ -161,6 +161,7 @@ function authV() {
 }
 
 function joinV() {
+  if (!joinTok) return `<h2>Join the rewards club</h2><p class="sub">To join, scan the sign-up QR code at the counter with your phone camera. Already a member? Use the Login tab.</p>`;
   return `<h2>Join the rewards club</h2><p class="sub">${pend ? 'Sign in to collect your stamp.' : (biz.join_stamp ? 'Create your card and get your first stamp free.' : 'Create your card in under a minute.')}</p>
   <label class="lb">Full name</label><input id="n" autocomplete="name">
   <label class="lb">Phone number</label><input id="p" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
@@ -188,6 +189,14 @@ function forgotV() {
 const onDay = x => new Date(+new Date(x.valid_from) + 12 * 36e5).toLocaleDateString(undefined, { timeZone: biz.tz || 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' });
 const when = x => x.valid_from ? 'Valid only on <b>' + onDay(x) + '</b>' : x.expires_at ? (daysTo(x.expires_at) <= 3 ? '<span class="expiry">Expires in ' + daysTo(x.expires_at) + (daysTo(x.expires_at) == 1 ? ' day' : ' days') + '</span>' : 'Valid until ' + fd(x.expires_at)) : 'No expiry';
 
+const newsKey = () => 'lk-news-' + (biz.news_at || '');
+function newsSeen() { try { return localStorage.getItem(newsKey()) == '1' } catch (e) { return false } }
+function newsV() {
+  if (!biz.news_text || newsSeen()) return '';
+  return `<div class="card news"><div class="row2"><span class="tag">What's new</span><button class="lnk" onclick="hideNews()" aria-label="Close">Got it</button></div><p style="margin:6px 0 0">${esc(biz.news_text)}</p></div>`;
+}
+function hideNews() { try { localStorage.setItem(newsKey(), '1') } catch (e) { biz.news_text = '' } render() }
+
 function homeV() {
   const m = card.member, need = +biz.need, s = m.stamps, ready = s >= need, of = card.offers || [];
   const live = of.filter(x => !x.used_at && !isExp(x)), past = of.filter(x => x.used_at || isExp(x));
@@ -195,7 +204,7 @@ function homeV() {
   const left = m.card_ends_at && !ready ? daysTo(m.card_ends_at) : null;
   const wait = m.last_stamp && biz.cooldown_min > 0 ? Math.ceil((new Date(m.last_stamp).getTime() + biz.cooldown_min * 6e4 - Date.now()) / 1000) : 0;
   let g = ''; for (let i = 0; i < need; i++) g += i < s ? `<div class="st f ${i == anim ? 'pop' : ''} ${intro ? 'in' : ''}" style="--i:${i}">${(biz.stamp_url && (biz.stamp_url.startsWith('http') || biz.stamp_url.startsWith('data:'))) ? `<img src="${esc(biz.stamp_url)}" alt="stamp" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : IC.chk}</div>` : `<div class="st">${i + 1}</div>`;
-  let o = head(biz) + `<div class="card"><div class="eyebrow">Hello, ${esc(m.name.split(' ')[0])}</div><div class="count"><b>${Math.min(s, need)}</b><span>of ${need} stamps${s < need ? ' · ' + (need - s) + ' to go' : ''}</span></div><div class="prog"><i style="width:${Math.min(100, s / need * 100)}%"></i></div><div class="grid">${g}</div>
+  let o = head(biz) + newsV() + `<div class="card"><div class="eyebrow">Hello, ${esc(m.name.split(' ')[0])}</div><div class="count"><b>${Math.min(s, need)}</b><span>of ${need} stamps${s < need ? ' · ' + (need - s) + ' to go' : ''}</span></div><div class="prog"><i style="width:${Math.min(100, s / need * 100)}%"></i></div><div class="grid">${g}</div>
   <p class="rule">Collect ${need} stamps to earn <b>${esc(biz.reward)}</b>.</p>`;
   if (m.card_ends_at && !ready) o += `<p class="mut sm">${left <= 14 ? '<span class="expiry">Card ends in ' + Math.max(left, 0) + (left == 1 ? ' day' : ' days') + '</span> · finish it before ' + fd(m.card_ends_at) : 'Card valid until ' + fd(m.card_ends_at)}</p>`;
   if (card.lost > 0) o += `<div class="rw"><small>Card expired</small><b>${card.lost} ${card.lost == 1 ? 'stamp was' : 'stamps were'} reset</b><span class="mut">Your last card ran out of time. A fresh card starts with your next stamp.</span></div>`;
@@ -231,6 +240,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && ca
   if (notReady()) { $('#app').innerHTML = setupMsg; return }
   try {
     const m = location.hash.match(/scan=([\w-]+)/); if (m) pend = m[1];
+    const jm = location.hash.match(/join=([\w-]+)/);
+    try { if (jm) sessionStorage.setItem('lk-join', jm[1]); joinTok = jm ? jm[1] : sessionStorage.getItem('lk-join') } catch (e) { joinTok = jm ? jm[1] : null }
     biz = await rpc(sb, 'get_business', { p_slug: CFG.slug });
     if (!biz) { $('#app').innerHTML = '<div class="card"><h2>Not found</h2><p class="sub">This business is not set up yet.</p></div>'; return }
     brand(biz); pwa();
