@@ -130,11 +130,11 @@ function dailyScrV() {
     const tick = () => {
       const el = document.getElementById('daily-cd-text'); if (!el) return;
       const l = daily && daily.next_at ? Math.max(0, new Date(daily.next_at).getTime() - Date.now()) : 0;
-      el.innerHTML = "You've scratched today. Come back in <b>" + fmtCd(l) + '</b>.';
+      el.innerHTML = "Come back tomorrow. <b>" + fmtCd(l) + '</b> left.';
       dailyT = l > 60000 ? setTimeout(tick, 60000) : null;
     };
     if (left > 0) dailyT = setTimeout(tick, 60000);
-    return `<div id="daily-done" class="card"><div class="row2"><h2>Today's scratch card</h2>${chip || '<span class="tag">Done</span>'}</div><p class="sub" id="daily-cd-text">You've scratched today. Come back in <b>${fmtCd(left)}</b>.</p></div>`;
+    return `<div id="daily-done" class="card"><div class="row2"><h2>Today's scratch card</h2>${chip || '<span class="tag">Done</span>'}</div><p class="sub" id="daily-cd-text">Come back tomorrow. <b>${fmtCd(left)}</b> left.</p></div>`;
   }
   const capLine = daily.cap ? ` Win up to ${daily.cap} surprise offers a week.` : '';
   return `<div id="daily-scr" class="card"><div class="row2"><h2>Today's scratch card</h2>${chip}</div>
