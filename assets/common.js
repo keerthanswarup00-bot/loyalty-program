@@ -16,7 +16,8 @@ const IC = {
 };
 
 // Separate storage keys so an owner and a customer can be signed in on the same browser.
-const mkClient = key => window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { storageKey: key } });
+// persistSession/autoRefreshToken are stated explicitly so the login survives reloads; detectSessionInUrl stays at its default (admin password recovery needs the hash).
+const mkClient = key => window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { storageKey: key, persistSession: true, autoRefreshToken: true } });
 async function rpc(c, fn, args) { const { data, error } = await c.rpc(fn, args); if (error) throw error; return data }
 
 const toast = m => { $('#t').innerHTML = '<div class="toast">' + esc(m) + '</div>'; setTimeout(() => $('#t').innerHTML = '', 3200) };

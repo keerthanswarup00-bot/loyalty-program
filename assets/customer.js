@@ -271,7 +271,8 @@ function homePgV() {
   if (soon.length) o += `<div class="rw"><small>Expiring soon</small><b>${soon.length == 1 ? '1 offer ends' : soon.length + ' offers end'} within 3 days</b><button type="button" class="lnk" onclick="goTo('offers')">See offers</button></div>`;
   if (ready) o += `<div class="rw"><small>Reward unlocked</small><b>${esc(biz.reward)}</b></div><button class="btn" onclick="claim()">Get my reward code</button>`;
   o += `<p class="hint" style="text-align:center;margin-top:18px">Tap your phone on the stamp tag at the counter to collect a stamp.${wait > 0 ? ' <b>Next stamp in ' + fmtWait(wait) + '.</b>' : ''}</p></div>`;
-  return o + a2hsV() + socials(biz);
+  const a = a2hsV(), top = a && a2hsHi();   // the first-login nudge sits at the very top of Home
+  return (top ? a : '') + o + (top ? '' : a) + socials(biz);
 }
 
 
@@ -342,7 +343,10 @@ const popV = () => `<div class="ov" onclick="pop=null;render()"><div class="mdl"
 async function ensureCard() {
   await load();
   if (card) { markUsed(); return true; }
-  const { data } = await sb.auth.getUser();
+  const { data, error } = await sb.auth.getUser();
+  // A network/server failure must never look like "no card" (that would sign the customer out).
+  // Any other auth error means the account itself is gone, so falling through to a clean "no card" is right.
+  if (error && error.name == 'AuthRetryableFetchError') throw error;
   const m = (data && data.user && data.user.user_metadata) || {};
   if (m.name && m.phone) {
     const j = ref => rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: m.name, p_phone: m.phone, p_bday: m.bday || null, p_consent: true, p_join_token: m.jt || null, p_ref: ref });
@@ -417,6 +421,8 @@ async function login(btn) {
     const { error } = await sb.auth.signInWithPassword({ email: mail(p), password: w });
     if (error) throw error;
     if (!(await ensureCard())) { await sb.auth.signOut(); throw new Error('No card found for this number. Please join first.') }
+    try { localStorage.setItem('lk-phone', p) } catch (e) { }   // remember the number for next time, never the password
+    a2hsHiOn();
     view = 'home'; form = 'in';
     render();
     if (pend) await scan();
@@ -457,13 +463,19 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); ip = e
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform == 'MacIntel' && navigator.maxTouchPoints > 1);
 const a2hsOff = () => { try { return localStorage.getItem('lk-a2hs') == '1' } catch (e) { return false } };
+// After the first successful login the card is shown prominently at the top of Home, until they act on it.
+const a2hsHi = () => { try { return localStorage.getItem('lk-a2hs-hi') == '1' } catch (e) { return false } };
+const a2hsHiOn = () => { try { if (!a2hsOff() && !standalone()) localStorage.setItem('lk-a2hs-hi', '1') } catch (e) { } };
+const a2hsHiOff = () => { try { localStorage.removeItem('lk-a2hs-hi') } catch (e) { } };
 function a2hsV() {
   if (standalone() || a2hsOff() || !(ip || isIos())) return '';
-  return `<div class="card"><h2>Keep your card on your phone</h2><p class="sub">${ip ? 'Add this card to your home screen to open it in one tap.' : 'Tap the Share button in your browser, then choose <b>Add to Home Screen</b>.'}</p>
+  const hi = a2hsHi(), lead = hi ? '<p class="sub" style="color:var(--tx);font-weight:600">Add this to your home screen so you stay logged in.</p>' : '';
+  const sub = hi && ip ? '' : ip ? 'Add this card to your home screen to open it in one tap.' : 'Tap the Share button in your browser, then choose <b>Add to Home Screen</b>.';
+  return `<div class="card${hi ? ' news' : ''}"><h2>Keep your card on your phone</h2>${lead}${sub ? `<p class="sub">${sub}</p>` : ''}
   <div class="row" style="margin-top:12px">${ip ? '<button class="btn sm" onclick="install()">Add to home screen</button>' : ''}<button class="btn sm alt" onclick="hideA2hs()">Not now</button></div></div>`;
 }
-async function install() { try { ip.prompt(); await ip.userChoice } catch (e) { } ip = null; render() }
-function hideA2hs() { try { localStorage.setItem('lk-a2hs', '1') } catch (e) { } render() }
+async function install() { try { ip.prompt(); await ip.userChoice } catch (e) { } ip = null; a2hsHiOff(); render() }
+function hideA2hs() { try { localStorage.setItem('lk-a2hs', '1') } catch (e) { } a2hsHiOff(); render() }
 
 // Home-screen icon and name for this business, generated from its colour and first letter.
 function icon(size) {
@@ -490,7 +502,7 @@ async function delMe() {
   unlive();
   usedSeen = null;
   if (!confirm('Delete your account, card and offers permanently?')) return;
-  try { await rpc(sb, 'delete_me'); await sb.auth.signOut(); card = null; sur = reward = null; form = 'new'; view = 'home'; pg = 'home'; render(); toast('Your account was deleted') } catch (e) { toast(nice(e)) }
+  try { await rpc(sb, 'delete_me'); await sb.auth.signOut(); try { localStorage.removeItem('lk-phone') } catch (x) { } card = null; sur = reward = null; form = 'new'; view = 'home'; pg = 'home'; render(); toast('Your account was deleted') } catch (e) { toast(nice(e)) }
 }
 
 async function claim() {
@@ -517,9 +529,10 @@ function joinV() {
   <p class="note" style="text-align:center;margin:14px 0 0"><a href="#" onclick="introShow=true;render();return false">How it works</a></p>`;
 }
 
+const savedPhone = () => { try { return localStorage.getItem('lk-phone') || '' } catch (e) { return '' } };
 function signinV() {
   return `<h2>Welcome back</h2><p class="sub">Login to view your rewards.</p>
-  <label class="lb">Phone number</label><input id="p" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
+  <label class="lb">Phone number</label><input id="p" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number" value="${esc(savedPhone())}">
   <label class="lb">Password</label>${pwField('w', 'current-password')}
   <div style="text-align:right;margin-top:8px"><a href="#" onclick="view='forgot';form='in';render();return false" style="color:var(--mut);font-size:14px">Forgot password?</a></div>
   <button class="btn" data-go onclick="login(this)">Login</button>
@@ -604,6 +617,8 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 (async () => {
+  // Ask for durable storage so the browser does not evict the saved login.
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { }) } catch (e) { }
   if (notReady()) { $('#app').innerHTML = setupMsg; return }
   try {
     const m = location.hash.match(/scan=([\w-]+)/); if (m) pend = m[1];
@@ -614,7 +629,12 @@ document.addEventListener('visibilitychange', async () => {
     brand(biz); pwa();
     try { dailyPub = !!(await rpc(sb, 'daily_public', { p_slug: CFG.slug })) } catch (e) { dailyPub = false }
     const { data: { session } } = await sb.auth.getSession();
-    if (session && !(await ensureCard())) await sb.auth.signOut();
+    if (session) {
+      let noCard = false, err = null;
+      try { noCard = !(await ensureCard()) } catch (e) { err = e }   // only a clean "my_card returned no card" may sign out
+      if (err) throw err;                                            // network/server error: show it and keep the session
+      if (noCard) await sb.auth.signOut();
+    }
     if (!card && !introSeen()) introShow = true;
     render();
     if (card && pend) await scan();
