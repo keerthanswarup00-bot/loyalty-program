@@ -144,3 +144,8 @@ body:has(.c-nav) .toast{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 .pf{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 4px}
 .pf div{background:var(--bg);border-radius:14px;padding:12px;text-align:center;color:var(--mut);font-size:12px}
 .pf b{display:block;font:600 22px/1.2 Fraunces,Georgia,serif;color:var(--tx)}
+
+/* ---- Coupon redeemed popup ---- */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:20px;z-index:20}
+.mdl{background:var(--card);border-radius:22px;padding:26px;max-width:340px;width:100%;text-align:center;animation:pop2 .35s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop2{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}

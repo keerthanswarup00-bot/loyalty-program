@@ -1,6 +1,6 @@
 // Customer app: sign up / sign in, stamp card, offers.
 const sb = notReady() ? null : mkClient('lk-customer');
-let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
+let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, pop = null, rt = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
 
 const mail = p => `${p}.${CFG.slug}@${CFG.emailDomain}`;
 const fmtWait = s => s < 60 ? 'under a minute' : s < 5400 ? Math.ceil(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
@@ -190,6 +190,28 @@ async function load() {
   if (card && card.granted) sur = { t: 'Happy birthday', x: biz.bday_offer };
 }
 
+// Re-fetch the card and pop up a message if any coupon became "used" since last time.
+async function sync() {
+  if (!card) return;
+  const before = new Set((card.offers || []).filter(o => o.used_at).map(o => o.id));
+  try { await load() } catch (e) { return }
+  const n = (card.offers || []).find(o => o.used_at && !before.has(o.id));
+  if (n) pop = { t: n.type, x: n.text };
+  render();
+}
+function live() {
+  if (rt || !card) return;
+  rt = sb.channel('my-offers')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'offers' }, () => sync())
+    .subscribe();
+}
+function unlive() { if (rt) { sb.removeChannel(rt); rt = null } }
+// Phones pause websockets in the background, so also re-sync when the page becomes visible again.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) sync() });
+const popV = () => `<div class="ov" onclick="pop=null;render()"><div class="mdl" onclick="event.stopPropagation()">
+  <div class="tag">${esc(pop.t)} redeemed</div><h2>${esc(pop.x)}</h2><p class="sub">Enjoy! This coupon has been used.</p>
+  <button class="btn" onclick="pop=null;render()">Done</button></div></div>`;
+
 // Make sure the signed-in user has a card; finish joining from signup details if a previous attempt was cut off.
 async function ensureCard() {
   await load();
@@ -283,7 +305,7 @@ async function login(btn) {
   }
 }
 
-async function out() { await sb.auth.signOut(); card = null; view = 'home'; pg = 'home'; sur = reward = null; render() }
+async function out() { unlive(); await sb.auth.signOut(); card = null; view = 'home'; pg = 'home'; sur = reward = null; render() }
 
 // Change password (customers have no real email, so there is no emailed reset: the owner can set a temporary one).
 function pwV() {
@@ -337,6 +359,7 @@ function pwa() {
 }
 
 async function delMe() {
+  unlive();
   if (!confirm('Delete your account, card and offers permanently?')) return;
   try { await rpc(sb, 'delete_me'); await sb.auth.signOut(); card = null; sur = reward = null; form = 'new'; view = 'home'; pg = 'home'; render(); toast('Your account was deleted') } catch (e) { toast(nice(e)) }
 }
@@ -398,11 +421,17 @@ function refV() {
 }
 
 function render() {
-  const app = $('#app');
-  const y = window.scrollY;
-  if (wasCard !== !!card) { fx = true; wasCard = !!card }
-  app.className = (card ? 'has-nav' : '') + (fx ? ' fx' : ''); fx = false;
-  app.innerHTML = !card ? authV() : heroV() + (view == 'pw' ? pwV() : pg == 'offers' ? offersPgV() : pg == 'rewards' ? rewardsPgV() : pg == 'profile' ? profilePgV() : homePgV()) + navV();
+  let y = 0;
+  try {
+    const app = $('#app');
+    y = window.scrollY;
+    if (wasCard !== !!card) { fx = true; wasCard = !!card }
+    app.className = (card ? 'has-nav' : '') + (fx ? ' fx' : ''); fx = false;
+    app.innerHTML = (!card ? authV() : heroV() + (view == 'pw' ? pwV() : pg == 'offers' ? offersPgV() : pg == 'rewards' ? rewardsPgV() : pg == 'profile' ? profilePgV() : homePgV())) + (card ? navV() : '') + (pop ? popV() : '');
+  } catch (e) {
+    $('#app').innerHTML = `<div class="card"><h2>Something went wrong</h2><p class="sub">${esc(e.message)}</p><button class="btn" onclick="location.reload()">Reload</button></div>`;
+  }
+  if (card) live(); else unlive();
   if (card) intro = false;
   if (card) {
     initScratch();
