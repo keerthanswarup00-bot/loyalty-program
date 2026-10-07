@@ -18,7 +18,7 @@ create table if not exists public.businesses (
   web text not null default '',
   need int not null default 8 check (need between 2 and 20),
   reward text not null default 'Free reward',
-  cooldown_min int not null default 60 check (cooldown_min >= 0),
+  cooldown_min int not null default 240 check (cooldown_min >= 0),
   sur_stamps text not null default '',
   sur_offer text not null default '',
   welcome_offer text not null default '',
