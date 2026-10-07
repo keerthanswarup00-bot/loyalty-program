@@ -583,7 +583,9 @@ async function svBrand(btn) {
     name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl, color: v('cc') || biz.color,
     ig: t('ci'), fb: t('cf'), wa: t('cw'), web: t('cs'),
     news_text: nw, news_at: nw ? (nw == (biz.news_text || '') && biz.news_at ? biz.news_at : new Date().toISOString()) : null,
-    ref_on: v('rfon') == '1', ref_offer: t('rfo') || '20% off your next bill', ref_cap: Math.max(1, Math.min(100, Math.round(+v('rfc')) || 5))
+    ref_on: v('rfon') == '1', ref_offer: t('rfo') || '20% off your next bill', ref_cap: Math.max(1, Math.min(100, Math.round(+v('rfc')) || 5)),
+    daily_on: v('dailon') == '1', daily_win_pct: (dw => isNaN(dw) ? 60 : Math.max(0, Math.min(100, dw)))(Math.round(+v('dwp'))),
+    daily_offers: t('dof')
   }, btn);
 }
 
@@ -595,6 +597,11 @@ function moreV() {
   <div class="a-card"><h2>Refer a friend</h2><p class="sub">Each customer gets a personal code. A friend who enters it when joining gets this offer, and the customer gets it too after the friend's next stamp.</p>
     <label class="lb">Referrals</label><select id="rfon"><option value="1"${biz.ref_on ? ' selected' : ''}>On</option><option value="0"${biz.ref_on ? '' : ' selected'}>Off</option></select>
     ${fld('rfo', 'Offer for both', biz.ref_offer, '', 'e.g. 20% off your next bill')}${fld('rfc', 'Most referral rewards per customer in 30 days', biz.ref_cap, 'type=number min=1 max=100')}</div>
+  <div class="a-card"><h2>Daily scratch card</h2><p class="sub">Customers get to scratch their card once a day for a chance to win a prize.</p>
+    <label class="lb">Daily scratch</label><select id="dailon"><option value="1"${biz.daily_on ? ' selected' : ''}>On</option><option value="0"${biz.daily_on ? '' : ' selected'}>Off</option></select>
+    ${fld('dwp', 'Win chance %', biz.daily_win_pct == null ? 60 : biz.daily_win_pct, 'type=number min=0 max=100')}
+    <label class="lb">Prizes, one per line</label><textarea id="dof" rows="3" maxlength="500">${esc(biz.daily_offers || '')}</textarea>
+    <p class="hint">Each day a customer can scratch once. If they win, one prize from this list is picked at random. Prizes last 2 days.</p></div>
   <button class="btn" data-go onclick="svBrand(this)">Save settings</button>
   <div class="a-card" style="margin-top:16px"><h2>Stamp tag</h2><p class="sub">The tap-only link behind your NFC tag — staff collect stamps after the first one by tapping the customer's phone on it.</p>
     <label class="lb">Link for the NFC tag</label><input readonly class="ro" value="${esc(scanUrl())}" onclick="this.select()">

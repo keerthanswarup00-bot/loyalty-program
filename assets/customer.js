@@ -2,6 +2,7 @@
 const sb = notReady() ? null : mkClient('lk-customer');
 let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, pop = null, rt = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
 let usedSeen = null;
+let daily = null, dailyPub = false, introShow = false, scratching = false, dailyT = null;
 
 const mail = p => `${p}.${CFG.slug}@${CFG.emailDomain}`;
 const fmtWait = s => s < 60 ? 'under a minute' : s < 5400 ? Math.ceil(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
@@ -41,7 +42,7 @@ function scrReveal(id) {
   const x = ((card && card.offers) || []).find(o => o.id == id); if (!x) return;
   scrMem.add(id); try { localStorage.setItem('lk-scr-' + id, '1') } catch (e) { }
   sur = { t: 'Surprise unlocked', x: x.text };   // no .scratch flag, so the normal banner shows
-  render(); burst(); buzz();
+  render(); confetti(); buzz();
   toast('Saved to your offers');
 }
 function initScratch() {
@@ -70,6 +71,121 @@ function initScratch() {
   });
 }
 
+
+// ---------- Confetti (canvas) ----------
+function confetti() {
+  if (!scrOn() || !document.body) return;
+  const cv = document.createElement('canvas');
+  const g = cv.getContext && cv.getContext('2d');
+  if (!g) return;
+  const w = cv.width = window.innerWidth || 360, h = cv.height = window.innerHeight || 640;
+  cv.setAttribute('aria-hidden', 'true');
+  Object.assign(cv.style, { position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: '40' });
+  document.body.appendChild(cv);
+  const brand = (getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#e8590c');
+  const cols = [brand, '#f5b301', '#e8590c', '#2b8a3e', '#1971c2', '#fff'];
+  const P = [];
+  for (let i = 0; i < 140; i++) P.push({ x: w / 2 + (Math.random() - .5) * 30, y: -14 - Math.random() * 40, vx: (Math.random() - .5) * 9, vy: Math.random() * 4 + 1.5, g: .35, r: Math.random() * Math.PI * 2, vr: (Math.random() - .5) * .35, w: 5 + Math.random() * 6, l: 8 + Math.random() * 8, c: cols[i % cols.length] });
+  const t0 = performance.now(), DUR = 3200;
+  const fr = t => {
+    const k = Math.max(0, 1 - (t - t0) / DUR);
+    g.clearRect(0, 0, w, h);
+    for (const p of P) { p.vy += p.g; p.vx *= .985; p.vr *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr; g.save(); g.globalAlpha = k; g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.c; g.fillRect(-p.w / 2, -p.l / 2, p.w, p.l); g.restore(); }
+    if (t - t0 < DUR) requestAnimationFrame(fr); else cv.remove();
+  };
+  requestAnimationFrame(fr);
+}
+
+// ---------- Daily scratch card ----------
+const fmtCd = ms => { const m = Math.max(0, Math.ceil(ms / 60000)); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm' };
+const dailyStatus = async () => { try { return await rpc(sb, 'daily_status', { p_slug: CFG.slug }) } catch (e) { return null } };
+async function dailyPlay() {
+  try {
+    const r = await rpc(sb, 'play_daily', { p_slug: CFG.slug });
+    if (r.ok) {
+      daily.win = !!r.win; daily.prize = r.win ? r.prize : ''; daily.played = true;
+      const s = document.querySelector('#daily-scr .dscr-under small'), b = document.querySelector('#daily-scr .dscr-under b');
+      if (s) s.textContent = r.win ? 'You won' : 'No win today';
+      if (b) b.textContent = r.win ? r.prize : 'Better luck tomorrow';
+    } else {
+      scratching = false;
+      if (r.error == 'done' || r.error == 'off') { daily = await dailyStatus(); render(); }
+      else toast('Could not play today. Try again.');
+    }
+  } catch (e) { scratching = false; toast(nice(e)); render() }
+}
+async function dailyFinish() {
+  if (daily && daily.win) confetti();
+  await load();
+  render();
+}
+function dailyScrV() {
+  if (!daily || !daily.on) return '';
+  const left = daily.next_at ? Math.max(0, new Date(daily.next_at).getTime() - Date.now()) : 0;
+  if (daily.played) {
+    if (dailyT) { clearTimeout(dailyT); dailyT = null }
+    const tick = () => {
+      const el = document.getElementById('daily-cd-text'); if (!el) return;
+      const l = daily && daily.next_at ? Math.max(0, new Date(daily.next_at).getTime() - Date.now()) : 0;
+      el.innerHTML = "You've scratched today. Come back in <b>" + fmtCd(l) + '</b>.';
+      dailyT = l > 60000 ? setTimeout(tick, 60000) : null;
+    };
+    if (left > 0) dailyT = setTimeout(tick, 60000);
+    return `<div id="daily-done" class="card"><div class="row2"><h2>Today's scratch card</h2><span class="tag">Done</span></div><p class="sub" id="daily-cd-text">You've scratched today. Come back in <b>${fmtCd(left)}</b>.</p></div>`;
+  }
+  return `<div id="daily-scr" class="card"><div class="row2"><h2>Today's scratch card</h2></div>
+    <div class="dscr"><div class="dscr-under"><small>${daily.win ? 'You won' : 'Your prize'}</small><b>${esc(daily.prize || 'Scratch to play')}</b></div><canvas aria-hidden="true"></canvas></div>
+    <p class="hint" style="text-align:center">Scratch the card to play today's game.</p></div>`;
+}
+const dailyScrSlot = () => !daily || !daily.on ? '' : (scratching ? '<div id="daily-anchor"></div>' : dailyScrV());
+function initDailyScr() {
+  const cv = document.querySelector('#daily-scr canvas'); if (!cv || cv.dataset.init) return;
+  cv.dataset.init = '1';
+  const box = cv.parentNode, w = box.clientWidth, h = box.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (!w || !h) return;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const g = cv.getContext('2d', { willReadFrequently: true }); if (!g) return;
+  g.scale(dpr, dpr);
+  const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#d3dbe2'); gr.addColorStop(.5, '#e9eff4'); gr.addColorStop(1, '#c2cad2');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(90,102,114,.8)'; g.font = '600 15px Inter,system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('Scratch here', w / 2, h / 2);
+  g.globalCompositeOperation = 'destination-out'; g.lineWidth = 42; g.lineCap = g.lineJoin = 'round';
+  let started = false, fin = false, down = false, lx = 0, ly = 0, n = 0;
+  const pt = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top] };
+  const check = () => {
+    if (fin) return;
+    let d; try { d = g.getImageData(0, 0, cv.width, cv.height).data } catch (e) { return }
+    let clear = 0, tot = 0; for (let i = 3; i < d.length; i += 64) { tot++; if (d[i] < 128) clear++ }
+    if (clear / tot > .5) { fin = true; scratching = false; setTimeout(dailyFinish, 450) }
+  };
+  cv.onpointerdown = e => { down = true; try { cv.setPointerCapture(e.pointerId) } catch (x) { } [lx, ly] = pt(e); g.beginPath(); g.arc(lx, ly, 21, 0, 7); g.fill(); if (!started) { started = true; scratching = true; dailyPlay() } e.preventDefault() };
+  cv.onpointermove = e => { if (!down || fin) return; const [x, y] = pt(e); g.beginPath(); g.moveTo(lx, ly); g.lineTo(x, y); g.stroke(); lx = x; ly = y; if (++n % 6 == 0) check() };
+  cv.onpointerup = cv.onpointercancel = () => { down = false; check() };
+}
+
+// ---------- First-visit intro ----------
+const introSeen = () => { try { return localStorage.getItem('lk-intro') == '1' } catch (e) { return true } };
+function introV() {
+  let s = '';
+  const st = (n, t, x) => s += `<li><i>${n}</i><div><b>${t}</b><span>${x}</span></div></li>`;
+  st(1, 'Join free', 'Enter your name and phone number. It takes 30 seconds.' + (biz.join_stamp ? ' Your first stamp is free.' : ''));
+  st(2, 'Collect stamps', 'Each visit, tap your phone on the stamp tag at the counter. Collect ' + biz.need + ' stamps and get ' + esc(biz.reward) + '.');
+  if (dailyPub) st(3, 'Scratch every day', 'Open your card once a day and scratch it for a surprise offer.');
+  st(dailyPub ? 4 : 3, 'Show your code', 'Offers have a 6-letter code. Show it to our staff and they will apply it.');
+  return `<div class="iv" role="dialog" aria-modal="true" aria-labelledby="int-t"><div class="is">
+    <h2 id="int-t">How ${esc(biz.name)} rewards work</h2>
+    <ol class="steps">${s}</ol>
+    <div class="iv-acts"><button class="btn" data-go onclick="introClose('join')">Let's get started</button>
+    <a href="#" onclick="introClose('login');return false">Already a member? Sign in</a></div></div></div>`;
+}
+function introClose(where) {
+  try { localStorage.setItem('lk-intro', '1') } catch (e) { }
+  introShow = false;
+  form = where == 'login' ? 'in' : 'new';
+  view = where == 'login' ? 'signin' : 'home';
+  render();
+}
 
 // ---------- Pages, top card, bottom nav ----------
 let pg = 'home', nfcRd = null;
@@ -157,7 +273,7 @@ function homePgV() {
 
 function offersPgV() {
   const { live, locked, past } = ctx();
-  let o = '';
+  let o = dailyScrSlot();
   if (locked.length) o += `<div class="card"><h2>Scratch to reveal</h2>${scrV(locked[0], locked.length - 1)}</div>`;
   o += `<div class="card"><div class="row2"><h2>Your offers</h2><span class="pill">${live.length}</span></div>${live.length ? live.map(offerRow).join('') + '<p class="hint">Show the code to staff at the counter (tap a code to copy it).</p>' : '<p class="sub" style="margin:0">Welcome, birthday and surprise offers will appear here.</p>'}</div>`;
   if (past.length) o += `<div class="card"><h2>History</h2>${past.map(pastRow).join('')}</div>`;
@@ -189,6 +305,7 @@ function profilePgV() {
 async function load() {
   card = await rpc(sb, 'my_card', { p_slug: CFG.slug });
   if (card && card.granted) sur = { t: 'Happy birthday', x: biz.bday_offer };
+  daily = await dailyStatus();
 }
 
 // Re-fetch the card and pop up a message if any coupon became "used" since last time.
@@ -250,7 +367,7 @@ async function scan() {
   if (got) {
     const full = card.member.stamps >= +biz.need;
     buzz(full ? [40, 60, 40, 60, 90] : 30);       // longer pattern when the card completes
-    if (full) burst();                             // no confetti for a surprise: the scratch reveal fires its own
+    if (full) confetti();                             // no confetti for a surprise: the scratch reveal fires its own
   }
 }
 
@@ -274,7 +391,7 @@ async function reg(btn) {
       if (card.member.stamps > 0) anim = Math.min(card.member.stamps, +biz.need) - 1;
     }
     view = 'home'; form = 'new';
-    render(); burst(); buzz();
+    render(); confetti(); buzz();
     if (pend) await scan();
   } catch (e) {
     const msg = String((e && e.message) || e);
@@ -373,7 +490,7 @@ async function delMe() {
 }
 
 async function claim() {
-  try { const r = await rpc(sb, 'claim_reward', { p_slug: CFG.slug }); reward = r.code; sur = null; await load(); render(); burst(); buzz() } catch (e) { toast(nice(e)); await load(); render() }
+  try { const r = await rpc(sb, 'claim_reward', { p_slug: CFG.slug }); reward = r.code; sur = null; await load(); render(); confetti(); buzz() } catch (e) { toast(nice(e)); await load(); render() }
 }
 
 function authV() {
@@ -392,7 +509,8 @@ function joinV() {
   <label class="lb">Birthday <span>(optional)</span></label><input id="b" type="date"><p class="hint">Your birthday offer is valid only on that day each year.</p>
   ${biz.ref_on ? `<label class="lb">Friend's code <span>(optional, for ${esc(biz.ref_offer)})</span></label><input id="rf" autocapitalize="characters" placeholder="e.g. ASHA-4K7">` : ''}
   <label class="chk"><input type="checkbox" id="cons"><span>I agree to receive offers and to ${esc(biz.name)} storing my details.</span></label>
-  <button class="btn" data-go onclick="reg(this)">Join</button>`;
+  <button class="btn" data-go onclick="reg(this)">Join</button>
+  <p class="note" style="text-align:center;margin:14px 0 0"><a href="#" onclick="introShow=true;render();return false">How it works</a></p>`;
 }
 
 function signinV() {
@@ -401,7 +519,8 @@ function signinV() {
   <label class="lb">Password</label>${pwField('w', 'current-password')}
   <div style="text-align:right;margin-top:8px"><a href="#" onclick="view='forgot';form='in';render();return false" style="color:var(--mut);font-size:14px">Forgot password?</a></div>
   <button class="btn" data-go onclick="login(this)">Login</button>
-  <p class="note" style="margin:16px 0 0">New here? <a href="#" onclick="form='new';view='home';render();return false">Join the rewards club</a></p>`;
+  <p class="note" style="margin:16px 0 0">New here? <a href="#" onclick="form='new';view='home';render();return false">Join the rewards club</a></p>
+  <p class="note" style="margin:6px 0 0"><a href="#" onclick="introShow=true;render();return false">How it works</a></p>`;
 }
 
 function forgotV() {
@@ -429,24 +548,32 @@ function refV() {
 }
 
 function render() {
-  let y = 0;
+  let y = 0, keep = null;
   try {
     const app = $('#app');
     y = window.scrollY;
     if (wasCard !== !!card) { fx = true; wasCard = !!card }
-    app.className = (card ? 'has-nav' : '') + (fx ? ' fx' : ''); fx = false;
-    app.innerHTML = (!card ? authV() : heroV() + (view == 'pw' ? pwV() : pg == 'offers' ? offersPgV() : pg == 'rewards' ? rewardsPgV() : pg == 'profile' ? profilePgV() : homePgV())) + (card ? navV() : '') + (pop ? popV() : '');
+    app.className = (card ? 'has-nav' : '') + (fx ? ' fx' : '');
+    keep = scratching ? document.getElementById('daily-scr') : null;
+    fx = false;
+    app.innerHTML = (!card ? authV() : heroV() + (view == 'pw' ? pwV() : pg == 'offers' ? offersPgV() : pg == 'rewards' ? rewardsPgV() : pg == 'profile' ? profilePgV() : homePgV())) + (card ? navV() : '') + (introShow && !card ? introV() : '') + (pop ? popV() : '');
   } catch (e) {
     $('#app').innerHTML = `<div class="card"><h2>Something went wrong</h2><p class="sub">${esc(e.message)}</p><button class="btn" onclick="location.reload()">Reload</button></div>`;
+  }
+  if (keep) {
+    const a = document.getElementById('daily-anchor');
+    if (a) a.replaceWith(keep); else scratching = false;
   }
   if (card) live(); else unlive();
   if (card) intro = false;
   if (card) {
     initScratch();
+    initDailyScr();
     const p = $('.prog i');
     if (p) { const to = +p.dataset.to; requestAnimationFrame(() => requestAnimationFrame(() => { p.style.width = to + '%' })); prevPct = to }
   }
   if (anim >= 0) setTimeout(() => anim = -1, 900);
+  if (pop && !pop.fired) { pop.fired = true; confetti() }
   if (y) window.scrollTo(0, y);
 }
 
@@ -481,8 +608,10 @@ document.addEventListener('visibilitychange', async () => {
     biz = await rpc(sb, 'get_business', { p_slug: CFG.slug });
     if (!biz) { $('#app').innerHTML = '<div class="card"><h2>Not found</h2><p class="sub">This business is not set up yet.</p></div>'; return }
     brand(biz); pwa();
+    try { dailyPub = !!(await rpc(sb, 'daily_public', { p_slug: CFG.slug })) } catch (e) { dailyPub = false }
     const { data: { session } } = await sb.auth.getSession();
     if (session && !(await ensureCard())) await sb.auth.signOut();
+    if (!card && !introSeen()) introShow = true;
     render();
     if (card && pend) await scan();
   } catch (e) { $('#app').innerHTML = `<div class="card"><h2>Something went wrong</h2><p class="sub">${esc(nice(e))}</p></div>` }
