@@ -103,10 +103,12 @@ async function dailyPlay() {
   try {
     const r = await rpc(sb, 'play_daily', { p_slug: CFG.slug });
     if (r.ok) {
-      daily.win = !!r.win; daily.prize = r.win ? r.prize : ''; daily.played = true;
-      const s = document.querySelector('#daily-scr .dscr-under small'), b = document.querySelector('#daily-scr .dscr-under b');
+      daily.win = !!r.win; daily.prize = r.win ? r.prize : ''; daily.note = r.win ? null : (r.note || 'Better luck tomorrow!');
+      daily.played = true; daily.streak = r.streak || 0;
+      const s = document.querySelector('#daily-scr .dscr-under small'), b = document.querySelector('#daily-scr .dscr-under b'), c = document.querySelector('#daily-scr .st-chip');
       if (s) s.textContent = r.win ? 'You won' : 'No win today';
-      if (b) b.textContent = r.win ? r.prize : 'Better luck tomorrow';
+      if (b) b.textContent = r.win ? r.prize : daily.note;
+      if (c && r.streak) c.textContent = r.streak + '-day streak';
     } else {
       scratching = false;
       if (r.error == 'done' || r.error == 'off') { daily = await dailyStatus(); render(); }
@@ -122,6 +124,7 @@ async function dailyFinish() {
 function dailyScrV() {
   if (!daily || !daily.on) return '';
   const left = daily.next_at ? Math.max(0, new Date(daily.next_at).getTime() - Date.now()) : 0;
+  const chip = daily.streak >= 1 ? `<span class="st-chip">${daily.streak}-day streak</span>` : '';
   if (daily.played) {
     if (dailyT) { clearTimeout(dailyT); dailyT = null }
     const tick = () => {
@@ -131,11 +134,12 @@ function dailyScrV() {
       dailyT = l > 60000 ? setTimeout(tick, 60000) : null;
     };
     if (left > 0) dailyT = setTimeout(tick, 60000);
-    return `<div id="daily-done" class="card"><div class="row2"><h2>Today's scratch card</h2><span class="tag">Done</span></div><p class="sub" id="daily-cd-text">You've scratched today. Come back in <b>${fmtCd(left)}</b>.</p></div>`;
+    return `<div id="daily-done" class="card"><div class="row2"><h2>Today's scratch card</h2>${chip || '<span class="tag">Done</span>'}</div><p class="sub" id="daily-cd-text">You've scratched today. Come back in <b>${fmtCd(left)}</b>.</p></div>`;
   }
-  return `<div id="daily-scr" class="card"><div class="row2"><h2>Today's scratch card</h2></div>
-    <div class="dscr"><div class="dscr-under"><small>${daily.win ? 'You won' : 'Your prize'}</small><b>${esc(daily.prize || 'Scratch to play')}</b></div><canvas aria-hidden="true"></canvas></div>
-    <p class="hint" style="text-align:center">Scratch the card to play today's game.</p></div>`;
+  const capLine = daily.cap ? ` Win up to ${daily.cap} surprise offers a week.` : '';
+  return `<div id="daily-scr" class="card"><div class="row2"><h2>Today's scratch card</h2>${chip}</div>
+    <p class="hint">Scratch every day.${capLine}</p>
+    <div class="dscr"><div class="dscr-under"><small>${daily.win ? 'You won' : 'Your prize'}</small><b>${esc(daily.prize || 'Scratch to play')}</b></div><canvas aria-hidden="true"></canvas></div></div>`;
 }
 const dailyScrSlot = () => !daily || !daily.on ? '' : (scratching ? '<div id="daily-anchor"></div>' : dailyScrV());
 function initDailyScr() {
