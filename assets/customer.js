@@ -1,6 +1,7 @@
 // Customer app: sign up / sign in, stamp card, offers.
 const sb = notReady() ? null : mkClient('lk-customer');
 let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, pop = null, rt = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
+let usedSeen = null;
 
 const mail = p => `${p}.${CFG.slug}@${CFG.emailDomain}`;
 const fmtWait = s => s < 60 ? 'under a minute' : s < 5400 ? Math.ceil(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
@@ -193,11 +194,17 @@ async function load() {
 // Re-fetch the card and pop up a message if any coupon became "used" since last time.
 async function sync() {
   if (!card) return;
-  const before = new Set((card.offers || []).filter(o => o.used_at).map(o => o.id));
   try { await load() } catch (e) { return }
-  const n = (card.offers || []).find(o => o.used_at && !before.has(o.id));
+  const n = markUsed();
   if (n) pop = { t: n.type, x: n.text };
   render();
+}
+function markUsed() {
+  const ids = (card && card.offers || []).filter(o => o.used_at).map(o => o.id);
+  if (usedSeen === null) { usedSeen = new Set(ids); return null; }   // first run: baseline, no popup
+  const n = (card.offers || []).find(o => o.used_at && !usedSeen.has(o.id));
+  ids.forEach(i => usedSeen.add(i));
+  return n || null;
 }
 function live() {
   if (rt || !card) return;
@@ -206,8 +213,6 @@ function live() {
     .subscribe();
 }
 function unlive() { if (rt) { sb.removeChannel(rt); rt = null } }
-// Phones pause websockets in the background, so also re-sync when the page becomes visible again.
-document.addEventListener('visibilitychange', () => { if (!document.hidden) sync() });
 const popV = () => `<div class="ov" onclick="pop=null;render()"><div class="mdl" onclick="event.stopPropagation()">
   <div class="tag">${esc(pop.t)} redeemed</div><h2>${esc(pop.x)}</h2><p class="sub">Enjoy! This coupon has been used.</p>
   <button class="btn" onclick="pop=null;render()">Done</button></div></div>`;
@@ -215,13 +220,14 @@ const popV = () => `<div class="ov" onclick="pop=null;render()"><div class="mdl"
 // Make sure the signed-in user has a card; finish joining from signup details if a previous attempt was cut off.
 async function ensureCard() {
   await load();
-  if (card) return true;
+  if (card) { markUsed(); return true; }
   const { data } = await sb.auth.getUser();
   const m = (data && data.user && data.user.user_metadata) || {};
   if (m.name && m.phone) {
     const j = ref => rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: m.name, p_phone: m.phone, p_bday: m.bday || null, p_consent: true, p_join_token: m.jt || null, p_ref: ref });
     try { await j(m.rf || null) } catch (e) { if (m.rf) await j(null); else throw e }
     await load();
+    if (card) markUsed();
   }
   return !!card;
 }
@@ -262,6 +268,7 @@ async function reg(btn) {
     await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: n, p_phone: p, p_bday: b || null, p_consent: true, p_join_token: joinTok, p_ref: v('rf').trim() || null });
     await load();
     if (card) {
+      markUsed();
       const w = card.offers.find(o => o.type == 'Welcome');
       if (w && !sur) sur = { t: 'Welcome gift', x: w.text };
       if (card.member.stamps > 0) anim = Math.min(card.member.stamps, +biz.need) - 1;
@@ -305,7 +312,7 @@ async function login(btn) {
   }
 }
 
-async function out() { unlive(); await sb.auth.signOut(); card = null; view = 'home'; pg = 'home'; sur = reward = null; render() }
+async function out() { unlive(); usedSeen = null; await sb.auth.signOut(); card = null; view = 'home'; pg = 'home'; sur = reward = null; render() }
 
 // Change password (customers have no real email, so there is no emailed reset: the owner can set a temporary one).
 function pwV() {
@@ -360,6 +367,7 @@ function pwa() {
 
 async function delMe() {
   unlive();
+  usedSeen = null;
   if (!confirm('Delete your account, card and offers permanently?')) return;
   try { await rpc(sb, 'delete_me'); await sb.auth.signOut(); card = null; sur = reward = null; form = 'new'; view = 'home'; pg = 'home'; render(); toast('Your account was deleted') } catch (e) { toast(nice(e)) }
 }
@@ -459,6 +467,7 @@ document.addEventListener('visibilitychange', async () => {
   try {
     const before = JSON.stringify(card);
     await load();
+    const n = markUsed(); if (n) pop = { t: n.type, x: n.text };
     if (JSON.stringify(card) !== before && !document.querySelector('.scr-cv:not(.gone)')) render();
   } catch (e) { }
 });
