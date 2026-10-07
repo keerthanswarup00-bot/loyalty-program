@@ -42,6 +42,13 @@ alter table public.businesses add column if not exists news_at timestamptz;
 alter table public.businesses add column if not exists ref_on boolean not null default false;
 alter table public.businesses add column if not exists ref_offer text not null default '20% off your next bill';
 alter table public.businesses add column if not exists ref_cap int not null default 5 check (ref_cap between 1 and 100);
+-- Daily scratch card: on/off, the prize list (one per line), the internal win chance,
+-- the maximum surprise offers a customer can win in a week, and the messages for no-win days (one per line).
+alter table public.businesses add column if not exists daily_on boolean not null default false;
+alter table public.businesses add column if not exists daily_offers text not null default '';
+alter table public.businesses add column if not exists daily_win_pct int not null default 60 check (daily_win_pct between 0 and 100);
+alter table public.businesses add column if not exists daily_week_cap int not null default 2 check (daily_week_cap between 0 and 7);
+alter table public.businesses add column if not exists daily_notes text not null default '';
 
 create table if not exists public.members (
   id uuid primary key default gen_random_uuid(),
@@ -68,6 +75,9 @@ alter table public.members add column if not exists wa_optout_at timestamptz;
 alter table public.members add column if not exists ref_code text;
 alter table public.members add column if not exists referred_by uuid references public.members(id) on delete set null;
 alter table public.members add column if not exists ref_rewarded boolean not null default false;
+-- Daily scratch card state per customer: when they last played and their current streak.
+alter table public.members add column if not exists last_daily timestamptz;
+alter table public.members add column if not exists daily_streak int not null default 0;
 create unique index if not exists members_refcode_idx on public.members (business_id, ref_code);
 create index if not exists members_business_idx on public.members (business_id);
 
@@ -101,6 +111,11 @@ create table if not exists public.offers (
 alter table public.offers add column if not exists valid_from timestamptz;
 create index if not exists offers_member_idx on public.offers (member_id);
 create index if not exists offers_code_idx on public.offers (business_id, code);
+
+-- Realtime: offer changes are pushed to the customer's app. (Also shipped as its own migration.)
+do $$ begin
+  alter publication supabase_realtime add table public.offers;
+exception when duplicate_object then null; end $$;
 
 create table if not exists public.visits (
   id bigint generated always as identity primary key,
@@ -148,7 +163,8 @@ revoke all on public.businesses, public.members, public.offers, public.visits fr
 grant select on public.businesses, public.members, public.offers, public.visits to authenticated;
 grant update (name, tagline, color, logo_url, stamp_url, ig, fb, wa, web, need, reward, cooldown_min,
               sur_stamps, sur_offer, welcome_offer, bday_offer, exp_days, join_stamp, card_months, scan_token,
-              join_token, news_text, news_at, ref_on, ref_offer, ref_cap)
+              join_token, news_text, news_at, ref_on, ref_offer, ref_cap,
+              daily_on, daily_offers, daily_win_pct, daily_week_cap, daily_notes)
   on public.businesses to authenticated;
 
 -- ---------- Functions ----------
@@ -349,6 +365,76 @@ begin
               from offers o where o.member_id = m.id), '[]'::json));
 end $$;
 
+-- Public (no login): is the daily scratch card switched on? Used by the first-visit intro.
+create or replace function public.daily_public(p_slug text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce(daily_on, false) from businesses where slug = p_slug;
+$$;
+
+-- For a signed-in customer: card state + today's status. {on, cap, played, streak, next_at}
+create or replace function public.daily_status(p_slug text) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare b businesses; m members; today date;
+begin
+  if auth.uid() is null then
+    return json_build_object('on', false, 'cap', 0, 'played', false, 'streak', 0, 'next_at', null);
+  end if;
+  select * into b from businesses where slug = p_slug;
+  if not found then
+    return json_build_object('on', false, 'cap', 0, 'played', false, 'streak', 0, 'next_at', null);
+  end if;
+  today := (now() at time zone b.tz)::date;
+  select * into m from members where business_id = b.id and user_id = auth.uid();
+  if not found then
+    return json_build_object('on', b.daily_on, 'cap', b.daily_week_cap, 'played', false, 'streak', 0, 'next_at', null);
+  end if;
+  return json_build_object(
+    'on', b.daily_on, 'cap', b.daily_week_cap,
+    'played', m.last_daily is not null and (m.last_daily at time zone b.tz)::date = today,
+    'streak', m.daily_streak,
+    'next_at', case when m.last_daily is not null and (m.last_daily at time zone b.tz)::date = today
+                    then ((today + 1)::timestamp at time zone b.tz) end);
+end $$;
+
+-- Scratch the card once per day. The streak grows on consecutive days played. A win hands over one
+-- prize from daily_offers as a 'Daily' coupon (valid 7 days); otherwise a message from daily_notes.
+-- Returned: {ok, win, prize, code, note, streak, next_at} or {ok:false, error:'done'|'off', next_at}
+create or replace function public.play_daily(p_slug text) returns json
+language plpgsql security definer set search_path = public as $$
+declare b businesses; m members; today date; streak int; wins int; prize text; note text; c text; nxt timestamptz;
+begin
+  if auth.uid() is null then return json_build_object('ok', false, 'error', 'auth'); end if;
+  select * into b from businesses where slug = p_slug;
+  if not found or not b.daily_on then return json_build_object('ok', false, 'error', 'off', 'next_at', null); end if;
+  select * into m from members where business_id = b.id and user_id = auth.uid() for update;
+  if not found then return json_build_object('ok', false, 'error', 'auth'); end if;
+  today := (now() at time zone b.tz)::date;
+  if m.last_daily is not null and (m.last_daily at time zone b.tz)::date = today then
+    nxt := ((today + 1)::timestamp at time zone b.tz);
+    return json_build_object('ok', false, 'error', 'done', 'next_at', nxt);
+  end if;
+  -- Streak: +1 when yesterday was played, otherwise a fresh streak of 1.
+  if m.last_daily is not null and (m.last_daily at time zone b.tz)::date = today - 1 then
+    streak := m.daily_streak + 1;
+  else
+    streak := 1;
+  end if;
+  update members set last_daily = now(), daily_streak = streak where id = m.id;
+
+  wins := (select count(*) from offers where member_id = m.id and type = 'Daily' and created_at > now() - interval '7 days');
+  prize := null; note := null; c := null;
+  if wins < b.daily_week_cap and b.daily_win_pct > 0 and random() * 100 < b.daily_win_pct then
+    prize := (select trim(x) from (select unnest(string_to_array(b.daily_offers, E'\n')) x) t where trim(x) <> '' order by random() limit 1);
+    if prize is not null then c := _give(m.id, b.id, 'Daily', prize, 7); end if;
+  end if;
+  if c is null then
+    note := (select trim(x) from (select unnest(string_to_array(b.daily_notes, E'\n')) x) t where trim(x) <> '' order by random() limit 1);
+    note := coalesce(note, 'Better luck tomorrow!');
+  end if;
+  nxt := ((today + 1)::timestamp at time zone b.tz);
+  return json_build_object('ok', true, 'win', c is not null, 'prize', prize, 'code', c, 'note', note, 'streak', streak, 'next_at', nxt);
+end $$;
+
 -- Add one stamp (needs the secret scan token from the QR / NFC link). Enforces the cooldown.
 create or replace function public.add_stamp(p_slug text, p_token text) returns json
 language plpgsql security definer set search_path = public as $$
@@ -509,6 +595,9 @@ end $$;
 -- ---------- Who may call what ----------
 revoke execute on all functions in schema public from public, anon, authenticated;
 grant execute on function public.get_business(text) to anon, authenticated;
+grant execute on function public.daily_public(text) to anon, authenticated;
+grant execute on function public.daily_status(text) to authenticated;
+grant execute on function public.play_daily(text) to authenticated;
 grant execute on function public.join_business(text, text, text, date, boolean, text, text) to authenticated;
 grant execute on function public.import_members(text, json) to authenticated;
 grant execute on function public.my_card(text) to authenticated;
