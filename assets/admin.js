@@ -15,6 +15,8 @@ const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).le
 // When this customer's current card runs out (null = no deadline: no stamps yet, full card, or no limit).
 const cardEnd = u => { if (!biz.card_months || !u.card_started_at || !(u.stamps > 0) || u.stamps >= biz.need) return null; const d = new Date(u.card_started_at); d.setMonth(d.getMonth() + biz.card_months); return d };
 const sameMonth = d => d && +d.slice(5, 7) == new Date().getMonth() + 1;
+// A date (or now) as YYYY-MM-DD in the business's timezone: the same day the SQL uses for "(last_daily at time zone tz)::date".
+const bizDay = d => (d == null ? new Date() : new Date(d)).toLocaleDateString('en-CA', { timeZone: biz.tz || 'Asia/Kolkata' });
 const optedOut = u => !!u.wa_optout;
 
 // ---------- icons ----------
@@ -147,7 +149,7 @@ function reminders() {
     const ce = cardEnd(u);
     if (ce && daysTo(ce) <= 14 && daysTo(ce) >= 0) L.push({ k: daysTo(ce), tag: 'Card ending', when: daysTo(ce) <= 1 ? 'within a day' : 'in ' + daysTo(ce) + ' days', u,
       msg: `Hi ${first(u)}, your ${biz.name} stamp card ends on ${fd(ce)} and you have ${u.stamps} of ${biz.need} stamps. Visit us before then to finish it and earn ${biz.reward}! ${link}` });
-    (u.offers || []).filter(o => !o.used_at && !o.valid_from && o.expires_at && !isExp(o) && daysTo(o.expires_at) <= 3).forEach(o => {
+    (u.offers || []).filter(o => o.type != 'Daily' && !o.used_at && !o.valid_from && o.expires_at && !isExp(o) && daysTo(o.expires_at) <= 3).forEach(o => {
       const k = daysTo(o.expires_at);
       L.push({ k, tag: 'Offer expiring', when: k <= 1 ? 'within a day' : 'in ' + k + ' days', u,
         msg: `Hi ${first(u)}, your offer at ${biz.name} ("${o.text}") expires on ${fd(o.expires_at)}. Open your card to see your code: ${link}` });
@@ -164,6 +166,13 @@ function homeV() {
   const stat = (b, l) => `<div class="a-st"><b>${b}</b><span>${l}</span></div>`;
   const redeemedToday = M.reduce((a, u) => a + (u.offers || []).filter(x => x.used_at && new Date(x.used_at) > today0).length, 0);
   const ending = M.filter(u => { const e = cardEnd(u); return e && daysTo(e) <= 14 && daysTo(e) >= 0 }).length;
+  let daily = '';
+  if (biz.daily_on) {
+    const today = bizDay(), d = M.flatMap(u => u.offers || []).filter(x => x.type == 'Daily');
+    daily = stat(M.filter(u => u.last_daily && bizDay(u.last_daily) == today).length, 'Scratched today')
+      + stat(d.filter(x => !x.used_at && !isExp(x)).length, 'Daily coupons outstanding')
+      + stat(d.filter(x => x.used_at).length, 'Daily coupons redeemed');
+  }
   return `<div class="a-card"><div class="a-h"><h2>Sign-up QR</h2><span class="a-tag">At the counter</span></div>
     <p class="sub">Print this for the counter or door. Scanning it lets a new customer join and get their first stamp — it cannot add any later stamps.</p>
     <label class="lb">Sign-up link</label><input readonly class="ro" value="${esc(joinUrl())}" onclick="this.select()">
@@ -171,7 +180,7 @@ function homeV() {
     <div class="row"><button class="btn sm" onclick="dlQR()">Download</button><button class="btn sm alt" onclick="cpL('j')">Copy link</button><button class="btn sm alt" onclick="regen('join_token')">Regenerate</button></div>
     <p class="hint">Later stamps come from the NFC tag set up in More → Stamp tag.</p></div>
   <div class="a-quick"><button onclick="go('r')">${AI.ok}<b>Redeem a coupon</b><span>Enter a customer's code</span></button><button onclick="go('b')">${AI.send}<b>Message customers</b><span>WhatsApp group send</span></button><button onclick="go('o')">${AI.gift}<b>Edit offers</b><span>Stamps, welcome, birthday</span></button></div>
-  <div class="a-card"><h2>At a glance</h2><div class="a-sts">${stat(M.filter(u => u.last_stamp && new Date(u.last_stamp) > wk).length, 'Active, 7 days')}${stat(redeemedToday, 'Redeemed today')}${stat(M.reduce((a, u) => a + heldOffers(u), 0), 'Coupons out')}${stat(ending, 'Cards ending')}${stat(M.filter(u => sameMonth(u.bday)).length, 'Birthdays this month')}</div></div>
+  <div class="a-card"><h2>At a glance</h2><div class="a-sts">${stat(M.filter(u => u.last_stamp && new Date(u.last_stamp) > wk).length, 'Active, 7 days')}${stat(redeemedToday, 'Redeemed today')}${stat(M.reduce((a, u) => a + heldOffers(u), 0), 'Coupons out')}${stat(ending, 'Cards ending')}${stat(M.filter(u => sameMonth(u.bday)).length, 'Birthdays this month')}${daily}</div></div>
   ${chartV()}
   ${reminders()}
   <div class="a-card"><div class="a-h"><h2>Latest sign-ups</h2><button class="lnk" onclick="go('c')">See all</button></div>${M.slice(0, 5).map(u => `<div class="of"><b>${esc(u.name)}</b><span class="mut sm">${esc(u.phone)} · ${fd(u.joined)}</span></div>`).join('') || '<p class="a-empty">No members yet. Print the QR above and put it at the counter.</p>'}</div>`;
@@ -574,6 +583,8 @@ async function svOffer(btn, kind) {
 // One save button for the whole More tab: brand, links, "What's new" note and refer-a-friend.
 async function svBrand(btn) {
   const t = i => v(i).trim(), ok = x => !x || /^https:\/\//.test(x);
+  // One line per prize/message: trimmed, empty lines dropped, each capped at 80 characters.
+  const lines = i => v(i).split('\n').map(s => s.trim().slice(0, 80)).filter(Boolean).join('\n');
   if (!['ci', 'cf', 'cw', 'cs'].map(t).every(ok)) return toast('Links must start with https://');
   let logoUrl = v('clx') == '1' ? '' : biz.logo_url || '';
   const f = $('#clfile').files[0];
@@ -585,11 +596,13 @@ async function svBrand(btn) {
     news_text: nw, news_at: nw ? (nw == (biz.news_text || '') && biz.news_at ? biz.news_at : new Date().toISOString()) : null,
     ref_on: v('rfon') == '1', ref_offer: t('rfo') || '20% off your next bill', ref_cap: Math.max(1, Math.min(100, Math.round(+v('rfc')) || 5)),
     daily_on: v('dailon') == '1',
-    daily_week_cap: (dw => isNaN(dw) ? 2 : Math.max(0, Math.min(7, Math.round(dw))))(Math.round(+v('dwc'))),
-    daily_offers: t('dof'), daily_notes: t('dno')
+    daily_week_cap: (dw => isNaN(dw) ? 2 : Math.max(0, Math.min(7, dw)))(Math.round(+v('dwc'))),
+    daily_offers: lines('dof'), daily_notes: lines('dno')
   }, btn);
 }
 
+// Live warning under the prizes box: switched on with no prizes means customers only see messages.
+function dailyWarn() { const w = $('#dwarn'); if (w) w.hidden = !(v('dailon') == '1' && !v('dof').trim()) }
 // ---------- MORE ----------
 function moreV() {
   return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${fld('cc', 'Brand colour', biz.color, 'type=color')}${dbHint()}</div>
@@ -599,9 +612,10 @@ function moreV() {
     <label class="lb">Referrals</label><select id="rfon"><option value="1"${biz.ref_on ? ' selected' : ''}>On</option><option value="0"${biz.ref_on ? '' : ' selected'}>Off</option></select>
     ${fld('rfo', 'Offer for both', biz.ref_offer, '', 'e.g. 20% off your next bill')}${fld('rfc', 'Most referral rewards per customer in 30 days', biz.ref_cap, 'type=number min=1 max=100')}</div>
   <div class="a-card"><h2>Daily scratch card</h2><p class="sub">Customers scratch their card once a day for a chance to win a prize.</p>
-    <label class="lb">Daily scratch</label><select id="dailon"><option value="1"${biz.daily_on ? ' selected' : ''}>On</option><option value="0"${biz.daily_on ? '' : ' selected'}>Off</option></select>
+    <label class="lb">Daily scratch</label><select id="dailon" onchange="dailyWarn()"><option value="1"${biz.daily_on ? ' selected' : ''}>On</option><option value="0"${biz.daily_on ? '' : ' selected'}>Off</option></select>
     ${fld('dwc', 'Surprise offers per customer per week', biz.daily_week_cap == null ? 2 : biz.daily_week_cap, 'type=number min=0 max=7')}
-    <label class="lb">Prizes, one per line</label><textarea id="dof" rows="3" maxlength="500">${esc(biz.daily_offers || '')}</textarea>
+    <label class="lb">Prizes, one per line</label><textarea id="dof" rows="3" maxlength="500" oninput="dailyWarn()">${esc(biz.daily_offers || '')}</textarea>
+    <p class="hint bad" id="dwarn"${biz.daily_on && !(biz.daily_offers || '').trim() ? '' : ' hidden'}>No prizes yet: customers will only see messages.</p>
     <label class="lb">Messages for days without an offer, one per line (optional)</label><textarea id="dno" rows="3" maxlength="500">${esc(biz.daily_notes || '')}</textarea>
     <p class="hint">Customers scratch daily. Each week they win up to this many offers, picked at random from your list. Other days they see a message.</p></div>
   <button class="btn" data-go onclick="svBrand(this)">Save settings</button>
