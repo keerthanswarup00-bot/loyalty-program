@@ -12,7 +12,8 @@ These tests are intentionally end-to-end. They should run against a **dedicated 
 - `SMOKE_CUSTOMER_PASSWORD` — optional; defaults to `SmokeTest!2026`
 - `SMOKE_PHONE_PREFIX` — optional 5-digit prefix; defaults to `60000`
 - `SMOKE_STAMP_COUNT` — optional; defaults to `2`
-- `SMOKE_DAILY_ENABLED` — set to `1` only when Daily Scratch is enabled for the smoke business
+- `SMOKE_DAILY_ENABLED` — must be `1`; Daily Scratch must be enabled for the smoke business
+- `SMOKE_STAMP_COUNT` — optional; defaults to `2`, and must match the smoke business stamp requirement
 
 ## Smoke-business settings
 
@@ -67,6 +68,7 @@ Add the same values as repository secrets:
 - `SMOKE_CUSTOMER_PASSWORD`
 - `SMOKE_PHONE_PREFIX`
 - `SMOKE_DAILY_ENABLED`
+- `SMOKE_STAMP_COUNT`
 
 The workflow runs on pushes to `main` and can also be started manually.
 
