@@ -55,6 +55,10 @@ alter table public.businesses add column if not exists daily_prizes jsonb not nu
 alter table public.businesses add column if not exists daily_days text not null default '1,2,3,4,5,6,7';
 -- How many days a won coupon stays valid.
 alter table public.businesses add column if not exists daily_valid_days int not null default 7;
+-- Win-back: how long a customer is counted as lapsed (no visit), the offer in the WhatsApp message, and coupon validity.
+alter table public.businesses add column if not exists lapsed_days int not null default 10 check (lapsed_days between 1 and 365);
+alter table public.businesses add column if not exists winback_offer text not null default '';
+alter table public.businesses add column if not exists winback_valid_days int not null default 7 check (winback_valid_days between 0 and 90);
 
 
 create table if not exists public.members (
@@ -169,6 +173,19 @@ create table if not exists public.visits (
 );
 create index if not exists visits_business_idx on public.visits (business_id, created_at);
 
+-- Win-back: a log of win-back messages sent, and whether the customer came back afterwards.
+create table if not exists public.messages (
+  id bigint generated always as identity primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  member_id uuid not null references public.members(id) on delete cascade,
+  offer_id uuid references public.offers(id) on delete set null,
+  kind text not null default 'winback',
+  created_at timestamptz not null default now(),
+  returned_at timestamptz
+);
+create index if not exists messages_member_idx on public.messages (member_id, created_at desc);
+create index if not exists messages_business_idx on public.messages (business_id, created_at desc);
+
 -- ---------- Row level security ----------
 -- Customers can read only their own rows. Owners can read only their business's rows.
 -- Nobody writes to members/offers/visits directly: all writes go through the functions below.
@@ -176,6 +193,7 @@ alter table public.businesses enable row level security;
 alter table public.members enable row level security;
 alter table public.offers enable row level security;
 alter table public.visits enable row level security;
+alter table public.messages enable row level security;
 
 drop policy if exists biz_owner_select on public.businesses;
 create policy biz_owner_select on public.businesses for select to authenticated
@@ -202,14 +220,19 @@ drop policy if exists visit_owner_select on public.visits;
 create policy visit_owner_select on public.visits for select to authenticated
   using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
 
+drop policy if exists message_owner_select on public.messages;
+create policy message_owner_select on public.messages for select to authenticated
+  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+
 -- Table privileges: read-only for members/offers/visits; owners may edit only these business columns.
-revoke all on public.businesses, public.members, public.offers, public.visits from anon, authenticated;
-grant select on public.businesses, public.members, public.offers, public.visits to authenticated;
+revoke all on public.businesses, public.members, public.offers, public.visits, public.messages from anon, authenticated;
+grant select on public.businesses, public.members, public.offers, public.visits, public.messages to authenticated;
 grant update (name, tagline, color, logo_url, stamp_url, ig, fb, wa, web, need, reward, cooldown_min,
               sur_stamps, sur_offer, welcome_offer, bday_offer, exp_days, join_stamp, card_months, scan_token,
               join_token, news_text, news_at, ref_on, ref_offer, ref_cap,
               daily_on, daily_offers, daily_win_pct, daily_week_cap, daily_notes,
-              daily_prizes, daily_days, daily_valid_days)
+              daily_prizes, daily_days, daily_valid_days,
+              lapsed_days, winback_offer, winback_valid_days)
   on public.businesses to authenticated;
 
 -- ---------- Functions ----------
@@ -304,9 +327,10 @@ begin
 end $$;
 
 -- Internal: add one stamp (no cooldown check), start the card clock on the first stamp, give the surprise offer if due.
+-- Also marks a recent win-back message as "came back".
 create or replace function public._do_stamp(p_member uuid) returns json
 language plpgsql security definer set search_path = public as $$
-declare b businesses; m members; pos int; surprise text := null; lost int; need_visits int;
+declare b businesses; m members; pos int; surprise text := null; lost int;
 begin
   select * into m from members where id = p_member;
   select * into b from businesses where id = m.business_id;
@@ -315,14 +339,8 @@ begin
          card_started_at = coalesce(card_started_at, now())
    where id = m.id returning * into m;
   insert into visits (member_id, business_id) values (m.id, b.id);
-  -- Referral reward for whoever invited this member: only once the friend has really visited (a stamp after the sign-up one).
-  need_visits := (case when b.join_stamp then 2 else 1 end);
-  if b.ref_on and m.referred_by is not null and not m.ref_rewarded and m.total >= need_visits then
-    update members set ref_rewarded = true where id = m.id;
-    if (select count(*) from offers where member_id = m.referred_by and type = 'Referral reward' and created_at > now() - interval '30 days') < b.ref_cap then
-      perform _give(m.referred_by, b.id, 'Referral reward', b.ref_offer, b.exp_days);
-    end if;
-  end if;
+  update messages set returned_at = now()
+   where member_id = m.id and returned_at is null and created_at > now() - interval '30 days';
   pos := (m.stamps - 1) % b.need + 1;
   if b.sur_offer <> '' and exists (
        select 1 from unnest(string_to_array(regexp_replace(b.sur_stamps, '\s', '', 'g'), ',')) s
@@ -331,6 +349,32 @@ begin
     surprise := b.sur_offer;
   end if;
   return json_build_object('stamps', m.stamps, 'surprise', surprise, 'lost', lost);
+end $$;
+
+-- Owner taps "Message" on a lapsed customer: creates the coupon, logs the message, returns what the app needs.
+create or replace function public.winback_message(p_slug text, p_member uuid) returns json
+language plpgsql security definer set search_path = public as $$
+declare b businesses; m members; c text; oid uuid; ex timestamptz; recent timestamptz;
+begin
+  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  if not found then raise exception 'Not allowed'; end if;
+  select * into m from members where id = p_member and business_id = b.id for update;
+  if not found then raise exception 'Customer not found'; end if;
+  if coalesce(b.winback_offer, '') = '' then
+    return json_build_object('ok', false, 'error', 'nooffer');
+  end if;
+  if coalesce(m.last_stamp, m.joined) > now() - make_interval(days => b.lapsed_days) then
+    return json_build_object('ok', false, 'error', 'notlapsed');
+  end if;
+  select max(created_at) into recent from messages where member_id = m.id and kind = 'winback';
+  if recent is not null and recent > now() - interval '14 days' then
+    return json_build_object('ok', false, 'error', 'recent', 'sent_at', recent);
+  end if;
+  c := _give(m.id, b.id, 'Win-back', b.winback_offer, b.winback_valid_days);
+  select id, expires_at into oid, ex from offers where business_id = b.id and code = c order by created_at desc limit 1;
+  insert into messages (business_id, member_id, offer_id, kind) values (b.id, m.id, oid, 'winback');
+  return json_build_object('ok', true, 'code', c, 'expires_at', ex, 'offer', b.winback_offer,
+                           'name', m.name, 'phone', m.phone);
 end $$;
 
 -- Create the member row for the signed-in customer, give the welcome offer and (if switched on) the first stamp.
@@ -710,6 +754,7 @@ grant execute on function public.delete_me() to authenticated;
 grant execute on function public.reset_member_password(uuid, text) to authenticated;
 grant execute on function public.set_wa_optout(uuid, boolean) to authenticated;
 grant execute on function public.set_my_wa_optout(text, boolean) to authenticated;
+grant execute on function public.winback_message(text, uuid) to authenticated;
 
 -- ---------- Image storage (logos and stamp images) ----------
 -- A public bucket "brand": anyone can view the images, only the business owner can write inside their own folder

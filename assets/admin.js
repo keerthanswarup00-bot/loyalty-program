@@ -2,7 +2,7 @@
 // Tabs: Home (sign-up QR, stats, chart, reminders) · Customers (sort, select, CSV) · Redeem ·
 // Message (WhatsApp queue) · Offers (visual editors) · More (brand, news, refer, tag, account).
 const sb = notReady() ? null : mkClient('lk-admin');
-let signed = false, recover = false, biz = null, M = [], V = [], tab = 'h', ov = null, openId = null, selMode = false, visCache = {};
+let signed = false, recover = false, biz = null, M = [], V = [], MSG = [], tab = 'h', ov = null, openId = null, selMode = false, visCache = {};
 let q = '', rq = '', rc = '', rp = '', rd = null, rbusy = false;
 // Customers selection (feeds the Message tab) + Message tab state
 let sel = new Set(), bsel = new Set(), sortBy = 'joined', bseg = 'all', bmsg = 'Hi {name}! ', bimg = '', bfile = null, blink = true, bstop = true, bq = null, binit = false;
@@ -14,6 +14,13 @@ const joinUrl = () => location.origin + '/#join=' + biz.join_token;
 const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).length;
 // When this customer's current card runs out (null = no deadline: no stamps yet, full card, or no limit).
 const cardEnd = u => { if (!biz.card_months || !u.card_started_at || !(u.stamps > 0) || u.stamps >= biz.need) return null; const d = new Date(u.card_started_at); d.setMonth(d.getMonth() + biz.card_months); return d };
+const lastSeen = u => new Date(u.last_stamp || u.joined);
+const daysAgo = d => Math.floor((Date.now() - d) / 864e5);
+const lastMsg = id => MSG.find(m => m.member_id == id);   // MSG is newest-first
+const WB_COOLDOWN = 14;                                    // keep in sync with winback_message()
+const WBERR = { nooffer: 'Set a win-back offer in Settings first', notlapsed: 'This customer visited recently', recent: 'Already messaged in the last 14 days' };
+const lapsed = () => M.map(u => ({ u, d: daysAgo(lastSeen(u)), m: lastMsg(u.id) }))
+  .filter(r => r.d >= biz.lapsed_days).sort((a, b) => b.d - a.d);   // longest gone first
 const sameMonth = d => d && +d.slice(5, 7) == new Date().getMonth() + 1;
 // A date (or now) as YYYY-MM-DD in the business's timezone: the same day the SQL uses for "(last_daily at time zone tz)::date".
 const bizDay = d => (d == null ? new Date() : new Date(d)).toLocaleDateString('en-CA', { timeZone: biz.tz || 'Asia/Kolkata' });
@@ -58,6 +65,9 @@ async function load() {
     if (biz) {
       brand(biz); document.title = 'Owner dashboard · ' + biz.name;
       M = await pages(() => sb.from('members').select('*,offers(id,type,text,code,valid_from,used_at,expires_at,created_at)').eq('business_id', biz.id).order('joined', { ascending: false }).order('id'));
+      const mr = await sb.from('messages').select('member_id,created_at,returned_at').eq('business_id', biz.id).order('created_at', { ascending: false }).limit(1000);
+      if (mr.error) throw mr.error;
+      MSG = mr.data;
       try {
         const since = new Date(Date.now() - 14 * 864e5).toISOString();
         V = (await pages(() => sb.from('visits').select('id,created_at').eq('business_id', biz.id).gte('created_at', since).order('id'))).map(x => x.created_at);
@@ -80,7 +90,7 @@ async function login(btn) {
 async function out() {
   await sb.auth.signOut();
   signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null;
-  sel = new Set(); bsel = new Set(); selMode = false; bq = null; binit = false; impRows = null; visCache = {};
+  sel = new Set(); bsel = new Set(); selMode = false; bq = null; binit = false; impRows = null; visCache = {}; MSG = [];
   render();
 }
 async function forgot() {
@@ -161,6 +171,36 @@ function reminders() {
     + (L.map(r => `<div class="of"><div><div class="tag">${r.tag} · ${r.when}</div><b>${esc(r.u.name)}</b><div class="mut sm">${esc(r.u.phone)}</div></div>${optedOut(r.u) ? '<span class="mut sm">Opted out</span>' : `<a class="btn sm" href="${esc(waLink(r.u.phone, r.msg))}" target="_blank" rel="noopener">WhatsApp</a>`}</div>`).join('')
       || '<p class="a-empty">Nothing due right now.</p>') + '</div>';
 }
+function comeBack() {
+  const L = lapsed(), more = L.length - 25;
+  const offer = !!biz.winback_offer;
+  const recent = MSG.filter(m => new Date(m.created_at) > Date.now() - 30 * 864e5);
+  const row = r => {
+    const msg = r.m ? daysAgo(new Date(r.m.created_at)) : -1;
+    return `<div class="of"><div><b>${esc(r.u.name)}</b><div class="mut sm">${r.u.last_stamp ? 'Last seen ' + r.d + ' days ago · ' + r.u.stamps + ' stamps' : 'Joined ' + r.d + ' days ago, no visit yet'}</div></div>${msg >= 0 && msg < WB_COOLDOWN ? `<span class="mut sm">Messaged ${msg}d ago</span>` : `<button class="btn sm" onclick="winback('${r.u.id}',this)"${offer ? '' : ' disabled'}>Message</button>`}</div>`;
+  };
+  return `<div class="a-card"><div class="a-h"><h2>Come back</h2></div>
+    <p class="sub">Customers who haven't visited in ${biz.lapsed_days}+ days.</p>
+    <p class="hint">Messaged ${recent.length} in the last 30 days · ${recent.filter(m => m.returned_at).length} came back</p>
+    ${offer ? '' : '<p class="hint">Set a win-back offer in Settings to start messaging.</p>'}
+    ${L.length ? L.slice(0, 25).map(row).join('') + (more > 0 ? `<p class="hint">+${more} more</p>` : '') : '<p class="a-empty">Nobody is overdue. Everyone has visited recently.</p>'}</div>`;
+}
+// Safari and Chrome block window.open after an await, so open the tab first and point it at WhatsApp once the RPC returns.
+async function winback(id, btn) {
+  const u = M.find(x => x.id == id); if (!u) return;
+  const w = window.open('', '_blank');
+  btn.disabled = true;
+  try {
+    const r = await rpc(sb, 'winback_message', { p_slug: CFG.slug, p_member: id });
+    if (!r.ok) { if (w) w.close(); btn.disabled = false; return toast(WBERR[r.error] || 'Could not create the message') }
+    const msg = `Hi ${first(u)}, we miss you at ${biz.name}! Here's a little something for your next visit: ${r.offer}.`
+      + (r.expires_at ? ` Valid until ${fd(r.expires_at)}.` : '')
+      + ` Show this code at the counter: ${r.code}. You can also see it on your card: ${location.origin}/`;
+    if (w) w.location.href = waLink(r.phone, msg);
+    else { try { await navigator.clipboard.writeText(msg) } catch (e) { } toast('Pop-up blocked. Message copied: paste it into WhatsApp.') }
+    await load(); render();
+  } catch (e) { if (w) w.close(); btn.disabled = false; toast(nice(e)) }
+}
 function homeV() {
   const wk = Date.now() - 6048e5, today0 = new Date().setHours(0, 0, 0, 0);
   const stat = (b, l) => `<div class="a-st"><b>${b}</b><span>${l}</span></div>`;
@@ -180,6 +220,7 @@ function homeV() {
     <div class="row"><button class="btn sm" onclick="dlQR()">Download</button><button class="btn sm alt" onclick="cpL('j')">Copy link</button><button class="btn sm alt" onclick="regen('join_token')">Regenerate</button></div>
     <p class="hint">Later stamps come from the NFC tag set up in More → Stamp tag.</p></div>
   <div class="a-quick"><button onclick="go('r')">${AI.ok}<b>Redeem a coupon</b><span>Enter a customer's code</span></button><button onclick="go('b')">${AI.send}<b>Message customers</b><span>WhatsApp group send</span></button><button onclick="go('o')">${AI.gift}<b>Edit offers</b><span>Stamps, welcome, birthday</span></button></div>
+  ${comeBack()}
   <div class="a-card"><h2>At a glance</h2><div class="a-sts">${stat(M.filter(u => u.last_stamp && new Date(u.last_stamp) > wk).length, 'Active, 7 days')}${stat(redeemedToday, 'Redeemed today')}${stat(M.reduce((a, u) => a + heldOffers(u), 0), 'Coupons out')}${stat(ending, 'Cards ending')}${stat(M.filter(u => sameMonth(u.bday)).length, 'Birthdays this month')}${daily}</div></div>
   ${chartV()}
   ${reminders()}
@@ -602,7 +643,10 @@ async function svBrand(btn) {
     daily_on: v('dailon') == '1',
     daily_week_cap: (dw => isNaN(dw) ? 2 : Math.max(0, Math.min(7, dw)))(Math.round(+v('dwc'))),
     daily_prizes: prizes, daily_days: dg.days.join(','), daily_offers: '', daily_notes: lines('dno'),
-    daily_valid_days: (n => isNaN(n) ? 7 : Math.max(1, Math.min(90, n)))(Math.round(+v('dvd')))
+    daily_valid_days: (n => isNaN(n) ? 7 : Math.max(1, Math.min(90, n)))(Math.round(+v('dvd'))),
+    lapsed_days: Math.max(1, Math.min(365, Math.round(+v('wl')) || 10)),
+    winback_offer: t('wb'),
+    winback_valid_days: v('wv') === '' ? 7 : Math.max(0, Math.min(90, Math.round(+v('wv')) || 0))
   }, btn, () => { DG = null; render(); });
 }
 
@@ -679,6 +723,11 @@ function moreV() {
     ${fld('dvd', '4. Days a won prize stays valid', biz.daily_valid_days || 7, 'type=number min=1 max=90')}
     <label class="lb">5. Messages for scratches that win nothing, one per line (optional)</label><textarea id="dno" rows="3" maxlength="500">${esc(biz.daily_notes || '')}</textarea>
     <p class="hint">Won prizes appear in the customer's Offers with a code your staff redeem like any other coupon. Changes apply to the next scratch; nothing is paid or promised until a customer wins.</p></div>
+  <div class="a-card"><h2>Win-back</h2><p class="sub">Bring back customers who stopped visiting. Leave the offer blank to switch it off.</p>
+    ${fld('wl', 'Count a customer as lapsed after (days)', biz.lapsed_days || 10, 'type=number min=1 max=365')}
+    ${fld('wb', 'Win-back offer (e.g. 15% off your next visit)', biz.winback_offer || '', '')}
+    ${fld('wv', 'Offer is valid for (days, 0 = never expires)', biz.winback_valid_days == null ? 7 : biz.winback_valid_days, 'type=number min=0 max=90')}
+  </div>
   <button class="btn" data-go onclick="svBrand(this)">Save settings</button>
   <div class="a-card" style="margin-top:16px"><h2>Stamp tag</h2><p class="sub">The tap-only link behind your NFC tag — staff collect stamps after the first one by tapping the customer's phone on it.</p>
     <label class="lb">Link for the NFC tag</label><input readonly class="ro" value="${esc(scanUrl())}" onclick="this.select()">
