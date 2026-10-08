@@ -5,7 +5,9 @@
   "scripts": {
     "test:smoke": "playwright test tests/smoke.spec.js",
     "test:smoke:headed": "playwright test tests/smoke.spec.js --headed",
-    "test:smoke:debug": "playwright test tests/smoke.spec.js --debug"
+    "test:smoke:debug": "playwright test tests/smoke.spec.js --debug",
+    "check:js": "node scripts/check-js-syntax.js",
+    "prepare": "node scripts/install-hooks.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1"
