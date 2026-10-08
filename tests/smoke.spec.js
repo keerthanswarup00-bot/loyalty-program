@@ -5,7 +5,8 @@ const required = [
   'SMOKE_ADMIN_EMAIL',
   'SMOKE_ADMIN_PASSWORD',
   'SMOKE_JOIN_URL',
-  'SMOKE_STAMP_URL'
+  'SMOKE_STAMP_URL',
+  'SMOKE_DAILY_ENABLED'
 ];
 
 for (const name of required) {
@@ -106,8 +107,7 @@ test.describe('Royalty Program smoke tests', () => {
     await admin.getByRole('button', { name: /redeem/i }).click();
     await expect(admin.getByText(/redeem/i).first()).toBeVisible();
 
-    const codeInput = admin.locator('input').filter({ has: undefined }).first();
-    // The redeem view has a single code field; locate it by placeholder/label when available.
+    // The redeem view has a single code field; locate it by its explicit label.
     const redeemInput = admin.getByLabel(/coupon code|code/i).first();
     await redeemInput.fill(rewardCode);
     await admin.getByRole('button', { name: /check coupon/i }).click();
@@ -119,8 +119,7 @@ test.describe('Royalty Program smoke tests', () => {
   });
 
   test('daily scratch card', async ({ page }) => {
-    test.skip(process.env.SMOKE_DAILY_ENABLED !== '1',
-      'Set SMOKE_DAILY_ENABLED=1 on the dedicated smoke business.');
+    test.expect(process.env.SMOKE_DAILY_ENABLED).toBe('1');
 
     await page.goto(JOIN_URL);
     await expect(page.getByRole('heading', { name: /join the rewards club/i })).toBeVisible();
