@@ -586,6 +586,10 @@ async function svBrand(btn) {
   // One line per prize/message: trimmed, empty lines dropped, each capped at 80 characters.
   const lines = i => v(i).split('\n').map(s => s.trim().slice(0, 80)).filter(Boolean).join('\n');
   if (!['ci', 'cf', 'cw', 'cs'].map(t).every(ok)) return toast('Links must start with https://');
+  const dg = dgGet(), prizes = dg.prizes.map(p => ({ text: String(p.text).trim().slice(0, 80), chance: Math.round(Math.max(0, Math.min(100, +p.chance || 0)) * 10) / 10 }));
+  if (prizes.some(p => !p.text)) return toast('Give every prize a name, or remove the empty row.');
+  if (prizes.reduce((a, p) => a + p.chance, 0) > 100.0001) return toast('Prize chances add up to more than 100%.');
+  if (!dg.days.length) return toast('Pick at least one day for the daily scratch card.');
   let logoUrl = v('clx') == '1' ? '' : biz.logo_url || '';
   const f = $('#clfile').files[0];
   if (f) { try { logoUrl = await readImg(f, 'logo') } catch (e) { return imgErr(e) } }
@@ -597,12 +601,59 @@ async function svBrand(btn) {
     ref_on: v('rfon') == '1', ref_offer: t('rfo') || '20% off your next bill', ref_cap: Math.max(1, Math.min(100, Math.round(+v('rfc')) || 5)),
     daily_on: v('dailon') == '1',
     daily_week_cap: (dw => isNaN(dw) ? 2 : Math.max(0, Math.min(7, dw)))(Math.round(+v('dwc'))),
-    daily_offers: lines('dof'), daily_notes: lines('dno')
-  }, btn);
+    daily_prizes: prizes, daily_days: dg.days.join(','), daily_offers: '', daily_notes: lines('dno'),
+    daily_valid_days: (n => isNaN(n) ? 7 : Math.max(1, Math.min(90, n)))(Math.round(+v('dvd')))
+  }, btn, () => { DG = null; render(); });
 }
 
-// Live warning under the prizes box: switched on with no prizes means customers only see messages.
-function dailyWarn() { const w = $('#dwarn'); if (w) w.hidden = !(v('dailon') == '1' && !v('dof').trim()) }
+// ---------- Daily scratch card editor (prizes, chances, weekdays) ----------
+// Edits live in DG until "Save settings" so typing never loses focus; DG resets after a save.
+let DG = null;
+const DGN = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function dgGet() {
+  if (!DG) DG = {
+    prizes: (Array.isArray(biz.daily_prizes) ? biz.daily_prizes : []).map(p => ({ text: String(p.text || ''), chance: +p.chance || 0 })),
+    days: String(biz.daily_days || '1,2,3,4,5,6,7').split(',').map(Number).filter(n => n >= 1 && n <= 7)
+  };
+  return DG;
+}
+function dgRowsV() {
+  const d = dgGet();
+  return d.prizes.map((p, i) => `<div class="dg-row"><input class="dg-n" maxlength="80" aria-label="Prize ${i + 1} name" placeholder="e.g. 5% off your next bill" value="${esc(p.text)}" oninput="dgSet(${i},'text',this.value)">
+    <span class="dg-c"><input type="number" inputmode="decimal" min="0" max="100" step="0.5" aria-label="Chance of prize ${i + 1} in percent" value="${esc(p.chance)}" oninput="dgSet(${i},'chance',this.value)"><b>%</b></span>
+    <button type="button" class="btn sm alt" aria-label="Remove prize ${i + 1}" onclick="dgDel(${i})">Remove</button></div>`).join('')
+    + (d.prizes.length ? '' : '<p class="hint">No prizes yet. Add your first one below.</p>');
+}
+function dgDaysV() {
+  const d = dgGet();
+  return DGN.slice(1).map((n, k) => `<button type="button" class="chip${d.days.includes(k + 1) ? ' on' : ''}" aria-pressed="${d.days.includes(k + 1)}" onclick="dgDay(${k + 1})">${n}</button>`).join('');
+}
+// Average prizes a customer wins per week: n prize days, chance p each, capped at c a week.
+function dgExpected(n, p, c) {
+  if (p >= 1) return Math.min(n, c);
+  let e = 0, pk = Math.pow(1 - p, n);
+  for (let k = 0; k <= n; k++) { e += Math.min(k, c) * pk; pk = pk * (n - k) / (k + 1) * p / (1 - p); }
+  return e;
+}
+function dgSum() {
+  const d = dgGet(), tot = Math.round(d.prizes.reduce((a, p) => a + (Math.max(0, +p.chance) || 0), 0) * 10) / 10;
+  const cap = Math.max(0, Math.min(7, Math.round(+v('dwc')) || 0)), n = d.days.length;
+  const el = $('#dgsum'); if (el) {
+    const bad = tot > 100.0001;
+    el.className = 'hint' + (bad ? ' bad' : '');
+    el.innerHTML = bad ? `Chances add up to <b>${tot}%</b>. They must add up to 100% or less.`
+      : `Chances add up to <b>${tot}%</b>, so on a prize day <b>${Math.round((100 - tot) * 10) / 10}%</b> of scratches win nothing.`
+      + (n && cap && tot ? ` With ${n} prize ${n == 1 ? 'day' : 'days'} and a limit of ${cap} a week, an average customer wins about <b>${(Math.round(dgExpected(n, tot / 100, cap) * 10) / 10)}</b> prizes a week.` : '');
+  }
+  const w = $('#dwarn'); if (w) w.hidden = !(v('dailon') == '1' && !d.prizes.some(p => p.text.trim() && +p.chance > 0));
+  const ds = $('#dgdaywarn'); if (ds) ds.hidden = n > 0;
+}
+function dgRefresh() { const r = $('#dgrows'); if (r) r.innerHTML = dgRowsV(); const c = $('#dgdays'); if (c) c.innerHTML = dgDaysV(); const a = $('#dgadd'); if (a) a.disabled = dgGet().prizes.length >= 12; dgSum(); }
+function dgSet(i, k, val) { const p = dgGet().prizes[i]; if (p) p[k] = val; dgSum(); }
+function dgAdd() { const d = dgGet(); if (d.prizes.length < 12) d.prizes.push({ text: '', chance: 0 }); dgRefresh(); const r = document.querySelectorAll('#dgrows .dg-n'); if (r.length) r[r.length - 1].focus(); }
+function dgDel(i) { dgGet().prizes.splice(i, 1); dgRefresh(); }
+function dgDay(n) { const d = dgGet(); d.days = d.days.includes(n) ? d.days.filter(x => x != n) : [...d.days, n].sort((a, b) => a - b); dgRefresh(); }
+function dailyWarn() { dgSum() }
 // ---------- MORE ----------
 function moreV() {
   return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${fld('cc', 'Brand colour', biz.color, 'type=color')}${dbHint()}</div>
@@ -611,13 +662,23 @@ function moreV() {
   <div class="a-card"><h2>Refer a friend</h2><p class="sub">Each customer gets a personal code. A friend who enters it when joining gets this offer, and the customer gets it too after the friend's next stamp.</p>
     <label class="lb">Referrals</label><select id="rfon"><option value="1"${biz.ref_on ? ' selected' : ''}>On</option><option value="0"${biz.ref_on ? '' : ' selected'}>Off</option></select>
     ${fld('rfo', 'Offer for both', biz.ref_offer, '', 'e.g. 20% off your next bill')}${fld('rfc', 'Most referral rewards per customer in 30 days', biz.ref_cap, 'type=number min=1 max=100')}</div>
-  <div class="a-card"><h2>Daily scratch card</h2><p class="sub">Customers scratch their card once a day for a chance to win a prize.</p>
+  <div class="a-card"><h2>Daily scratch card</h2>
+    <p class="sub">A game your customers can play once a day. Everyone scratches every day, but a prize only drops on the days you choose, with the chances you set, and never more than your weekly limit. This is how you bring people back on your quiet days.</p>
     <label class="lb">Daily scratch</label><select id="dailon" onchange="dailyWarn()"><option value="1"${biz.daily_on ? ' selected' : ''}>On</option><option value="0"${biz.daily_on ? '' : ' selected'}>Off</option></select>
-    ${fld('dwc', 'Surprise offers per customer per week', biz.daily_week_cap == null ? 2 : biz.daily_week_cap, 'type=number min=0 max=7')}
-    <label class="lb">Prizes, one per line</label><textarea id="dof" rows="3" maxlength="500" oninput="dailyWarn()">${esc(biz.daily_offers || '')}</textarea>
-    <p class="hint bad" id="dwarn"${biz.daily_on && !(biz.daily_offers || '').trim() ? '' : ' hidden'}>No prizes yet: customers will only see messages.</p>
-    <label class="lb">Messages for days without an offer, one per line (optional)</label><textarea id="dno" rows="3" maxlength="500">${esc(biz.daily_notes || '')}</textarea>
-    <p class="hint">Customers scratch daily. Each week they win up to this many offers, picked at random from your list. Other days they see a message.</p></div>
+    <label class="lb">1. Prizes and their chance</label>
+    <p class="hint" style="margin-top:0">Each scratch on a prize day picks at random. Example: "5% off" at 60% and "20% off" at 10% means 60 in every 100 scratches win 5% off, 10 win 20% off, and the other 30 win nothing.</p>
+    <div id="dgrows">${dgRowsV()}</div>
+    <button type="button" class="btn sm alt" id="dgadd" onclick="dgAdd()"${dgGet().prizes.length >= 12 ? ' disabled' : ''}>Add a prize</button>
+    <p class="hint" id="dgsum"></p>
+    <p class="hint bad" id="dwarn"${biz.daily_on && !dgGet().prizes.some(p => p.text.trim() && +p.chance > 0) ? '' : ' hidden'}>No prizes yet: customers will only see messages.</p>
+    <label class="lb">2. Days a prize can drop</label>
+    <p class="hint" style="margin-top:0">Pick the days you want customers to come in. Customers see these days on their card. On the other days they can still scratch but will only see a message.</p>
+    <div class="chips" id="dgdays">${dgDaysV()}</div>
+    <p class="hint bad" id="dgdaywarn"${dgGet().days.length ? ' hidden' : ''}>Pick at least one day.</p>
+    ${fld('dwc', '3. Most prizes one customer can win per week (Monday to Sunday)', biz.daily_week_cap == null ? 2 : biz.daily_week_cap, 'type=number min=0 max=7 oninput=dgSum()')}
+    ${fld('dvd', '4. Days a won prize stays valid', biz.daily_valid_days || 7, 'type=number min=1 max=90')}
+    <label class="lb">5. Messages for scratches that win nothing, one per line (optional)</label><textarea id="dno" rows="3" maxlength="500">${esc(biz.daily_notes || '')}</textarea>
+    <p class="hint">Won prizes appear in the customer's Offers with a code your staff redeem like any other coupon. Changes apply to the next scratch; nothing is paid or promised until a customer wins.</p></div>
   <button class="btn" data-go onclick="svBrand(this)">Save settings</button>
   <div class="a-card" style="margin-top:16px"><h2>Stamp tag</h2><p class="sub">The tap-only link behind your NFC tag — staff collect stamps after the first one by tapping the customer's phone on it.</p>
     <label class="lb">Link for the NFC tag</label><input readonly class="ro" value="${esc(scanUrl())}" onclick="this.select()">
@@ -721,6 +782,7 @@ function render() {
   const m = $('#app'); m.className = sg ? 'a' : '';
   m.innerHTML = recover ? recoverV() : !signed ? loginV() : !biz ? deniedV() : view();
   if (sg && tab == 'h') drawQR();
+  if (sg && tab == 'm') dgSum();
   if (sg && tab == 'o' && ov == 'stamp') pvStamps();
   if (y) window.scrollTo(0, y);
 }

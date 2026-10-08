@@ -104,3 +104,6 @@ Vercel -> Add New -> Project -> import the repo -> Framework Preset **Other** ->
 - Passwords are handled by Supabase Auth (hashed, rate-limited). Supabase's built-in email sender is limited to a few emails per hour, which is plenty for owner resets.
 - Reminders are manual (the owner taps WhatsApp). Automatic sending needs a paid WhatsApp/SMS service or web push, which is a later step.
 - The admin loads all customers, 1,000 at a time.
+
+## Daily scratch card (gamble system)
+Run `supabase/2026-10-08-daily-gamble.sql` once in the Supabase SQL Editor (safe to re-run), then in the owner app go to More > Daily scratch card, set it On and press Save settings. The owner chooses the prizes and the chance of each (they add up to 100% or less; the rest is "no win"), the weekdays a prize can drop, the most prizes per customer per week (Monday to Sunday) and how long a won coupon is valid. Every customer can scratch once a day; the server picks the result.

@@ -98,13 +98,16 @@ function confetti() {
 
 // ---------- Daily scratch card ----------
 const fmtCd = ms => { const m = Math.max(0, Math.ceil(ms / 60000)); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm' };
-const dailyStatus = async () => { try { return await rpc(sb, 'daily_status', { p_slug: CFG.slug }) } catch (e) { return null } };
+const WD = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const dayList = d => { const a = (d || []).map(Number).filter(n => n >= 1 && n <= 7); return a.length == 7 ? 'every day' : a.length ? a.map(n => WD[n]).join(', ') : 'no days'; };
+// Never hide a failure: if the card cannot load, show a retry instead of silently dropping it.
+const dailyStatus = async () => { try { return await rpc(sb, 'daily_status', { p_slug: CFG.slug }) } catch (e) { return { on: true, error: true } } };
 async function dailyPlay() {
   try {
     const r = await rpc(sb, 'play_daily', { p_slug: CFG.slug });
     if (r.ok) {
-      daily.win = !!r.win; daily.prize = r.win ? r.prize : ''; daily.note = r.win ? null : (r.note || 'Better luck tomorrow!');
-      daily.played = true; daily.streak = r.streak || 0;
+      daily.win = !!r.win; daily.prize = r.win ? r.prize : ''; daily.note = r.win ? null : (r.note || (r.win_day ? 'Not this time. Try again tomorrow!' : 'No prize today. Prizes drop on ' + dayList(daily.days) + '.'));
+      daily.played = true; daily.streak = r.streak || 0; daily.win_day = !!r.win_day;
       const s = document.querySelector('#daily-scr .dscr-under small'), b = document.querySelector('#daily-scr .dscr-under b'), c = document.querySelector('#daily-scr .st-chip');
       if (s) s.textContent = r.win ? 'You won' : 'No win today';
       if (b) b.textContent = r.win ? r.prize : daily.note;
@@ -123,6 +126,7 @@ async function dailyFinish() {
 }
 function dailyScrV() {
   if (!daily || !daily.on) return '';
+  if (daily.error) return `<div class="card"><div class="row2"><h2>Today's scratch card</h2></div><p class="sub">The card could not load. Check your connection.</p><button type="button" class="lnk" onclick="retryDaily()">Try again</button></div>`;
   const left = daily.next_at ? Math.max(0, new Date(daily.next_at).getTime() - Date.now()) : 0;
   const chip = daily.streak >= 1 ? `<span class="st-chip">${daily.streak}-day streak</span>` : '';
   if (daily.played) {
@@ -134,14 +138,21 @@ function dailyScrV() {
       dailyT = l > 60000 ? setTimeout(tick, 60000) : null;
     };
     if (left > 0) dailyT = setTimeout(tick, 60000);
-    return `<div id="daily-done" class="card"><div class="row2"><h2>Today's scratch card</h2>${chip || '<span class="tag">Done</span>'}</div><p class="sub" id="daily-cd-text">Come back tomorrow. <b>${fmtCd(left)}</b> left.</p></div>`;
+    const when = daily.days && daily.days.length < 7 ? `<p class="hint">Prizes drop on ${dayList(daily.days)}.</p>` : '';
+    return `<div id="daily-done" class="card"><div class="row2"><h2>Today's scratch card</h2>${chip || '<span class="tag">Done</span>'}</div><p class="sub" id="daily-cd-text">Come back tomorrow. <b>${fmtCd(left)}</b> left.</p>${when}</div>`;
   }
-  const capLine = daily.cap ? ` Win up to ${daily.cap} surprise offers a week.` : '';
-  return `<div id="daily-scr" class="card"><div class="row2"><h2>Today's scratch card</h2>${chip}</div>
-    <p class="hint">Scratch every day.${capLine}</p>
+  const capped = daily.cap > 0 && daily.wins_week >= daily.cap;
+  let line;
+  if (!daily.cap || !(daily.days || []).length) line = 'Scratch every day.';
+  else if (capped) line = `You have won your ${daily.cap} ${daily.cap == 1 ? 'prize' : 'prizes'} this week. Keep scratching, new prizes start on Monday.`;
+  else if (daily.win_day) line = `Today is a prize day! Scratch for a chance to win. You can win up to ${daily.cap} a week (${daily.wins_week} so far).`;
+  else line = `Scratch every day. Prizes can drop on ${dayList(daily.days)}.`;
+  return `<div id="daily-scr" class="card${daily.win_day && !capped ? ' dscr-hot' : ''}"><div class="row2"><h2>Today's scratch card</h2>${chip}</div>
+    <p class="hint">${line}</p>
     <div class="dscr"><div class="dscr-under"><small>${daily.win ? 'You won' : 'Your prize'}</small><b>${esc(daily.prize || 'Scratch to play')}</b></div><canvas aria-hidden="true"></canvas></div></div>`;
 }
 const dailyScrSlot = () => !daily || !daily.on ? '' : (scratching ? '<div id="daily-anchor"></div>' : dailyScrV());
+async function retryDaily() { daily = await dailyStatus(); render(); }
 function initDailyScr() {
   const cv = document.querySelector('#daily-scr canvas'); if (!cv || cv.dataset.init) return;
   cv.dataset.init = '1';
@@ -272,7 +283,7 @@ function homePgV() {
   if (ready) o += `<div class="rw"><small>Reward unlocked</small><b>${esc(biz.reward)}</b></div><button class="btn" onclick="claim()">Get my reward code</button>`;
   o += `<p class="hint" style="text-align:center;margin-top:18px">Tap your phone on the stamp tag at the counter to collect a stamp.${wait > 0 ? ' <b>Next stamp in ' + fmtWait(wait) + '.</b>' : ''}</p></div>`;
   const a = a2hsV(), top = a && a2hsHi();   // the first-login nudge sits at the very top of Home
-  return (top ? a : '') + o + (top ? '' : a) + socials(biz);
+  return (top ? a : '') + o + dailyScrSlot() + (top ? '' : a) + socials(biz);
 }
 
 
