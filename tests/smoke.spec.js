@@ -16,6 +16,9 @@ for (const name of required) {
     );
   }
 }
+if (process.env.SMOKE_DAILY_ENABLED !== '1') {
+  throw new Error('SMOKE_DAILY_ENABLED must be 1. The dedicated smoke business must have Daily Scratch enabled.');
+}
 
 const BASE = process.env.SMOKE_BASE_URL.replace(/\/$/, '');
 const ADMIN_EMAIL = process.env.SMOKE_ADMIN_EMAIL;
@@ -119,7 +122,6 @@ test.describe('Royalty Program smoke tests', () => {
   });
 
   test('daily scratch card', async ({ page }) => {
-    test.expect(process.env.SMOKE_DAILY_ENABLED).toBe('1');
 
     await page.goto(JOIN_URL);
     await expect(page.getByRole('heading', { name: /join the rewards club/i })).toBeVisible();
