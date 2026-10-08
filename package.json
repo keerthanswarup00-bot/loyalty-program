@@ -1,0 +1,13 @@
+{
+  "name": "royalty-program-smoke-tests",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test:smoke": "playwright test tests/smoke.spec.js",
+    "test:smoke:headed": "playwright test tests/smoke.spec.js --headed",
+    "test:smoke:debug": "playwright test tests/smoke.spec.js --debug"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  }
+}
