@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Validate JavaScript syntax
+        run: npm run check:js
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
