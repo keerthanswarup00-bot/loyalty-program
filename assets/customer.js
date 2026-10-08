@@ -318,16 +318,16 @@ function profilePgV() {
   <p class="note"><a href="#" onclick="delMe();return false" style="color:#b91c1c">Delete my account</a></p></div>`;
 }
 
-async function load() {
+async function load({ withDaily = true } = {}) {
   card = await rpc(sb, 'my_card', { p_slug: CFG.slug });
   if (card && card.granted) sur = { t: 'Happy birthday', x: biz.bday_offer };
-  daily = await dailyStatus();
+  if (withDaily) daily = await dailyStatus();
 }
 
 // Re-fetch the card and pop up a message if any coupon became "used" since last time.
 async function sync() {
   if (!card) return;
-  try { await load() } catch (e) { return }
+  try { await load({ withDaily: false }) } catch (e) { return }
   const n = markUsed();
   if (n) pop = { t: n.type, x: n.text };
   render();
@@ -340,9 +340,18 @@ function markUsed() {
   return n || null;
 }
 function live() {
-  if (rt || !card) return;
-  rt = sb.channel('my-offers')
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'offers' }, () => sync())
+  if (rt || !card || !card.member || !card.member.id) return;
+  rt = sb.channel('my-offers-' + card.member.id)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'offers',
+        filter: 'member_id=eq.' + card.member.id
+      },
+      () => sync()
+    )
     .subscribe();
 }
 function unlive() { if (rt) { sb.removeChannel(rt); rt = null } }
