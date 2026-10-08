@@ -56,10 +56,6 @@ async function loginCustomer(page, phone) {
   await expect(page.getByText(/stamps/i).first()).toBeVisible();
 }
 
-async function openStamp(page) {
-  await page.goto(urlWithHash(STAMP_URL, ''));
-}
-
 test.describe('Royalty Program smoke tests', () => {
   test.describe.configure({ mode: 'serial' });
 
