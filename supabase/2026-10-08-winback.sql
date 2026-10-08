@@ -41,7 +41,7 @@ grant select on public.messages to authenticated;
 -- Stamping now also marks a recent win-back message as "came back".
 create or replace function public._do_stamp(p_member uuid) returns json
 language plpgsql security definer set search_path = public as $$
-declare b businesses; m members; pos int; surprise text := null; lost int;
+declare b businesses; m members; pos int; surprise text := null; lost int; need_visits int;
 begin
   select * into m from members where id = p_member;
   select * into b from businesses where id = m.business_id;
@@ -50,6 +50,14 @@ begin
          card_started_at = coalesce(card_started_at, now())
    where id = m.id returning * into m;
   insert into visits (member_id, business_id) values (m.id, b.id);
+  -- Referral reward for whoever invited this member: only once the friend has really visited (a stamp after the sign-up one).
+  need_visits := (case when b.join_stamp then 2 else 1 end);
+  if b.ref_on and m.referred_by is not null and not m.ref_rewarded and m.total >= need_visits then
+    update members set ref_rewarded = true where id = m.id;
+    if (select count(*) from offers where member_id = m.referred_by and type = 'Referral reward' and created_at > now() - interval '30 days') < b.ref_cap then
+      perform _give(m.referred_by, b.id, 'Referral reward', b.ref_offer, b.exp_days);
+    end if;
+  end if;
   update messages set returned_at = now()
    where member_id = m.id and returned_at is null and created_at > now() - interval '30 days';
   pos := (m.stamps - 1) % b.need + 1;
