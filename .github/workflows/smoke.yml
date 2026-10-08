@@ -18,6 +18,7 @@ jobs:
       SMOKE_CUSTOMER_PASSWORD: ${{ secrets.SMOKE_CUSTOMER_PASSWORD }}
       SMOKE_PHONE_PREFIX: ${{ secrets.SMOKE_PHONE_PREFIX }}
       SMOKE_DAILY_ENABLED: ${{ secrets.SMOKE_DAILY_ENABLED }}
+      SMOKE_STAMP_COUNT: ${{ secrets.SMOKE_STAMP_COUNT }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,7 +30,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
