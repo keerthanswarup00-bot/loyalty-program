@@ -734,6 +734,11 @@ function moreV() {
     <div class="row" style="margin-top:12px"><button class="btn sm alt" onclick="cpL('s')">Copy link</button><button class="btn sm alt" onclick="regen('scan_token')">Regenerate code</button></div>
     <details class="a-det2"><summary>How to write an NFC tag</summary><p class="sub" style="margin-top:8px">Buy NTAG213 or NTAG215 stickers. In a free app such as NFC Tools, write the link above as a URL record. Staff then tap the customer's phone on the tag. Do not print it as a QR — one stamp per customer per cooldown period either way. If the link ever leaks, regenerate the code and rewrite the tags.</p></details>
     <p class="hint">If you printed the old QR with the stamp link, press Regenerate code and rewrite your tags: the old QR then stops adding stamps.</p></div>
+  <div class="a-card" style="margin-top:16px"><h2>Moving to a new address</h2><p class="sub">Innondu has a new web address. Your sign-up QR and NFC stamp tag are built from the address you opened this dashboard on, so the links below are already the new ones.</p>
+    <div class="row" style="margin-top:12px"><button class="btn sm" onclick="dlQR()">Download the new QR</button><button class="btn sm alt" onclick="cpL('s')">Copy the stamp link</button></div>
+    <p class="hint">Current address: ${esc(location.origin)}</p>
+    <details class="a-det2"><summary>Rewrite each NFC tag</summary><ol class="sub" style="margin-top:8px"><li>Install a free NFC app such as NFC Tools.</li><li>Tap Write, then Add a record and choose URL / URI.</li><li>Paste the stamp link copied above.</li><li>Hold the phone on the tag and tap Write.</li><li>Lock the tag so it cannot be overwritten.</li><li>Test the tag on one iPhone and one Android phone.</li></ol></details>
+    <p class="hint">Keep any old printed QR in place until the new one replaces it: download the new QR above and print it at the counter.</p></div>
   <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="/app/">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
 }
 async function regen(col) {
