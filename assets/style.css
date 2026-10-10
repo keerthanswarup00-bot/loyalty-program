@@ -184,13 +184,13 @@ body:has(.c-nav) .toast{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 .modal-card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:26px;max-width:340px;width:100%;text-align:center;animation:pop2 .2s cubic-bezier(.2,1.4,.4,1);box-shadow:0 24px 60px -20px rgba(0,0,0,.4)}
 .modal-card h2{margin:0 0 12px}
 .modal-card .btn{margin-top:18px}
-.reel{position:relative;width:150px;height:150px;margin:4px auto 8px;display:grid;place-items:center}
+.reel{position:relative;width:min(60vw,200px);aspect-ratio:1/1;height:auto;margin:4px auto 8px;display:grid;place-items:center;overflow:visible}
 .reel svg{position:absolute;inset:0;width:100%;height:100%}
 .reel .rb{fill:none;stroke:var(--line);stroke-width:9}
 .reel .rf{fill:none;stroke:var(--brand);stroke-width:9;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .85s linear}
-.reel b{font:600 30px/1 ui-monospace,monospace}
+.reel b{position:relative;z-index:1;font:600 clamp(20px,7vw,28px)/1 ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;white-space:nowrap}
 .cd-done .dot{display:block;width:56px;height:56px;margin:6px auto 14px;border-radius:50%;background:var(--brand);animation:cdPulse 1.1s ease-out infinite}
 .cd-done b{display:block;font:600 20px/1.3 Fraunces,Georgia,serif}
 .cd-done span{color:var(--mut);font-size:14px}
 @keyframes cdPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--brand) 60%,transparent)}100%{box-shadow:0 0 0 22px transparent}}
-@media (prefers-reduced-motion:reduce){.modal-wrap,.modal-card,.cd-done .dot{animation:none}}
+@media (prefers-reduced-motion:reduce){.modal-wrap,.modal-card,.cd-done .dot{animation:none}.reel .rf{transition:none}}
