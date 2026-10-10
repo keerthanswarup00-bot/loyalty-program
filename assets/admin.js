@@ -9,8 +9,8 @@ let sel = new Set(), bsel = new Set(), sortBy = 'joined', bseg = 'all', bmsg = '
 let impRows = null;
 const first = u => (u.name || '').split(' ')[0];
 
-const scanUrl = () => location.origin + '/#scan=' + biz.scan_token;
-const joinUrl = () => location.origin + '/#join=' + biz.join_token;
+const scanUrl = () => location.origin + '/app/#scan=' + biz.scan_token;
+const joinUrl = () => location.origin + '/app/#join=' + biz.join_token;
 const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).length;
 // When this customer's current card runs out (null = no deadline: no stamps yet, full card, or no limit).
 const cardEnd = u => { if (!biz.card_months || !u.card_started_at || !(u.stamps > 0) || u.stamps >= biz.need) return null; const d = new Date(u.card_started_at); d.setMonth(d.getMonth() + biz.card_months); return d };
@@ -147,7 +147,7 @@ function chartV() {
       : '<p class="sub" style="margin:8px 0 0">No stamps yet. They will show up here as customers tap the tag.</p>') + '</div>';
 }
 function reminders() {
-  const L = [], t = new Date(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), link = location.origin + '/';
+  const L = [], t = new Date(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), link = location.origin + '/app/';
   M.forEach(u => {
     if (u.bday && biz.bday_offer) {
       const [, mo, d] = u.bday.split('-').map(Number);
@@ -195,7 +195,7 @@ async function winback(id, btn) {
     if (!r.ok) { if (w) w.close(); btn.disabled = false; return toast(WBERR[r.error] || 'Could not create the message') }
     const msg = `Hi ${first(u)}, we miss you at ${biz.name}! Here's a little something for your next visit: ${r.offer}.`
       + (r.expires_at ? ` Valid until ${fd(r.expires_at)}.` : '')
-      + ` Show this code at the counter: ${r.code}. You can also see it on your card: ${location.origin}/`;
+      + ` Show this code at the counter: ${r.code}. You can also see it on your card: ${location.origin}/app/`;
     if (w) w.location.href = waLink(r.phone, msg);
     else { try { await navigator.clipboard.writeText(msg) } catch (e) { } toast('Pop-up blocked. Message copied: paste it into WhatsApp.') }
     await load(); render();
@@ -250,7 +250,7 @@ async function fetchVis(id) {
 }
 function detail(u) {
   const f = (l, x) => `<div><span>${l}</span><b>${x}</b></div>`;
-  const msg = `Hi ${first(u)}, thanks for being part of ${biz.name} rewards! ${location.origin}/`;
+  const msg = `Hi ${first(u)}, thanks for being part of ${biz.name} rewards! ${location.origin}/app/`;
   const ce = cardEnd(u);
   const of = (u.offers || []).slice().sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   const st = x => x.used_at ? 'Used ' + fd(x.used_at) : isExp(x) ? 'Expired ' + fd(x.expires_at) : x.valid_from && new Date(x.valid_from) > Date.now() ? 'Valid on ' + fd(x.valid_from) : x.expires_at ? 'Until ' + fd(x.expires_at) : 'No expiry';
@@ -383,7 +383,7 @@ const BT = () => [
 function bText(u) {
   let t = bmsg.trim().replace(/\{name\}/gi, first(u) || 'there');
   if (/^https:\/\/\S+$/.test(bimg)) t += '\n' + bimg;
-  if (blink) t += '\n' + location.origin + '/';
+  if (blink) t += '\n' + location.origin + '/app/';
   if (bstop) t += '\n\nReply STOP if you do not want these messages.';
   return t;
 }
@@ -734,7 +734,7 @@ function moreV() {
     <div class="row" style="margin-top:12px"><button class="btn sm alt" onclick="cpL('s')">Copy link</button><button class="btn sm alt" onclick="regen('scan_token')">Regenerate code</button></div>
     <details class="a-det2"><summary>How to write an NFC tag</summary><p class="sub" style="margin-top:8px">Buy NTAG213 or NTAG215 stickers. In a free app such as NFC Tools, write the link above as a URL record. Staff then tap the customer's phone on the tag. Do not print it as a QR — one stamp per customer per cooldown period either way. If the link ever leaks, regenerate the code and rewrite the tags.</p></details>
     <p class="hint">If you printed the old QR with the stamp link, press Regenerate code and rewrite your tags: the old QR then stops adding stamps.</p></div>
-  <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="/">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
+  <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="/app/">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
 }
 async function regen(col) {
   if (!confirm(col == 'join_token' ? 'The old sign-up QR will stop working and you will need to print the new one. Continue?' : 'Old NFC tags and any printed stamp QR will stop adding stamps. Continue?')) return;

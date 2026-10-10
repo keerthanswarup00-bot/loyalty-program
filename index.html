@@ -3,20 +3,582 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f6f2ec">
-<title>Rewards</title>
+<meta name="theme-color" content="#f0f2ee">
+<meta name="description" content="Innondu is a simple rewards web app for local shops: stamp cards, a daily scratch card and offers, with a dashboard for the owner.">
+<meta property="og:title" content="Innondu. Come back for one more.">
+<meta property="og:description" content="Stamp cards, a daily scratch card and offers for neighbourhood shops. No new POS, nothing to install.">
+<script>
+// Printed NFC/QR links (#scan=, #join=) and already-installed home-screen apps still open the customer app.
+(function(){try{var h=location.hash;if(/(^|[#&])(scan|join)=/.test(h)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true){location.replace('/app/'+h)}}catch(e){}})();
+</script>
+<title>Innondu</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/style.css?v=20261010">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Noto+Sans+Kannada:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one calm column system. The only loud moment is the working scratch card in the hero; everything else stays quiet and ruled. */
+:root{
+  --bg:#f0f2ee; --surface:#ffffff; --fg:#12161a; --mut:#566069; --line:#d8ddd5;
+  --accent:#3a2ee0; --accent-fg:#ffffff; --soft:#e6e5ff; --good:#17803d;
+  --ph-bg:#fbfbf9; --ph-fg:#161a1d; --ph-mut:#68717a; --ph-line:#e1e4de;
+  --display:'Bricolage Grotesque','Noto Sans Kannada',system-ui,sans-serif;
+  --body:'Figtree','Noto Sans Kannada',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1114; --surface:#171b20; --fg:#eef0f2; --mut:#9aa3ab; --line:#2a3037;
+  --accent:#8c84ff; --accent-fg:#0e1114; --soft:#1e1c3f; --good:#4ade80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1114; --surface:#171b20; --fg:#eef0f2; --mut:#9aa3ab; --line:#2a3037;
+  --accent:#8c84ff; --accent-fg:#0e1114; --soft:#1e1c3f; --good:#4ade80; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font:400 17px/1.6 var(--body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1160px;margin-inline:auto;padding-inline:20px}
+section{padding-block:clamp(56px,9vw,104px)}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.02em}
+h1{font-size:clamp(2.7rem,6.6vw,5.2rem);line-height:1.02;font-weight:800;letter-spacing:-.035em}
+h2{font-size:clamp(1.85rem,3.7vw,2.8rem);line-height:1.1;font-weight:700}
+h3{font-size:1.2rem;line-height:1.25;font-weight:700}
+p{margin:0}
+.lead{font-size:clamp(1.05rem,1.6vw,1.22rem);color:var(--mut);max-width:56ch}
+.eyebrow{font:500 .78rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+.sec-head{display:grid;gap:14px;max-width:760px;margin-bottom:clamp(32px,5vw,56px)}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:6px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 22px;border-radius:999px;border:1.5px solid var(--fg);background:var(--fg);color:var(--bg);font:600 .98rem/1 var(--body);text-decoration:none;cursor:pointer}
+.btn:hover{opacity:.9}
+.btn.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+.btn.sm{padding:9px 16px;font-size:.88rem}
+
+/* header */
+header{position:sticky;top:0;padding-top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:62px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font:800 1.3rem/1 var(--display);letter-spacing:-.03em}
+.mark{width:34px;height:34px;color:var(--accent);flex:none}
+.nav ul{display:flex;gap:26px;list-style:none;margin:0;padding:0;font-size:.95rem;font-weight:500}
+.nav ul a{text-decoration:none;color:var(--mut)}.nav ul a:hover{color:var(--fg)}
+@media (max-width:860px){.nav ul{display:none}}
+
+/* hero */
+.hero{padding-block:clamp(40px,7vw,84px) clamp(48px,8vw,96px)}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,72px);align-items:center}
+.hero-grid>*{min-width:0}
+.hero h1{margin-block:18px 22px}
+.hero .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+.hero .meaning{margin-top:28px;display:flex;gap:10px;align-items:center;color:var(--mut);font-size:.95rem}
+.hero .meaning b{font-family:var(--display);color:var(--fg)}
+@media (max-width:860px){.hero-grid{grid-template-columns:1fr}}
+
+.deck{display:grid;gap:14px;justify-items:start}
+.foilcard{position:relative;width:100%;max-width:470px;aspect-ratio:8/5;border-radius:24px;overflow:hidden;background:var(--soft);border:1px solid var(--line);box-shadow:0 30px 60px -34px color-mix(in srgb,var(--accent) 60%,transparent);transform:rotate(-1.6deg)}
+.foilcard .prize{position:absolute;inset:0;display:grid;align-content:center;gap:8px;padding:8% 9%;z-index:0}
+.foilcard .prize small{font:500 .72rem/1.2 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.foilcard .prize b{font:800 clamp(1.5rem,4vw,2.2rem)/1.08 var(--display);letter-spacing:-.025em;text-wrap:balance}
+.foilcard .prize span{font:500 .8rem var(--mono);color:var(--accent)}
+.foilcard .ghost{position:absolute;right:-4%;bottom:-18%;width:58%;color:var(--accent);opacity:.12}
+.foilcard canvas{position:absolute;inset:0;width:100%;height:100%;z-index:1;touch-action:none;cursor:grab;transition:opacity .7s ease}
+.foilcard.done canvas{opacity:0;pointer-events:none}
+.cap{font-size:.9rem;color:var(--mut)}
+.deck .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.linkbtn{background:none;border:0;padding:0;color:var(--mut);font:inherit;font-size:.9rem;text-decoration:underline;cursor:pointer}
+
+/* problem */
+.problems{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+.problems>div{padding:28px 28px 8px 0;display:grid;gap:10px;align-content:start}
+.problems>div+div{padding-left:28px;border-left:1px solid var(--line)}
+.problems p{color:var(--mut)}
+@media (max-width:860px){.problems{grid-template-columns:1fr}.problems>div,.problems>div+div{padding:24px 0;border-left:0;border-top:1px solid var(--line)}.problems>div:first-child{border-top:0}}
+
+/* not a pos */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(24px,4vw,56px);align-items:start}
+.split>*{min-width:0}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:var(--surface)}
+.cols>div{padding:26px}
+.cols>div+div{border-left:1px solid var(--line);background:var(--soft)}
+.cols h3{margin-bottom:14px;font-size:1rem;font-family:var(--mono);font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.cols ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.cols li{display:flex;gap:10px;align-items:baseline}
+.cols li::before{content:"";flex:none;width:14px;height:2px;background:var(--mut);transform:translateY(-4px)}
+.cols>div+div li::before{background:var(--accent);height:8px;width:8px;border-radius:50%;transform:none}
+@media (max-width:860px){.split{grid-template-columns:1fr}}
+@media (max-width:520px){.cols{grid-template-columns:1fr}.cols>div+div{border-left:0;border-top:1px solid var(--line)}}
+
+/* first customer + phone demo */
+.demo-wrap{display:grid;grid-template-columns:1fr 360px;gap:clamp(32px,6vw,88px);align-items:center}
+.demo-wrap>*{min-width:0}
+.first{display:inline-flex;gap:10px;align-items:center;padding:8px 14px 8px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:.92rem;margin-bottom:22px;width:fit-content}
+.first i{font:normal 800 .8rem var(--display);background:var(--accent);color:var(--accent-fg);border-radius:999px;padding:5px 11px}
+.ctrl{display:grid;gap:18px;margin-top:28px;max-width:420px}
+.ctrl label{display:grid;gap:8px;font:500 .78rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.ctrl input[type=text]{font:500 1rem var(--body);letter-spacing:0;text-transform:none;color:var(--fg);padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);width:100%}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.sw button{width:36px;height:36px;border-radius:50%;border:2px solid var(--bg);outline:1.5px solid var(--line);cursor:pointer;padding:0}
+.sw button[aria-pressed="true"]{outline:2.5px solid var(--fg)}
+.phone{width:100%;max-width:340px;justify-self:center;border-radius:42px;padding:11px;background:#1b1f24;box-shadow:0 40px 70px -40px rgba(0,0,0,.55);border:1px solid #333a42}
+.ph{background:var(--ph-bg);color:var(--ph-fg);border-radius:32px;padding:22px 18px 20px;display:grid;gap:14px;min-height:560px;align-content:start}
+.ph-head{display:grid;justify-items:center;gap:4px;text-align:center}
+.ph-logo{width:52px;height:52px;border-radius:16px;background:var(--brand);color:#fff;display:grid;place-items:center;font:800 1.5rem var(--display)}
+.ph-head b{font:800 1.3rem/1.1 var(--display);letter-spacing:-.02em;margin-top:6px;overflow-wrap:anywhere}
+.ph-head span{font-size:.8rem;color:var(--ph-mut)}
+.ph-card{border:1px solid var(--ph-line);border-radius:18px;padding:14px;display:grid;gap:10px;background:#fff}
+.ph-count{display:flex;align-items:baseline;gap:8px;color:var(--ph-mut);font-size:.82rem}
+.ph-count b{font:800 2rem/1 var(--display);color:var(--ph-fg)}
+.ph-bar{height:5px;border-radius:9px;background:var(--ph-line);overflow:hidden}.ph-bar i{display:block;height:100%;background:var(--brand);transition:width .4s}
+.ph-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.ph-st{aspect-ratio:1;border-radius:50%;border:1.5px dashed var(--ph-line);display:grid;place-items:center;font-size:.72rem;color:var(--ph-mut)}
+.ph-st.f{border:0;background:var(--brand);color:#fff}.ph-st svg{width:50%;height:50%}
+.ph-st.pop{animation:pop .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(0) rotate(-40deg)}to{transform:scale(1) rotate(0)}}
+.ph-btn{border:0;border-radius:12px;padding:12px;background:var(--brand);color:#fff;font:600 .92rem var(--body);cursor:pointer;width:100%}
+.ph-rule{font-size:.78rem;color:var(--ph-mut)}
+.ph-offer{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--ph-line);border-radius:14px;padding:10px 12px;background:#fff;font-size:.82rem}
+.ph-offer small{display:block;font:700 .6rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+.ph-offer b{font-weight:600}
+.ph-code{font:500 .9rem var(--mono);letter-spacing:.14em;border:1.5px dashed var(--brand);color:var(--brand);border-radius:8px;padding:5px 8px;flex:none}
+.ph-reward{background:color-mix(in srgb,var(--brand) 10%,#fff);border:1px solid color-mix(in srgb,var(--brand) 30%,transparent);border-radius:14px;padding:12px;display:grid;gap:6px;text-align:center}
+.ph-reward b{font:800 1.4rem var(--mono);letter-spacing:.16em;color:var(--brand)}
+.ph-reward small{font-size:.74rem;color:var(--ph-mut)}
+@media (max-width:860px){.demo-wrap{grid-template-columns:1fr}.phone{justify-self:start}}
+
+/* visit flow */
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--line)}
+.steps li{padding:26px 24px 10px 0;display:grid;gap:10px;align-content:start}
+.steps li+li{padding-left:24px;border-left:1px solid var(--line)}
+.steps .n{font:500 .8rem var(--mono);color:var(--accent);letter-spacing:.1em}
+.steps p{color:var(--mut);font-size:.98rem}
+@media (max-width:900px){.steps{grid-template-columns:1fr 1fr}.steps li,.steps li+li{padding:24px 20px 10px 0;border-left:0;border-top:1px solid var(--line)}.steps li:nth-child(even){padding-left:20px;border-left:1px solid var(--line)}.steps li:first-child,.steps li:nth-child(2){border-top:0}}
+@media (max-width:520px){.steps{grid-template-columns:1fr}.steps li,.steps li:nth-child(even){padding:22px 0 8px;border-left:0}.steps li:nth-child(2){border-top:1px solid var(--line)}}
+
+/* feature lists */
+.feat{display:grid;grid-template-columns:1fr 1fr;column-gap:clamp(24px,5vw,72px)}
+.feat>div{padding:22px 0;border-top:1px solid var(--line);display:grid;gap:6px;align-content:start}
+.feat p{color:var(--mut);font-size:.98rem}
+@media (max-width:760px){.feat{grid-template-columns:1fr}}
+
+/* admin mock */
+.admin-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:clamp(28px,5vw,64px);align-items:start}
+.admin-grid>*{min-width:0}
+.dash{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 60px -44px rgba(0,0,0,.4);overflow:hidden}
+.dash-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);font-weight:700;font-family:var(--display)}
+.dash-bar span{font:500 .7rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.tabs{display:flex;gap:4px;padding:0 12px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs span{padding:12px 10px;font-size:.84rem;color:var(--mut);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs span.on{color:var(--fg);font-weight:600;border-color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:16px}
+.stat{border:1px solid var(--line);border-radius:14px;padding:12px;font-size:.74rem;color:var(--mut);line-height:1.3}
+.stat b{display:block;font:800 1.6rem/1.1 var(--display);color:var(--fg);margin-bottom:2px;font-variant-numeric:tabular-nums}
+.rem{padding:4px 18px 18px}
+.rem h4{margin:6px 0 4px;font:700 1rem var(--display)}
+.rem-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.rem-row small{display:block;font:700 .6rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.rem-row b{font-weight:600;font-size:.94rem}
+.pill{flex:none;padding:6px 12px;border-radius:999px;background:var(--soft);color:var(--accent);font-size:.78rem;font-weight:600}
+.dash-note{padding:10px 18px;border-top:1px solid var(--line);font-size:.78rem;color:var(--mut)}
+@media (max-width:860px){.admin-grid{grid-template-columns:1fr}}
+@media (max-width:520px){.stats{grid-template-columns:1fr 1fr}}
+
+/* kit */
+.kit{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(18px,3vw,32px)}
+.kit>div{display:grid;gap:14px;align-content:start;min-width:0}
+.kit .art{aspect-ratio:1/.9;border-radius:20px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;overflow:hidden;position:relative}
+.kit .art svg{width:72%;max-height:88%}
+.tagline{display:inline-block;font:500 .7rem var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:999px;width:fit-content}
+.tag-free{background:var(--accent);color:var(--accent-fg)}
+.tag-opt{border:1px solid var(--line);color:var(--mut)}
+.kit p{color:var(--mut);font-size:.98rem}
+.poster{width:56%;aspect-ratio:3/4;background:var(--accent);color:var(--accent-fg);border-radius:10px;padding:10% 9%;display:grid;gap:8px;align-content:space-between;box-shadow:0 14px 30px -16px rgba(0,0,0,.5);transform:rotate(2deg)}
+.poster b{font:800 clamp(1rem,2.4vw,1.5rem)/1.05 var(--display);letter-spacing:-.02em}
+.poster small{font:500 .62rem var(--mono);letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.poster .qr{background:#fff;border-radius:6px;padding:6px;width:62%}
+.poster .qr svg{width:100%;height:auto;display:block}
+@media (max-width:860px){.kit{grid-template-columns:1fr}.kit .art{aspect-ratio:16/10}}
+
+/* setup + footer */
+.setup{background:var(--fg);color:var(--bg);border-radius:28px;padding:clamp(28px,5vw,64px);display:grid;gap:36px}
+.setup h2{max-width:20ch}
+.setup .steps{border-color:color-mix(in srgb,var(--bg) 22%,transparent)}
+.setup .steps li+li{border-color:color-mix(in srgb,var(--bg) 22%,transparent)}
+.setup .steps p{color:color-mix(in srgb,var(--bg) 70%,transparent)}
+.setup .steps .n{color:color-mix(in srgb,var(--bg) 60%,var(--accent))}
+.setup .lead{color:color-mix(in srgb,var(--bg) 72%,transparent)}
+footer{padding-block:40px calc(56px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);color:var(--mut);font-size:.92rem}
+footer .wrap{display:flex;gap:16px 40px;justify-content:space-between;flex-wrap:wrap}
+footer b{font-family:var(--display);color:var(--fg)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.foilcard canvas,.ph-bar i{transition:none}.ph-st.pop{animation:none}}
+</style>
 </head>
 <body>
-<main id="app"><div class="card sk" aria-busy="true" aria-label="Loading"><i></i><i style="width:55%;margin-inline:auto"></i><i></i><i style="width:80%"></i><i style="width:65%"></i></div></main>
-<div id="t" role="status" aria-live="polite"></div>
-<div id="modal"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous"></script>
-<script src="/assets/config.js"></script>
-<script src="/assets/common.js?v=20261010"></script>
-<script src="/assets/customer.js?v=20261010"></script>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="3.2 2.4"/><text x="20" y="25.5" text-anchor="middle" font-family="Bricolage Grotesque,system-ui,sans-serif" font-weight="800" font-size="15" fill="currentColor">+1</text></symbol>
+  <symbol id="nfc" viewBox="0 0 24 24"><path d="M6 8.5a5 5 0 0 1 0 7M9.5 6a9 9 0 0 1 0 12M13 3.5a13 13 0 0 1 0 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="tick" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="Innondu home"><svg class="mark" aria-hidden="true"><use href="#mark"/></svg>Innondu</a>
+    <ul>
+      <li><a href="#problem">The problem</a></li>
+      <li><a href="#customers">For customers</a></li>
+      <li><a href="#owners">For owners</a></li>
+      <li><a href="#kit">Free kit</a></li>
+      <li><a href="/admin/">Owner login</a></li>
+    </ul>
+    <a class="btn sm" href="#kit">What you get</a>
+  </div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow">Rewards for neighbourhood shops</div>
+      <h1>Come back for one more.</h1>
+      <p class="lead">Innondu is a simple rewards web app for local shops. Customers collect stamps and scratch a card every day on their phone. Owners see who keeps coming back and can say thanks.</p>
+      <div class="cta">
+        <a class="btn" href="#how">See how a visit works</a>
+        <a class="btn ghost" href="#kit">What shop owners get</a>
+      </div>
+      <p class="meaning"><b>Innondu</b> <span lang="kn">ಇನ್ನೊಂದು</span> <span>means &ldquo;one more&rdquo;</span></p>
+    </div>
+    <div class="deck">
+      <div class="foilcard" id="fc">
+        <div class="prize">
+          <small>Today&rsquo;s scratch card</small>
+          <b id="prizeTxt">10% off your next visit</b>
+          <span>Sample prize</span>
+        </div>
+        <svg class="ghost" aria-hidden="true" viewBox="0 0 40 40"><use href="#mark"/></svg>
+        <canvas id="foil" aria-label="Scratch card. Scratch to reveal the prize."></canvas>
+      </div>
+      <p class="cap" id="cap">Try it. Scratch the card with your finger or mouse.</p>
+      <div class="row">
+        <button class="btn sm ghost" id="again" hidden>Try another card</button>
+        <button class="linkbtn" id="reveal" type="button">Reveal it for me</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="problem" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">The problem</div>
+      <h2>Your regulars keep the lights on, and most shops can&rsquo;t see them.</h2>
+    </div>
+    <div class="problems">
+      <div><h3>The paper card is in another wallet.</h3><p>Customers forget it, lose it, or never pick it up. A stamp that never gets collected is a visit that never gets rewarded.</p></div>
+      <div><h3>You don&rsquo;t know who comes back.</h3><p>No names, no numbers, no way to wish someone a happy birthday or tell them an offer is about to end.</p></div>
+      <div><h3>Big loyalty tools want your whole till.</h3><p>Many ask you to change your billing, your POS or your menu setup before a single customer gets a stamp.</p></div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap split">
+    <div class="sec-head" style="margin-bottom:0">
+      <div class="eyebrow">What Innondu is</div>
+      <h2>A rewards add-on, not another system to run your shop.</h2>
+      <p class="lead">Your billing, GST and stock stay exactly where they are. Innondu is a web page your customers open and a dashboard you open. Nothing to install at the counter and no hardware to wire in.</p>
+    </div>
+    <div class="cols">
+      <div>
+        <h3>Never touches</h3>
+        <ul><li>Billing and invoices</li><li>Your POS</li><li>Payments and GST</li><li>Inventory and stock</li><li>Your staff workflow</li></ul>
+      </div>
+      <div>
+        <h3>Only handles</h3>
+        <ul><li>Stamps and rewards</li><li>Offers and coupons</li><li>Daily scratch cards</li><li>Your customer list</li><li>Reaching out to regulars</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="customers" style="border-top:1px solid var(--line)">
+  <div class="wrap demo-wrap">
+    <div>
+      <div class="first"><i>First on Innondu</i><span>Renteison</span></div>
+      <h2>Their brand on every screen, not ours.</h2>
+      <p class="lead" style="margin-top:14px">Each shop gets its own address and its own look: name, logo, colour, tagline and social links. Customers see your card, not a generic app. Try it on the phone: change the name and colour, then tap to stamp.</p>
+      <div class="ctrl">
+        <label for="brandName">Shop name<input id="brandName" type="text" value="Renteison" maxlength="18" autocomplete="off"></label>
+        <div>
+          <div class="eyebrow" style="margin-bottom:10px">Brand colour</div>
+          <div class="sw" id="sw">
+            <button type="button" data-c="#3a2ee0" aria-label="Ultramarine" aria-pressed="true" style="background:#3a2ee0"></button>
+            <button type="button" data-c="#8a4b2a" aria-label="Chestnut" aria-pressed="false" style="background:#8a4b2a"></button>
+            <button type="button" data-c="#0f766e" aria-label="Teal" aria-pressed="false" style="background:#0f766e"></button>
+            <button type="button" data-c="#be123c" aria-label="Rose" aria-pressed="false" style="background:#be123c"></button>
+            <button type="button" data-c="#b45309" aria-label="Amber" aria-pressed="false" style="background:#b45309"></button>
+            <button type="button" data-c="#1f2937" aria-label="Ink" aria-pressed="false" style="background:#1f2937"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="phone" id="phone" style="--brand:#3a2ee0">
+      <div class="ph">
+        <div class="ph-head"><div class="ph-logo" id="phLogo">R</div><b id="phName">Renteison</b><span>Come back for one more.</span></div>
+        <div class="ph-card">
+          <div class="ph-count"><b id="phN">3</b><span>of 8 stamps</span></div>
+          <div class="ph-bar"><i id="phBar" style="width:37.5%"></i></div>
+          <div class="ph-grid" id="phGrid"></div>
+          <p class="ph-rule">Collect 8 stamps to earn <b>a free reward</b>.</p>
+          <button class="ph-btn" id="phTap" type="button">Tap to stamp</button>
+        </div>
+        <div class="ph-reward" id="phReward" hidden><small>Reward unlocked. Show this code to staff.</small><b>K7M2QX</b></div>
+        <div class="ph-offer"><div><small>Daily scratch card</small><b>Your card for today is ready</b></div></div>
+        <div class="ph-offer"><div><small>Welcome</small><b>10% off your next visit</b></div><span class="ph-code">4HT9ZE</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">A visit, start to finish</div>
+      <h2>Four taps from the counter to the reward.</h2>
+      <p class="lead">No scanning apps and no cards to carry. The customer joins once with a phone number and a password, then it stays on their phone.</p>
+    </div>
+    <ol class="steps">
+      <li><span class="n">STEP 1</span><h3>Tap or scan</h3><p>The customer taps their phone on the NFC stamp or scans the QR on the poster. The card opens in their browser.</p></li>
+      <li><span class="n">STEP 2</span><h3>The stamp lands</h3><p>One stamp per visit. A cooldown you set stops two stamps in the same minute.</p></li>
+      <li><span class="n">STEP 3</span><h3>Scratch today&rsquo;s card</h3><p>A fresh scratch card every day gives people a small reason to open the card again tomorrow.</p></li>
+      <li><span class="n">STEP 4</span><h3>Claim at the counter</h3><p>A full card turns into a 6-character code. Staff type it in, check it, confirm it. Used codes stay used.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Everything the customer gets</div>
+      <h2>Simple for them, so they actually use it.</h2>
+    </div>
+    <div class="feat">
+      <div><h3>A branded card</h3><p>Your name, logo, colour, tagline and links to Instagram, Facebook, WhatsApp and your website.</p></div>
+      <div><h3>Daily scratch card</h3><p>Scratch it on the phone, reveal today&rsquo;s prize. You choose what can be won.</p></div>
+      <div><h3>Stamps by tap or scan</h3><p>NFC stamp or QR code, whichever the customer prefers. Your stamp image can replace the default tick.</p></div>
+      <div><h3>Welcome, birthday and surprise offers</h3><p>A gift when they join, a coupon valid only on their birthday, and a surprise on the stamp numbers you pick.</p></div>
+      <div><h3>Coupon codes staff can check</h3><p>Every offer and reward carries its own code, so nothing can be used twice or by the wrong person.</p></div>
+      <div><h3>Clear dates, no surprises</h3><p>Customers see when an offer or card ends, with a heads-up in the last few days.</p></div>
+      <div><h3>On their home screen</h3><p>One tap to add the card to the phone. It is a web app, so there is nothing to download.</p></div>
+      <div><h3>Phone number and password</h3><p>No email and no one-time codes to wait for at the counter.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="owners" style="border-top:1px solid var(--line)">
+  <div class="wrap admin-grid">
+    <div>
+      <div class="sec-head" style="margin-bottom:28px">
+        <div class="eyebrow">The owner dashboard</div>
+        <h2>Easy to find your way around, easy to keep track.</h2>
+        <p class="lead">One screen for the day, a few tabs for the rest. Built for the owner or whoever is at the counter, with no training needed.</p>
+      </div>
+      <div class="feat" style="grid-template-columns:1fr">
+        <div><h3>Know your customers</h3><p>Every member in one searchable list: stamps, visits, rewards, last visit and card end date. Export it any time.</p></div>
+        <div><h3>Reach out in one tap</h3><p>Birthdays this week, offers about to end and cards about to run out each come with a ready-made WhatsApp message.</p></div>
+        <div><h3>Redeem rewards</h3><p>Type the customer&rsquo;s code, check it, confirm it. Every redemption is logged and searchable.</p></div>
+        <div><h3>Manage your menu</h3><p>Keep your menu up to date on the same dashboard your customers already use.</p></div>
+        <div><h3>Settings you control</h3><p>Custom offers, stamps needed, cooldown, how long a card lasts, brand colour, logo and stamp image. Changes apply to everyone straight away.</p></div>
+      </div>
+    </div>
+    <div class="dash" role="img" aria-label="Sample owner dashboard showing member counts and reminders">
+      <div class="dash-bar">Renteison <span>Owner</span></div>
+      <div class="tabs"><span class="on">Overview</span><span>Redeem</span><span>Customers</span><span>Menu</span><span>QR &amp; NFC</span><span>Settings</span></div>
+      <div class="stats">
+        <div class="stat"><b>128</b>Members</div>
+        <div class="stat"><b>612</b>Stamps given</div>
+        <div class="stat"><b>9</b>Redeemed today</div>
+        <div class="stat"><b>34</b>Coupons waiting</div>
+      </div>
+      <div class="rem">
+        <h4>Reminders</h4>
+        <div class="rem-row"><div><small>Birthday &middot; tomorrow</small><b>Asha K.</b></div><span class="pill">WhatsApp</span></div>
+        <div class="rem-row"><div><small>Offer expiring &middot; in 2 days</small><b>Rahul M.</b></div><span class="pill">WhatsApp</span></div>
+        <div class="rem-row"><div><small>Card ending &middot; in 9 days</small><b>Meera S.</b></div><span class="pill">WhatsApp</span></div>
+      </div>
+      <div class="dash-note">Sample data to show the layout. Names and numbers are made up.</div>
+    </div>
+  </div>
+</section>
+
+<section id="kit" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Free for every shop</div>
+      <h2>An NFC stamp and a poster, on us.</h2>
+      <p class="lead">Every owner gets an NFC stamp for the counter and a printed poster with a QR code. If you want something that looks like part of your shop, we can also make you a branded stand.</p>
+    </div>
+    <div class="kit">
+      <div>
+        <div class="art">
+          <svg viewBox="0 0 200 200" aria-hidden="true">
+            <ellipse cx="100" cy="176" rx="62" ry="9" fill="currentColor" opacity=".08"/>
+            <circle cx="100" cy="98" r="70" fill="var(--soft)" stroke="var(--accent)" stroke-width="3"/>
+            <circle cx="100" cy="98" r="52" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="3 5"/>
+            <g transform="translate(66 64) scale(3.4)" style="color:var(--accent)"><use href="#nfc"/></g>
+          </svg>
+        </div>
+        <span class="tagline tag-free">Free</span>
+        <h3>NFC stamp</h3>
+        <p>Customers tap their phone on it at the counter to collect a stamp. Staff do nothing.</p>
+      </div>
+      <div>
+        <div class="art">
+          <div class="poster">
+            <b>Scan or tap. Collect a stamp.</b>
+            <div class="qr" id="qrArt"></div>
+            <small>Innondu &middot; one more</small>
+          </div>
+        </div>
+        <span class="tagline tag-free">Free</span>
+        <h3>Poster with QR code</h3>
+        <p>For the wall or the counter. Anyone without NFC on their phone scans the code instead.</p>
+      </div>
+      <div>
+        <div class="art">
+          <svg viewBox="0 0 240 220" aria-hidden="true">
+            <ellipse cx="120" cy="200" rx="84" ry="10" fill="currentColor" opacity=".08"/>
+            <path d="M52 196 L78 56 Q82 38 100 38 H140 Q158 38 162 56 L188 196 Z" fill="var(--accent)"/>
+            <path d="M52 196 H188 V186 H52 Z" fill="currentColor" opacity=".18"/>
+            <g transform="translate(97 62) scale(2.3)" style="color:var(--accent-fg)"><use href="#nfc"/></g>
+            <text x="120" y="136" text-anchor="middle" font-family="Bricolage Grotesque,system-ui,sans-serif" font-weight="800" font-size="15" fill="var(--accent-fg)">Tap for</text>
+            <text x="120" y="154" text-anchor="middle" font-family="Bricolage Grotesque,system-ui,sans-serif" font-weight="800" font-size="15" fill="var(--accent-fg)">one more</text>
+            <g fill="none" stroke="var(--accent-fg)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="86" y="168" width="14" height="14" rx="4"/><circle cx="93" cy="175" r="3"/>
+              <circle cx="120" cy="175" r="7"/><path d="M118 172v6M118 172h3"/>
+              <path d="M147 168h10a4 4 0 0 1 4 4v7a4 4 0 0 1-4 4h-6l-4 3v-3a4 4 0 0 1-4-4v-7a4 4 0 0 1 4-4z" transform="translate(-6 -1)"/>
+            </g>
+          </svg>
+        </div>
+        <span class="tagline tag-opt">Optional</span>
+        <h3>3D-printed branded stand</h3>
+        <p>Your name, your colours and your social links on a stand for the counter, with the NFC stamp built in.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="setup">
+      <div style="display:grid;gap:14px">
+        <div class="eyebrow" style="color:color-mix(in srgb,var(--bg) 60%,transparent)">Getting started</div>
+        <h2>Your shop could be next.</h2>
+        <p class="lead">We set up your page and your kit. You decide the offers. Customers can start joining the same day the poster goes up.</p>
+      </div>
+      <ol class="steps">
+        <li><span class="n">STEP 1</span><h3>We build your page</h3><p>Your name, logo, colours and your own web address.</p></li>
+        <li><span class="n">STEP 2</span><h3>You get your kit</h3><p>NFC stamp and poster, free. Stand on request.</p></li>
+        <li><span class="n">STEP 3</span><h3>You set the offers</h3><p>Welcome, birthday, surprise and the daily scratch card prizes.</p></li>
+        <li><span class="n">STEP 4</span><h3>Customers join</h3><p>They tap, join once and start collecting.</p></li>
+      </ol>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div><b>Innondu</b> &middot; <span lang="kn">ಇನ್ನೊಂದು</span> means &ldquo;one more&rdquo;. Rewards for neighbourhood shops.</div>
+    <div>First shop on Innondu: Renteison. &middot; <a href="/app/">Customer app</a> &middot; <a href="/admin/">Owner login</a></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  /* ---------- Scratch card ---------- */
+  var fc=document.getElementById('fc'), cv=document.getElementById('foil'), ctx=cv.getContext('2d', {willReadFrequently:true});
+  var prizeTxt=document.getElementById('prizeTxt'), cap=document.getElementById('cap'), again=document.getElementById('again'), reveal=document.getElementById('reveal');
+  var prizes=['10% off your next visit','One extra stamp on your card','A free add-on, on us','Not this time. Try again tomorrow.'];
+  var pi=0, dpr=1, down=false, last=null, done=false, tmr=null, lastW=0;
+  function size(){
+    var r=fc.getBoundingClientRect(); dpr=Math.min(window.devicePixelRatio||1,2);
+    cv.width=Math.round(r.width*dpr); cv.height=Math.round(r.height*dpr); lastW=r.width; paint();
+  }
+  function paint(){
+    var w=cv.width,h=cv.height; ctx.globalCompositeOperation='source-over';
+    var g=ctx.createLinearGradient(0,0,w,h);
+    g.addColorStop(0,'#aeb5bd'); g.addColorStop(.32,'#e8ebee'); g.addColorStop(.6,'#b7bec6'); g.addColorStop(1,'#dde1e5');
+    ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+    for(var i=0;i<w*h/110;i++){ctx.fillStyle='rgba(255,255,255,'+(Math.random()*.4)+')';ctx.fillRect(Math.random()*w,Math.random()*h,1.6*dpr,1.6*dpr)}
+    for(var j=0;j<w*h/260;j++){ctx.fillStyle='rgba(90,100,110,'+(Math.random()*.14)+')';ctx.fillRect(Math.random()*w,Math.random()*h,1.4*dpr,1.4*dpr)}
+    ctx.fillStyle='#667078'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font='800 '+(26*dpr)+'px "Bricolage Grotesque",system-ui,sans-serif';
+    ctx.fillText('SCRATCH HERE',w/2,h/2);
+    ctx.font='500 '+(11*dpr)+'px "JetBrains Mono",monospace';
+    ctx.fillText('INNONDU  +1',w/2,h/2+30*dpr);
+  }
+  function pt(e){var r=cv.getBoundingClientRect();return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]}
+  function scratch(e){
+    var p=pt(e); ctx.globalCompositeOperation='destination-out';
+    ctx.lineWidth=46*dpr; ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath(); if(last){ctx.moveTo(last[0],last[1])}else{ctx.moveTo(p[0],p[1])}
+    ctx.lineTo(p[0]+.01,p[1]); ctx.stroke(); last=p;
+    if(!tmr){tmr=setTimeout(function(){tmr=null;check()},180)}
+  }
+  function check(){
+    if(done) return;
+    var w=cv.width,h=cv.height, d=ctx.getImageData(0,0,w,h).data, clear=0, n=0, step=16;
+    for(var y=0;y<h;y+=step){for(var x=0;x<w;x+=step){n++; if(d[(y*w+x)*4+3]<40)clear++}}
+    if(clear/n>.5) finish();
+  }
+  function finish(){
+    done=true; fc.classList.add('done'); again.hidden=false; reveal.hidden=true;
+    cap.textContent='That was a sample prize. On a real card, a new one unlocks every day.';
+  }
+  function reset(){
+    done=false; fc.classList.remove('done'); pi=(pi+1)%prizes.length; prizeTxt.textContent=prizes[pi];
+    again.hidden=true; reveal.hidden=false; cap.textContent='Try it. Scratch the card with your finger or mouse.'; last=null; paint();
+  }
+  cv.addEventListener('pointerdown',function(e){down=true;last=null;try{cv.setPointerCapture(e.pointerId)}catch(_){ }scratch(e)});
+  cv.addEventListener('pointermove',function(e){if(down)scratch(e)});
+  ['pointerup','pointercancel'].forEach(function(t){cv.addEventListener(t,function(){down=false;last=null;check()})});
+  again.addEventListener('click',reset); reveal.addEventListener('click',finish);
+  size();
+  if(window.ResizeObserver){new ResizeObserver(function(){var w=fc.getBoundingClientRect().width; if(!done && Math.abs(w-lastW)>2) size()}).observe(fc)}
+  if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){if(!done) paint()})}
+
+  /* ---------- Branded phone demo ---------- */
+  var NEED=8, s=3, phone=document.getElementById('phone');
+  var grid=document.getElementById('phGrid'), nEl=document.getElementById('phN'), bar=document.getElementById('phBar'), tap=document.getElementById('phTap'), rew=document.getElementById('phReward');
+  var nameIn=document.getElementById('brandName'), phName=document.getElementById('phName'), phLogo=document.getElementById('phLogo');
+  function draw(popIdx){
+    var h=''; for(var i=0;i<NEED;i++){h+= i<s ? '<div class="ph-st f'+(i===popIdx?' pop':'')+'"><svg aria-hidden="true"><use href="#tick"/></svg></div>' : '<div class="ph-st">'+(i+1)+'</div>'}
+    grid.innerHTML=h; nEl.textContent=s; bar.style.width=(s/NEED*100)+'%';
+    rew.hidden = s<NEED; tap.textContent = s>=NEED ? 'Start a new card' : 'Tap to stamp';
+  }
+  tap.addEventListener('click',function(){ if(s>=NEED){s=0;draw(-1);return} s++; draw(s-1) });
+  function setName(){var v=nameIn.value.trim()||'Your shop'; phName.textContent=v; phLogo.textContent=v.charAt(0).toUpperCase()}
+  nameIn.addEventListener('input',setName);
+  document.getElementById('sw').addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    phone.style.setProperty('--brand',b.dataset.c);
+    [].forEach.call(this.children,function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+  });
+  draw(-1);
+
+  /* ---------- Illustrative QR for the poster (decorative, not scannable) ---------- */
+  (function(){
+    var N=21, seed=7, cells='';
+    function rnd(){seed=(seed*9301+49297)%233280;return seed/233280}
+    function finder(x,y){return x<7&&y<7||x>=N-7&&y<7||x<7&&y>=N-7}
+    function ring(x,y){var cx=x<7?0:N-7, cy=y<7?0:N-7, dx=x-cx, dy=y-cy; return dx===0||dx===6||dy===0||dy===6||(dx>=2&&dx<=4&&dy>=2&&dy<=4)}
+    for(var y=0;y<N;y++){for(var x=0;x<N;x++){
+      var on; if(finder(x,y)) on=ring(x,y); else if((x<8&&y<8)||(x>=N-8&&y<8)||(x<8&&y>=N-8)) on=false; else on=rnd()>.5;
+      if(on) cells+='<rect x="'+x+'" y="'+y+'" width="1" height="1"/>';
+    }}
+    var host=document.getElementById('qrArt');
+    if(host) host.innerHTML='<svg viewBox="0 0 '+N+' '+N+'" fill="#12161a" shape-rendering="crispEdges" aria-hidden="true">'+cells+'</svg>';
+  })();
+})();
+</script>
 </body>
 </html>

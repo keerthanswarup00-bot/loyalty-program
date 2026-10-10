@@ -48,7 +48,7 @@ async function loginAdmin(page) {
 }
 
 async function loginCustomer(page, phone) {
-  await page.goto(BASE + '/');
+  await page.goto(BASE + '/app/');
   await page.getByRole('button', { name: /login/i }).first().click();
   await page.getByLabel(/phone number/i).fill(phone);
   await page.getByLabel(/^password$/i).fill(CUSTOMER_PASSWORD);

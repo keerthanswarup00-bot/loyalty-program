@@ -1,9 +1,10 @@
 # Loyalty Kit (Phase 2: shared backend)
 
-Customer app at `/`, owner dashboard at `/admin`. One free Supabase database serves every client. Plain HTML/CSS/JS, no build step.
+Landing page at `/`, customer app at `/app/`, owner dashboard at `/admin/`. One free Supabase database serves every client. Plain HTML/CSS/JS, no build step.
 
 ```
-index.html            customer app          assets/customer.js
+index.html            Innondu landing page (public site root)
+app/index.html        customer app          assets/customer.js
 admin/index.html      owner dashboard       assets/admin.js + assets/admin.css
 assets/config.js      per-deployment settings (the only file you edit)
 assets/common.js, style.css   shared
@@ -28,7 +29,7 @@ and the docs out of the published site.
 1. Authentication -> Users -> **Add user**: the owner's email + password, tick *Auto Confirm User*.
 2. SQL Editor: open `supabase/new-client.sql`, change the slug, name and owner email, Run.
 3. In `assets/config.js` set `supabaseUrl`, `supabaseKey` and `slug` (same slug as step 2).
-4. Test locally (VS Code Live Server, open the folder root). Customer app: `/`. Owner: `/admin`.
+4. Test locally (VS Code Live Server, open the folder root). Landing: `/`. Customer app: `/app/`. Owner: `/admin/`.
 
 Branding, offers, cooldown, expiry, first stamp and card length are then edited by the owner in **/admin -> Offers and More** and apply to everyone instantly. No redeploy needed.
 
