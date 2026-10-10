@@ -49,10 +49,10 @@ async function loginAdmin(page) {
 
 async function loginCustomer(page, phone) {
   await page.goto(BASE + '/');
-  await page.getByRole('button', { name: /login/i }).click();
+  await page.getByRole('button', { name: /login/i }).first().click();
   await page.getByLabel(/phone number/i).fill(phone);
   await page.getByLabel(/^password$/i).fill(CUSTOMER_PASSWORD);
-  await page.getByRole('button', { name: /^login$/i }).click();
+  await page.getByRole('button', { name: /^login$/i }).last().click();
   await expect(page.getByText(/stamps/i).first()).toBeVisible();
 }
 

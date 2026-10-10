@@ -67,17 +67,33 @@ const setupMsg = '<div class="card"><h2>Almost there</h2><p class="sub">Add your
 // ---- Small touches shared by both apps ----
 async function copyText(t, msg) { try { await navigator.clipboard.writeText(t); toast(msg || 'Copied') } catch (e) { toast('Press and hold to copy: ' + t) } }
 const haptic = () => { try { navigator.vibrate && navigator.vibrate(30) } catch (e) { } };
-// A short burst of confetti in the brand colour (skipped for people who prefer reduced motion).
-function burst() {
+// Confetti from a point on the screen. o = the burst origin as a fraction of the viewport (0..1),
+// or the viewport centre when called with no origin (admin app). big = more pieces + a second wave.
+// Skipped entirely for people who prefer reduced motion. Only transform/opacity animate, and the
+// wrapper is a single element so cleanup is one remove().
+const _lt = hex => { const s = String(hex || '').replace('#', ''); if (s.length != 6) return '#e8e0d5'; const n = parseInt(s, 16); const m = v => Math.round(v * .55 + 255 * .45); return '#' + [m((n >> 16) & 255), m((n >> 8) & 255), m(n & 255)].map(x => x.toString(16).padStart(2, '0')).join('') };
+function burst(o, big) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('.confetti').forEach(el => el.remove());   // cap DOM nodes: one overlay at a time
   const w = document.createElement('div'); w.className = 'confetti'; w.setAttribute('aria-hidden', 'true');
-  const c = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#8a4b2a', cols = [c, '#f5b942', '#ffffff', '#e8e0d5', c];
-  for (let i = 0; i < 36; i++) {
-    const p = document.createElement('i');
-    p.style.cssText = `left:${50 + (Math.random() - .5) * 30}%;background:${cols[i % cols.length]};--dx:${(Math.random() - .5) * 360}px;--dy:${-120 - Math.random() * 220}px;--r:${Math.random() * 720 - 360}deg;animation-delay:${Math.random() * .12}s`;
-    w.appendChild(p);
-  }
-  document.body.appendChild(w); setTimeout(() => w.remove(), 1800);
+  document.body.appendChild(w);
+  const c = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#8a4b2a';
+  const cols = [c, '#f5b942', '#ffffff', _lt(c), c];
+  const ox = o && o.x >= 0 && o.x <= 1 ? o.x : .5, oy = o && o.y >= 0 && o.y <= 1 ? o.y : .5;
+  const star = 'clip-path:polygon(50% 0%,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0% 50%,39% 39%)';
+  const shape = () => { const k = Math.random(); return k < .5 ? 'width:8px;height:12px;border-radius:2px' : k < .72 ? 'width:11px;height:11px;border-radius:50%' : k < .9 ? 'width:4px;height:17px;border-radius:2px' : 'width:12px;height:12px;border-radius:2px;' + star };
+  const drop = n => {
+    for (let i = 0; i < n; i++) {
+      const p = document.createElement('i');
+      const ang = Math.random() * Math.PI * 2, R = .7 + Math.random() * .8;
+      const dx = Math.cos(ang) * 130 * R, dy = -Math.sin(ang) * (90 + Math.random() * 190) - 30;
+      p.style.cssText = `left:${(ox * 100).toFixed(1)}%;top:${(oy * 100).toFixed(1)}%;background:${cols[i % cols.length]};--dx:${dx.toFixed(0)}px;--dy:${dy.toFixed(0)}px;--r:${(Math.random() * 720 - 360).toFixed(0)}deg;animation-delay:${(Math.random() * .1).toFixed(2)}s;${shape()}`;
+      w.appendChild(p);
+    }
+  };
+  drop(big ? 54 : 28);
+  if (big) setTimeout(() => drop(36), 250);
+  setTimeout(() => w.remove(), big ? 2100 : 1800);
 }
 // Enter in a text box presses the primary button of the same card (buttons opt in with the data-go attribute).
 document.addEventListener('keydown', e => {

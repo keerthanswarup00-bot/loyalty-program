@@ -3,6 +3,7 @@ const sb = notReady() ? null : mkClient('lk-customer');
 let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, pop = null, rt = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
 let usedSeen = null;
 let daily = null, dailyPub = false, introShow = false, scratching = false, dailyT = null;
+let mdlPrev = null, mdlItv = null, stampTm = null;
 
 const mail = p => `${p}.${CFG.slug}@${CFG.emailDomain}`;
 const fmtWait = s => s < 60 ? 'under a minute' : s < 5400 ? Math.ceil(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
@@ -23,6 +24,91 @@ addEventListener('pointerup', () => {
   const q = buzzQ; buzzQ = null;
   if (Date.now() - q.t < 8000) { try { navigator.vibrate(q.p) } catch (e) { } }   // a buzz 8s late would feel random
 }, { capture: true, passive: true });
+
+
+// ---------- Modal (cooldown countdown + invalid code) ----------
+// Lives in #modal (outside #app) so render() and the visibilitychange reload never destroy it.
+const fmtCdStop = s => { const x = Math.max(0, Math.ceil(s)); const m = Math.floor(x / 60), h = Math.floor(m / 60); const mm = m % 60, ss = x % 60; return h ? h + ':' + String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0') : String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0') };
+const lkSeen = () => { try { return localStorage.getItem('lk-seen') == '1' } catch (e) { return false } };
+function mdlOpen(html) {
+  clearInterval(mdlItv); mdlItv = null;
+  const r = $('#modal'); if (!r) return;
+  r.innerHTML = html;
+  document.body.classList.add('modal-open');
+  mdlPrev = document.activeElement;
+  const b = r.querySelector('[data-x]') || r.querySelector('button');
+  if (b) b.focus();
+}
+function closeModal() {
+  clearInterval(mdlItv); mdlItv = null;
+  const r = $('#modal'); if (r) r.innerHTML = '';
+  document.body.classList.remove('modal-open');
+  if (mdlPrev && mdlPrev.focus) { try { mdlPrev.focus() } catch (e) { } }
+  mdlPrev = null;
+}
+document.addEventListener('keydown', e => { const r = $('#modal'); if (e.key == 'Escape' && r && r.innerHTML) { e.preventDefault(); closeModal() } }, true);
+function showCooldown(wait) {
+  const tot = Math.max(0, Math.ceil(Number(wait) || 0));
+  const end = Date.now() + tot * 1000, C = 2 * Math.PI * 52;
+  mdlOpen(`<div class="modal-wrap" onclick="if(event.target==this)closeModal()"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="cd-t">
+    <h2 id="cd-t">Next stamp in</h2>
+    <div class="reel" id="cd-mid"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="rb" cx="60" cy="60" r="52"/><circle class="rf" cx="60" cy="60" r="52"/></svg><b id="cd-num"></b></div>
+    <p class="sub" style="margin:2px 0 0" id="cd-at"></p>
+    <div class="cd-done" id="cd-ok" hidden><i class="dot"></i><b>Your next stamp is ready</b><span>Tap the tag again.</span></div>
+    <button type="button" class="btn" data-x onclick="closeModal()">Got it</button>
+  </div></div>`);
+  const ring = $('.reel .rf'), num = $('#cd-num'), at = $('#cd-at'), mid = $('#cd-mid'), ok = $('#cd-ok'), h2 = $('#cd-t');
+  if (ring) ring.style.strokeDasharray = C;
+  const tick = () => {
+    const left = Math.max(0, (end - Date.now()) / 1000);
+    if (num) num.textContent = fmtCdStop(left);
+    if (ring && tot > 0) ring.style.strokeDashoffset = C * (1 - left / tot);
+    if (left <= 0) {
+      clearInterval(mdlItv); mdlItv = null;
+      if (mid) mid.hidden = true;
+      if (at) at.hidden = true;
+      if (h2) h2.textContent = 'Ready!';
+      if (ok) ok.hidden = false;
+    }
+  };
+  at.textContent = 'Come back at ' + new Date(end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  tick();
+  if (tot > 0) mdlItv = setInterval(tick, 1000);
+}
+function showInvalid() {
+  mdlOpen(`<div class="modal-wrap" onclick="if(event.target==this)closeModal()"><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="iv-t">
+    <h2 id="iv-t">That code is no longer valid</h2>
+    <p class="sub" style="margin:0">Ask staff to tap the tag again for you.</p>
+    <button type="button" class="btn" data-x onclick="closeModal()">Got it</button>
+  </div></div>`);
+}
+
+// ---------- Stamp press animation + confetti ----------
+function clearStamp() { if (stampTm) { clearTimeout(stampTm); stampTm = null } }
+function drawChk(el) {
+  const p = el.querySelector('svg path'); if (!p) return;
+  let L; try { L = p.getTotalLength() } catch (e) { return }
+  p.style.strokeDasharray = L; p.style.strokeDashoffset = L; p.classList.add('drw');
+  requestAnimationFrame(() => { p.style.strokeDashoffset = '0' });
+}
+function playStamp(i, big) {
+  clearStamp();
+  const el = document.querySelectorAll('.grid .st.f')[i];
+  if (!el) return;
+  el.scrollIntoView({ block: 'center', behavior: scrOn() ? 'smooth' : 'auto' });
+  const step = (fn, ms) => { stampTm = setTimeout(() => { stampTm = null; if (!el.isConnected) return; fn() }, ms) };
+  step(() => el.classList.add('press'), 150);
+  el.addEventListener('animationend', e => {
+    if (e.animationName != 'pressDrop' || !el.isConnected) return;
+    el.classList.add('hit');
+    const card = el.closest('#app > .card'); if (card) card.classList.add('thud');
+    buzz(big ? [40, 60, 40, 60, 90] : 30);           // buzz() is the gesture-safe haptic path (queued until a tap on NFC opens)
+    drawChk(el);
+    const r = el.getBoundingClientRect(), vw = window.innerWidth || 360, vh = window.innerHeight || 640;
+    burst({ x: (r.left + r.width / 2) / vw, y: (r.top + r.height / 2) / vh }, big);
+    step(() => { el.classList.remove('press', 'hit'); if (card) card.classList.remove('thud') }, 760);
+  });
+}
 
 
 // ---------- Scratch-to-reveal (Surprise offers only) ----------
@@ -271,8 +357,8 @@ function homePgV() {
   const left = m.card_ends_at && !ready ? daysTo(m.card_ends_at) : null;
   const wait = m.last_stamp && biz.cooldown_min > 0 ? Math.ceil((new Date(m.last_stamp).getTime() + biz.cooldown_min * 6e4 - Date.now()) / 1000) : 0;
   const img = biz.stamp_url && (biz.stamp_url.startsWith('http') || biz.stamp_url.startsWith('data:'));
-  let g = ''; for (let i = 0; i < need; i++) g += i < s ? `<div class="st f ${i == anim ? 'pop' : ''} ${intro ? 'in' : ''}" style="--i:${i}">${img ? `<img src="${esc(biz.stamp_url)}" alt="stamp" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : IC.chk}</div>` : `<div class="st">${i + 1}</div>`;
-  let o = newsV() + `<div class="card${anim >= 0 ? ' thump' : ''}"><div class="eyebrow">Hello, ${esc(m.name.split(' ')[0])}</div><div class="grid">${g}</div>
+  let g = ''; for (let i = 0; i < need; i++) g += i < s ? `<div class="st f ${intro ? 'in' : ''}" style="--i:${i}">${img ? `<img src="${esc(biz.stamp_url)}" alt="stamp" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : IC.chk}</div>` : `<div class="st">${i + 1}</div>`;
+  let o = newsV() + `<div class="card"><div class="eyebrow">Hello, ${esc(m.name.split(' ')[0])}</div><div class="grid">${g}</div>
   <p class="rule">Collect ${need} stamps to earn <b>${esc(biz.reward)}</b>.</p>`;
   if (m.card_ends_at && !ready) o += `<p class="mut sm">${left <= 14 ? '<span class="expiry">Card ends in ' + Math.max(left, 0) + (left == 1 ? ' day' : ' days') + '</span> · finish it before ' + fd(m.card_ends_at) : 'Card valid until ' + fd(m.card_ends_at)}</p>`;
   if (card.lost > 0) o += `<div class="rw"><small>Card expired</small><b>${card.lost} ${card.lost == 1 ? 'stamp was' : 'stamps were'} reset</b><span class="mut">Your last card ran out of time. A fresh card starts with your next stamp.</span></div>`;
@@ -379,24 +465,25 @@ async function ensureCard() {
 
 async function scan() {
   const t = pend; pend = null; sur = null; reward = null;
-  let got = false;
+  let got = false, full = false, surprise = false;
+  closeModal(); clearStamp();
   try { history.replaceState(null, '', location.pathname + location.search) } catch (e) { }
   try {
     const r = await rpc(sb, 'add_stamp', { p_slug: CFG.slug, p_token: t });
     if (r.ok) {
-      if (r.surprise) sur = { t: 'Surprise unlocked', x: r.surprise, scratch: scrOn() };
+      if (r.surprise) { sur = { t: 'Surprise unlocked', x: r.surprise, scratch: scrOn() }; surprise = true }
       await load();
       anim = Math.min(card.member.stamps, +biz.need) - 1;
+      full = card.member.stamps >= +biz.need;
       got = true;
-    } else if (r.error == 'cooldown') toast('You already collected a stamp recently. Next one in ' + fmtWait(r.wait));
-    else toast('This code is no longer valid. Ask staff to tap again.');
+      pg = 'home'; view = 'home';
+    } else if (r.error == 'cooldown') showCooldown(r.wait);
+    else if (r.error == 'nomember') toast('No card found for this account. Please join first.');
+    else if (r.error == 'auth') toast('Please sign in again.');
+    else showInvalid();
   } catch (e) { toast(nice(e)) }
   render();
-  if (got) {
-    const full = card.member.stamps >= +biz.need;
-    buzz(full ? [40, 60, 40, 60, 90] : 30);       // longer pattern when the card completes
-    if (full) confetti();                             // no confetti for a surprise: the scratch reveal fires its own
-  }
+  if (got) playStamp(anim, full || surprise);
 }
 
 async function reg(btn) {
@@ -406,11 +493,12 @@ async function reg(btn) {
   if (w.length < 6) return toast('Password must be at least 6 characters');
   if (!$('#cons').checked) return toast('Please tick the consent box to join');
   busy(btn, true);
+  const jt = joinTok || pend;   // whichever token (sign-up QR or NFC tag) brought this customer here
   try {
-    const { data, error } = await sb.auth.signUp({ email: mail(p), password: w, options: { data: { name: n, phone: p, bday: b || null, consent: true, jt: joinTok, rf: v('rf').trim() || null } } });
+    const { data, error } = await sb.auth.signUp({ email: mail(p), password: w, options: { data: { name: n, phone: p, bday: b || null, consent: true, jt, rf: v('rf').trim() || null } } });
     if (error) throw error;
     if (!data.session) throw new Error('Sign-ups are paused: turn off "Confirm email" in Supabase (see README).');
-    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: n, p_phone: p, p_bday: b || null, p_consent: true, p_join_token: joinTok, p_ref: v('rf').trim() || null });
+    await rpc(sb, 'join_business', { p_slug: CFG.slug, p_name: n, p_phone: p, p_bday: b || null, p_consent: true, p_join_token: jt, p_ref: v('rf').trim() || null });
     await load();
     if (card) {
       markUsed();
@@ -418,9 +506,21 @@ async function reg(btn) {
       if (w && !sur) sur = { t: 'Welcome gift', x: w.text };
       if (card.member.stamps > 0) anim = Math.min(card.member.stamps, +biz.need) - 1;
     }
+    try { localStorage.setItem('lk-seen', '1') } catch (e) { }
     view = 'home'; form = 'new';
-    render(); confetti(); buzz();
+    let a = anim;
+    if (pend && biz.join_stamp) {
+      // The NFC tap WAS the join stamp: don't scan again, so a new member ends with exactly one stamp.
+      pend = null;
+      try { history.replaceState(null, '', location.pathname + location.search) } catch (e) { }
+    } else if (pend) {
+      // No free join stamp: the tag's tap itself adds the first stamp below.
+      a = -1;
+    }
+    render();
     if (pend) await scan();
+    else if (a >= 0) playStamp(a, card.member.stamps >= +biz.need);
+    else { confetti(); buzz() }
   } catch (e) {
     const msg = String((e && e.message) || e);
     // signUp may have worked while join failed on a rule: remove the half-made login so they can retry
@@ -442,6 +542,7 @@ async function login(btn) {
     if (error) throw error;
     if (!(await ensureCard())) { await sb.auth.signOut(); throw new Error('No card found for this number. Please join first.') }
     try { localStorage.setItem('lk-phone', p) } catch (e) { }   // remember the number for next time, never the password
+    try { localStorage.setItem('lk-seen', '1') } catch (e) { }
     a2hsHiOn();
     view = 'home'; form = 'in';
     render();
@@ -537,7 +638,7 @@ function authV() {
 }
 
 function joinV() {
-  if (!joinTok) return `<h2>Join the rewards club</h2><p class="sub">To join, scan the sign-up QR code at the counter with your phone camera. Already a member? Use the Login tab.</p>`;
+  if (!joinTok && !pend) return `<h2>Join the rewards club</h2><p class="sub">To join, scan the sign-up QR code at the counter with your phone camera. Already a member? Use the Login tab.</p>`;
   return `<h2>Join the rewards club</h2><p class="sub">${pend ? 'Sign in to collect your stamp.' : (biz.join_stamp ? 'Create your card and get your first stamp free.' : 'Create your card in under a minute.')}</p>
   <label class="lb">Full name</label><input id="n" autocomplete="name">
   <label class="lb">Phone number</label><input id="p" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number">
@@ -593,6 +694,7 @@ function render() {
     app.className = (card ? 'has-nav' : '') + (fx ? ' fx' : '');
     keep = scratching ? document.getElementById('daily-scr') : null;
     fx = false;
+    clearStamp();   // a re-render replaces the slots mid-animation: drop any pending stamp timers
     app.innerHTML = (!card ? authV() : heroV() + (view == 'pw' ? pwV() : pg == 'offers' ? offersPgV() : pg == 'rewards' ? rewardsPgV() : pg == 'profile' ? profilePgV() : homePgV())) + (card ? navV() : '') + (introShow && !card ? introV() : '') + (pop ? popV() : '');
   } catch (e) {
     $('#app').innerHTML = `<div class="card"><h2>Something went wrong</h2><p class="sub">${esc(e.message)}</p><button class="btn" onclick="location.reload()">Reload</button></div>`;
@@ -623,7 +725,7 @@ async function reload() { try { await load(); render(); toast('Up to date') } ca
 addEventListener('hashchange', () => {
   const s = location.hash.match(/scan=([\w-]+)/), j = location.hash.match(/join=([\w-]+)/);
   if (j) { joinTok = j[1]; try { sessionStorage.setItem('lk-join', j[1]) } catch (e) { } render() }
-  if (s) { pend = s[1]; if (card) scan(); else render() }
+  if (s) { pend = s[1]; if (card) scan(); else { if (!joinTok) joinTok = pend; render() } }
 });
 // Coming back to the page (e.g. after staff taps the tag, or a day later) shows fresh stamps and offers.
 document.addEventListener('visibilitychange', async () => {
@@ -655,6 +757,8 @@ document.addEventListener('visibilitychange', async () => {
       if (err) throw err;                                            // network/server error: show it and keep the session
       if (noCard) await sb.auth.signOut();
     }
+    if (!card && pend && !joinTok) joinTok = pend;   // the NFC tag can also open the sign-up form
+    if (!card && lkSeen()) form = 'in';              // returning members land on the Login tab
     if (!card && !introSeen()) introShow = true;
     render();
     if (card && pend) await scan();

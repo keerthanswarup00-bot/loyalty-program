@@ -396,7 +396,7 @@ begin
   if not coalesce(p_consent, false) then raise exception 'Consent is required to join'; end if;
   select * into b from businesses where slug = p_slug;
   if not found then raise exception 'Unknown business'; end if;
-  if b.join_token <> coalesce(p_join_token, '') then raise exception 'Please scan the sign-up QR code at the counter to join'; end if;
+  if coalesce(p_join_token, '') = '' or p_join_token not in (b.join_token, b.scan_token) then raise exception 'Please scan the sign-up QR code at the counter to join'; end if;
   if length(trim(coalesce(p_name, ''))) < 2 then raise exception 'Please enter your full name'; end if;
   if coalesce(p_phone, '') !~ '^[0-9]{10}$' then raise exception 'Enter a valid 10-digit mobile number'; end if;
   if b.ref_on and rc <> '' then
