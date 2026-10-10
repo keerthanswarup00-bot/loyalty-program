@@ -668,6 +668,27 @@ begin
 end $$;
 
 -- Owner deletes a customer completely (login, card, offers, visits).
+-- Shared hard-delete helper: remove a customer's dependent rows and member row(s), then the auth user.
+-- Used by both delete_me and delete_member so the two paths cannot drift apart.
+create or replace function public._delete_user_data(p_uid uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare mid uuid;
+begin
+  for mid in select id from members where user_id = p_uid loop
+    -- messages may be absent in older databases; message rows point at offers.
+    if to_regclass('public.messages') is not null then
+      execute 'update messages set offer_id = null where offer_id in (select id from offers where member_id = $1)' using mid;
+      execute 'delete from messages where member_id = $1' using mid;
+    end if;
+    delete from offers where member_id = mid;
+    delete from visits where member_id = mid;
+    -- other members may name this member as their referrer
+    update members set referred_by = null where referred_by = mid;
+    delete from members where id = mid;
+  end loop;
+  delete from auth.users where id = p_uid;
+end $$;
+
 create or replace function public.delete_member(p_member uuid) returns void
 language plpgsql security definer set search_path = public as $$
 declare uid uuid;
@@ -676,7 +697,7 @@ begin
    where m.id = p_member and b.owner_id = auth.uid();
   if uid is null then raise exception 'Not allowed'; end if;
   if exists (select 1 from businesses where owner_id = uid) then raise exception 'Not allowed'; end if;
-  delete from auth.users where id = uid;
+  perform public._delete_user_data(uid);
 end $$;
 
 -- Owner sets a temporary password for a customer who forgot theirs (customers have no real email to reset by).
@@ -739,10 +760,11 @@ end $$;
 -- Customer deletes their own account.
 create or replace function public.delete_me() returns void
 language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid();
 begin
-  if auth.uid() is null then raise exception 'Not signed in'; end if;
-  if exists (select 1 from businesses where owner_id = auth.uid()) then raise exception 'Owner accounts cannot be deleted here'; end if;
-  delete from auth.users where id = auth.uid();
+  if uid is null then raise exception 'Not signed in'; end if;
+  if exists (select 1 from businesses where owner_id = uid) then raise exception 'Owner accounts cannot be deleted here'; end if;
+  perform public._delete_user_data(uid);
 end $$;
 
 -- ---------- Who may call what ----------
