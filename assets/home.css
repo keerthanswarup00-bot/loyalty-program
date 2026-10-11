@@ -148,7 +148,7 @@
 @media (max-width:640px){.beliefs{grid-template-columns:1fr}}
 
 /* contact */
-.contact-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:clamp(28px,5vw,64px);align-items:start}
+.contact-grid{display:grid;gap:26px;max-width:560px;margin-inline:auto}
 .contact-grid>*{min-width:0}
 .cform{display:grid;gap:18px}
 .cform label{display:grid;gap:8px;font:500 .8rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
@@ -161,7 +161,6 @@
 .form-msg{margin:0;min-height:1.5em;font-size:.95rem;color:var(--mut)}.form-msg.ok{color:var(--good)}
 .aside-card{border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:12px;justify-items:start;background:var(--surface);margin-bottom:14px}
 .aside-card[hidden]{display:none}
-@media (max-width:760px){.contact-grid{grid-template-columns:1fr}}
 
 @media (prefers-reduced-motion:reduce){
   .rise{opacity:1;transform:none;animation:none}
