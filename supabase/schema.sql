@@ -815,7 +815,10 @@ language sql stable security definer set search_path = public as $$
            'price', i.price,
            'image_url', case
              when char_length(i.image_url) <= 2048
-              and i.image_url ~ ('^https://[a-z0-9-]+\\.supabase\\.co/storage/v1/object/public/brand/' || b.id::text || '/menu-[a-z0-9]+\\.(png|jpg|webp)
+              and i.image_url ~ ('^https://[a-z0-9-]+[.]supabase[.]co/storage/v1/object/public/brand/' || b.id::text || '/menu-[a-z0-9]+[.](png|jpg|webp)$')
+             then i.image_url else '' end) order by i.sort, i.created_at), '[]'::json)
+  from menu_items i join businesses b on b.id = i.business_id
+  where b.slug = p_slug and i.available;
 $$;
 
 -- Owner: add (p_id null) or change an item. Returns the item id.
@@ -832,7 +835,11 @@ begin
   if char_length(coalesce(p_price, '')) > 24 then raise exception 'Price is too long'; end if;
   if img <> '' and (
        char_length(img) > 2048
-       or img !~ ('^https://[a-z0-9-]+\\.supabase\\.co/storage/v1/object/public/brand/' || b.id::text || '/menu-[a-z0-9]+\\.(png|jpg|webp)
+       or img !~ ('^https://[a-z0-9-]+[.]supabase[.]co/storage/v1/object/public/brand/' || b.id::text || '/menu-[a-z0-9]+[.](png|jpg|webp)$')
+     ) then
+    raise exception 'Invalid image. Upload a PNG, JPG or WebP menu photo to this business storage folder.';
+  end if;
+
   if p_id is null then
     if (select count(*) from menu_items where business_id = b.id) >= 300 then raise exception 'Menu is full (300 items)'; end if;
     insert into menu_items (business_id, title, description, price, image_url, available, sort)
