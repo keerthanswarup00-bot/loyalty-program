@@ -219,3 +219,27 @@ body:has(.c-nav) .toast{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 @keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
 @media (min-width:600px){.ms-wrap{align-items:center}.msheet{border-radius:26px;max-height:82vh}.ms-img{margin:0}.ms-grab{display:none}.ms-img img{border-radius:26px 26px 0 0}}
 @media (prefers-reduced-motion:reduce){.msheet,.ms-bk{animation:none}.msheet{transition:none}}
+
+/* ---- Stamp landing: skeleton, waiting slot, count bump ---- */
+.st.shim{border:0;background:linear-gradient(90deg,var(--line) 25%,color-mix(in srgb,var(--line) 40%,var(--card)) 50%,var(--line) 75%);background-size:200% 100%;animation:sh 1.2s linear infinite}
+.st.next{border-color:var(--brand);color:var(--brand);animation:nextPulse 1s ease-in-out infinite}
+@keyframes nextPulse{50%{transform:scale(1.07);background:color-mix(in srgb,var(--brand) 10%,transparent)}}
+.st.f.press{animation:discIn .3s cubic-bezier(.2,1.2,.4,1) both}
+@keyframes discIn{0%{transform:scale(.55);opacity:.3}100%{transform:none;opacity:1}}
+.c-count{transform-origin:left center}.c-count.bump{animation:cBump .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes cBump{40%{transform:scale(1.08)}}
+@media (prefers-reduced-motion:reduce){.st.next,.c-count.bump{animation:none}}
+
+/* ---- Menu categories: sticky chip slider, grouped list ---- */
+.mn-bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin:-4px -18px 12px;padding:8px 0;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.mn-chips{display:flex;gap:8px;overflow-x:auto;padding:2px 18px;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.mn-chips::-webkit-scrollbar{display:none}
+.mn-chip{flex:none;scroll-snap-align:center;border:1px solid var(--line);background:var(--card);color:var(--tx);border-radius:99px;padding:9px 16px;font:600 13.5px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background .18s,color .18s,border-color .18s,transform .12s}
+.mn-chip:active{transform:scale(.96)}
+.mn-chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.mn-in{animation:up .24s cubic-bezier(.2,.8,.2,1) both}
+.mn-sec+.mn-sec{margin-top:18px}
+.mn-h{display:flex;align-items:center;gap:8px;margin:14px 0 0;font:600 17px Fraunces,Georgia,serif}
+.mn-h span{font:600 11px Inter,system-ui,sans-serif;color:var(--mut);background:color-mix(in srgb,var(--brand) 9%,transparent);border-radius:99px;padding:3px 8px}
+.ms-cat{justify-self:start;font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--brand)}
+@media (prefers-reduced-motion:reduce){.mn-in{animation:none}}

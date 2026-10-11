@@ -92,7 +92,7 @@ async function login(btn) {
 }
 async function out() {
   await sb.auth.signOut();
-  signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null; MENU = null;
+  signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null; MENU = null; CATS = null;
   sel = new Set(); bsel = new Set(); selMode = false; bq = null; binit = false; impRows = null; visCache = {}; MSG = [];
   render();
 }
@@ -824,30 +824,112 @@ async function impGo(btn) {
 }
 
 // ---------- MENU ----------
-// Items live in public.menu_items (owner reads via RLS, writes only through save_menu_item / delete_menu_item).
+// Items live in public.menu_items, categories in public.menu_categories (owner reads via RLS, writes only through the save_/delete_ functions).
+// CATS: null (not loaded) | 'err' (database not updated yet) | [{ id, name, sort }]. mfilt: which category the item list is showing.
+let CATS = null, mfilt = 'all';
 const priceShow = p => { p = String(p || '').trim(); return /^\d+([.,]\d+)?$/.test(p) ? '₹' + p : p };
 const mthumb = u => `<span class="mi-ph">${u ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}</span>`;
+const catOk = () => Array.isArray(CATS);
+const catName = id => ((catOk() ? CATS : []).find(c => c.id == id) || {}).name || '';
+const catErr = e => /function|schema cache|relation|does not exist/i.test(String(e && e.message || e)) ? 'Run supabase/2026-10-11-menu-categories-fast-stamp.sql first' : nice(e);
+const MCOLS = 'id,title,description,price,image_url,available,sort,created_at';
+async function loadCats() {
+  const r = await sb.from('menu_categories').select('id,name,sort').eq('business_id', biz.id).order('sort').order('created_at');
+  CATS = r.error ? 'err' : r.data;
+}
 async function loadMenuAdm() {
-  const { data, error } = await sb.from('menu_items').select('id,title,description,price,image_url,available,sort,created_at')
-    .eq('business_id', biz.id).order('sort').order('created_at');
-  MENU = error ? 'err' : data;
+  const q = cols => sb.from('menu_items').select(cols).eq('business_id', biz.id).order('sort').order('created_at');
+  const [it, ct] = await Promise.all([q(MCOLS + ',category_id'), sb.from('menu_categories').select('id,name,sort').eq('business_id', biz.id).order('sort').order('created_at')]);
+  let items = it;
+  if (it.error) items = await q(MCOLS);                       // database not updated yet: items still work, just without categories
+  MENU = items.error ? 'err' : items.data.map(x => ({ category_id: null, ...x }));
+  CATS = ct.error ? 'err' : ct.data;
   if (tab == 'p') render();
 }
+function setMf(id) { mfilt = id; render() }
 function menuV() {
   if (MENU == null) { loadMenuAdm(); return `<h2 class="a-title">Menu</h2><div class="a-card"><p class="sub" style="margin:0">Loading…</p></div>` }
   if (MENU == 'err') return `<h2 class="a-title">Menu</h2><div class="a-card"><p class="sub" style="margin:0">The menu is not set up in your database yet. Run <b>supabase/2026-10-11-menu-leads.sql</b> in the Supabase SQL editor, then reload.</p></div>`;
+  if (ov == 'cats') return catsV();
+  if (String(ov || '').startsWith('cat:')) return catEditV();
   if (ov) return menuEditV();
-  return `<h2 class="a-title">Menu</h2><p class="sub" style="margin-bottom:14px">Add what you sell. Customers see it in the Menu tab of their app.</p>
+  const cats = catOk() ? CATS : [], loose = MENU.filter(x => !x.category_id || !cats.some(c => c.id == x.category_id));
+  if (mfilt != 'all' && !(mfilt == 'none' ? loose.length : cats.some(c => c.id == mfilt))) mfilt = 'all';
+  const L = MENU.filter(x => mfilt == 'all' || (mfilt == 'none' ? loose.includes(x) : x.category_id == mfilt));
+  const chip = (id, l, n) => `<button type="button" class="a-mchip${mfilt == id ? ' on' : ''}" onclick="setMf('${id}')">${esc(l)}<i>${n}</i></button>`;
+  const chips = cats.length ? `<div class="a-mchips">${chip('all', 'All', MENU.length)}${cats.map(c => chip(c.id, c.name, MENU.filter(x => x.category_id == c.id).length)).join('')}${loose.length ? chip('none', 'No category', loose.length) : ''}</div>` : '';
+  return `<h2 class="a-title">Menu</h2><p class="sub" style="margin-bottom:14px">Add what you sell and group it into categories. Customers see it in the Menu tab of their app.</p>
   <button class="btn" onclick="go('p','new')">Add an item</button>
-  ${MENU.length ? `<div class="a-card flush" style="margin-top:14px">${MENU.map(x => `<button type="button" class="mi-row" onclick="go('p','${x.id}')">${mthumb(x.image_url)}
-    <span class="mi-tx"><b>${esc(x.title)}</b>${x.available ? '' : '<em>Hidden</em>'}</span><span class="mi-pr">${esc(priceShow(x.price))}</span><i class="mi-ch">${AI.chev}</i></button>`).join('')}</div>`
-  : `<div class="a-card" style="margin-top:14px"><p class="sub" style="margin:0">No items yet. Add your first one: a name, a price and a photo is enough.</p></div>`}`;
+  <button class="btn alt" style="margin-top:10px" onclick="go('p','cats')">${catOk() ? (cats.length ? 'Manage categories (' + cats.length + ')' : 'Add categories') : 'Categories'}</button>
+  ${CATS == 'err' ? `<p class="hint">Categories need one database update: run <b>supabase/2026-10-11-menu-categories-fast-stamp.sql</b> in the Supabase SQL editor.</p>` : ''}
+  ${chips}
+  ${L.length ? `<div class="a-card flush" style="margin-top:14px">${L.map(x => `<button type="button" class="mi-row" onclick="go('p','${x.id}')">${mthumb(x.image_url)}
+    <span class="mi-tx"><b>${esc(x.title)}</b>${x.available ? '' : '<em>Hidden</em>'}${catName(x.category_id) ? `<small class="mi-cat">${esc(catName(x.category_id))}</small>` : ''}</span><span class="mi-pr">${esc(priceShow(x.price))}</span><i class="mi-ch">${AI.chev}</i></button>`).join('')}</div>`
+  : `<div class="a-card" style="margin-top:14px"><p class="sub" style="margin:0">${MENU.length ? 'Nothing in this category yet. Open Manage categories to choose its items.' : 'No items yet. Add your first one: a name, a price and a photo is enough.'}</p></div>`}`;
 }
+
+// ----- Categories: add, rename, reorder, choose which items belong -----
+function catsV() {
+  const back = `<button class="a-back" onclick="go('p')">${AI.back}<span>Back to menu</span></button><h2 class="a-title">Categories</h2>`;
+  if (!catOk()) return back + `<div class="a-card"><p class="sub" style="margin:0">Categories need one database update. Run <b>supabase/2026-10-11-menu-categories-fast-stamp.sql</b> in the Supabase SQL editor, then reload.</p></div>`;
+  const n = id => MENU.filter(x => x.category_id == id).length;
+  return back + `<p class="sub" style="margin-bottom:14px">Group your menu: Starters, Drinks, Desserts, anything you like. Make as many as you want. Customers get them as a swipeable row at the top of their menu.</p>
+  <div class="a-card"><label class="lb" style="margin-top:0">New category</label><div class="row"><input id="cnew" maxlength="40" autocomplete="off" placeholder="e.g. Starters" onkeydown="if(event.key==='Enter')addCat()"><button class="btn sm" onclick="addCat()">Add</button></div></div>
+  ${CATS.length ? `<div class="a-card flush">${CATS.map((c, i) => `<div class="ct-row"><button type="button" class="ct-main" onclick="go('p','cat:${c.id}')"><span class="ct-n"><b>${esc(c.name)}</b><small>${n(c.id)} ${n(c.id) == 1 ? 'item' : 'items'}</small></span><i class="mi-ch">${AI.chev}</i></button>
+    <span class="ct-mv"><button type="button" aria-label="Move up" class="up"${i ? '' : ' disabled'} onclick="moveCat('${c.id}',-1)">${AI.back}</button><button type="button" aria-label="Move down" class="dn"${i < CATS.length - 1 ? '' : ' disabled'} onclick="moveCat('${c.id}',1)">${AI.back}</button></span></div>`).join('')}</div>
+  <p class="hint">Tap a category to rename it or tick the items that belong in it. Use the arrows to set the order customers see.</p>`
+  : `<div class="a-card"><p class="sub" style="margin:0">No categories yet. Add your first one above, then choose which items go in it.</p></div>`}`;
+}
+async function addCat() {
+  const i = $('#cnew'), name = i ? i.value.trim() : ''; if (!name) return toast('Type a category name');
+  try { await rpc(sb, 'save_menu_category', { p_slug: CFG.slug, p_id: null, p_name: name }); await loadCats(); render(); toast('Category added'); const j = $('#cnew'); if (j) j.focus() }
+  catch (e) { toast(catErr(e)) }
+}
+async function moveCat(id, d) {
+  const a = CATS.map(c => c.id), i = a.indexOf(id), j = i + d; if (i < 0 || j < 0 || j >= a.length) return;
+  [a[i], a[j]] = [a[j], a[i]]; CATS = a.map(x => CATS.find(c => c.id == x)); render();
+  try { await rpc(sb, 'reorder_menu_categories', { p_slug: CFG.slug, p_ids: a }) } catch (e) { toast(catErr(e)); await loadCats(); render() }
+}
+function catEditV() {
+  const id = String(ov).slice(4), c = catOk() && CATS.find(x => x.id == id);
+  if (!c) { ov = 'cats'; return catsV() }
+  return `<button class="a-back" onclick="go('p','cats')">${AI.back}<span>Back to categories</span></button><h2 class="a-title">${esc(c.name)}</h2>
+  <div class="a-card">${fld('cname', 'Category name', c.name, 'maxlength="40" autocomplete="off"')}</div>
+  <div class="a-card flush"><div class="ct-hd"><b>Items in this category</b><span><button type="button" class="lnk" onclick="pickAll(true)">All</button> &nbsp;·&nbsp; <button type="button" class="lnk" onclick="pickAll(false)">None</button></span></div>
+  ${MENU.length ? MENU.map(x => `<label class="ct-pick">${mthumb(x.image_url)}<span class="mi-tx"><b>${esc(x.title)}</b>${x.category_id && x.category_id != id && catName(x.category_id) ? `<small class="mi-cat">now in ${esc(catName(x.category_id))}</small>` : ''}</span><input type="checkbox" class="cpick" value="${x.id}"${x.category_id == id ? ' checked' : ''}></label>`).join('')
+    : '<p class="sub" style="padding:4px 16px 16px;margin:0">Add some menu items first, then come back to put them here.</p>'}</div>
+  <p class="hint">An item sits in one category. Ticking it here moves it out of its old one.</p>
+  <button class="btn" data-go onclick="saveCat(this,'${id}')">Save category</button>
+  <button class="btn alt" style="margin-top:10px" onclick="delCat(this,'${id}')">Delete this category</button>`;
+}
+function pickAll(on) { document.querySelectorAll('.cpick').forEach(x => x.checked = on) }
+async function saveCat(btn, id) {
+  const name = v('cname').trim(); if (!name) return toast('Give the category a name');
+  const ids = [...document.querySelectorAll('.cpick:checked')].map(x => x.value);
+  btn.disabled = true;
+  try {
+    await rpc(sb, 'save_menu_category', { p_slug: CFG.slug, p_id: id, p_name: name });
+    await rpc(sb, 'set_category_items', { p_slug: CFG.slug, p_category: id, p_items: ids });
+    await loadMenuAdm(); toast('Saved'); go('p', 'cats');
+  } catch (e) { btn.disabled = false; toast(catErr(e)) }
+}
+async function delCat(btn, id) {
+  if (!confirm('Delete the category "' + catName(id) + '"? Its items stay on the menu, they just lose the category.')) return;
+  btn.disabled = true;
+  try { await rpc(sb, 'delete_menu_category', { p_id: id }); await loadMenuAdm(); if (mfilt == id) mfilt = 'all'; toast('Deleted'); go('p', 'cats') }
+  catch (e) { btn.disabled = false; toast(catErr(e)) }
+}
+
+// ----- Items -----
+function catNew(sel) { const w = $('#mcatnw'); if (!w) return; w.hidden = sel.value != '__new'; if (!w.hidden) { const i = $('#mcatn'); if (i) i.focus() } }
 function menuEditV() {
-  const x = ov == 'new' ? { title: '', description: '', price: '', image_url: '', available: true } : MENU.find(i => i.id == ov);
+  const x = ov == 'new' ? { title: '', description: '', price: '', image_url: '', available: true, category_id: mfilt != 'all' && mfilt != 'none' ? mfilt : '' } : MENU.find(i => i.id == ov);
   if (!x) { ov = null; return menuV() }
+  const catPick = catOk() ? `<label class="lb">Category</label><select id="mcat" onchange="catNew(this)"><option value="">No category</option>${CATS.map(c => `<option value="${c.id}"${x.category_id == c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="__new">+ New category…</option></select>
+    <div id="mcatnw" hidden><input id="mcatn" maxlength="40" autocomplete="off" placeholder="New category name" style="margin-top:8px"></div>` : '';
   return `<button class="a-back" onclick="go('p')">${AI.back}<span>Back to menu</span></button><h2 class="a-title">${ov == 'new' ? 'New item' : 'Edit item'}</h2>
   <div class="a-card">${fld('mt', 'Name', x.title, 'maxlength="80" autocomplete="off"', 'e.g. Masala dosa')}
+    ${catPick}
     ${fld('mp', 'Price', x.price, 'maxlength="24" autocomplete="off"', 'e.g. 120')}
     <p class="hint">A plain number shows with a ₹. For sizes you can type "80 / 120".</p>
     <label class="lb">Description <span>(optional)</span></label><textarea id="md" rows="4" maxlength="600" placeholder="What is it, what is in it?">${esc(x.description)}</textarea>
@@ -864,10 +946,20 @@ async function svMenu(btn) {
     let img = v('mx') == '1' ? '' : (cur && cur.image_url) || '';
     const f = $('#mfile').files[0];
     if (f) img = await readImg(f, 'menu');
-    await rpc(sb, 'save_menu_item', { p_slug: CFG.slug, p_id: isNew ? null : ov, p_title: title, p_description: v('md').trim(), p_price: v('mp').trim(), p_image: img, p_available: v('mav') != '0' });
+    const args = { p_slug: CFG.slug, p_id: isNew ? null : ov, p_title: title, p_description: v('md').trim(), p_price: v('mp').trim(), p_image: img, p_available: v('mav') != '0' };
+    if (catOk()) {
+      let cat = v('mcat') || null;
+      if (cat == '__new') {
+        const nm = v('mcatn').trim();
+        if (!nm) { btn.disabled = false; return toast('Type the new category name') }
+        cat = await rpc(sb, 'save_menu_category', { p_slug: CFG.slug, p_id: null, p_name: nm });
+      }
+      args.p_category = cat;
+    }
+    await rpc(sb, 'save_menu_item', args);
     if (cur && cur.image_url && cur.image_url != img) await dropOld(cur.image_url);
-    MENU = null; toast('Saved'); go('p');
-  } catch (e) { btn.disabled = false; typeof e == 'string' ? imgErr(e) : toast(/function|schema cache/i.test(String(e && e.message || e)) ? 'Run supabase/2026-10-11-menu-leads.sql first' : nice(e)) }
+    MENU = null; CATS = null; toast('Saved'); go('p');
+  } catch (e) { btn.disabled = false; typeof e == 'string' ? imgErr(e) : toast(/function|schema cache/i.test(String(e && e.message || e)) ? 'Run supabase/2026-10-11-menu-categories-fast-stamp.sql first' : nice(e)) }
 }
 async function delMenu(btn) {
   const cur = MENU.find(i => i.id == ov); if (!cur || !confirm('Delete "' + cur.title + '" from the menu?')) return;

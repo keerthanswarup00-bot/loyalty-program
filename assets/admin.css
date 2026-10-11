@@ -92,3 +92,22 @@ a.btn.sm{display:inline-block}
 .mi-tx em{font-style:normal;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--line);color:var(--mut)}
 .mi-pr{flex:none;font-weight:600;font-variant-numeric:tabular-nums}
 .mi-ch{flex:none;color:var(--mut);display:grid}.mi-ch svg{width:18px;height:18px}
+
+/* Menu categories */
+.mi-cat{flex-basis:100%;font-size:12px;font-weight:600;color:var(--brand)}
+.a-mchips{display:flex;gap:8px;overflow-x:auto;margin:16px -2px 0;padding:2px;scrollbar-width:none}.a-mchips::-webkit-scrollbar{display:none}
+.a-mchip{flex:none;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);color:var(--tx);border-radius:99px;padding:8px 14px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.a-mchip i{font-style:normal;font-size:11px;font-weight:600;color:var(--mut)}
+.a-mchip.on{background:var(--brand);border-color:var(--brand);color:#fff}.a-mchip.on i{color:rgba(255,255,255,.8)}
+.ct-row{display:flex;align-items:stretch}.ct-row+.ct-row{border-top:1px solid var(--line)}
+.ct-main{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:14px 8px 14px 16px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ct-main:active{background:color-mix(in srgb,var(--brand) 7%,transparent)}
+.ct-n{flex:1;min-width:0;display:grid;gap:2px}.ct-n b{font-weight:600;overflow-wrap:anywhere}.ct-n small{color:var(--mut);font-size:12.5px}
+.ct-mv{flex:none;display:flex;align-items:center;gap:2px;padding-right:8px}
+.ct-mv button{width:36px;height:36px;border:0;border-radius:10px;background:none;color:var(--mut);cursor:pointer;display:grid;place-items:center}
+.ct-mv button:disabled{opacity:.25;cursor:default}.ct-mv button:not(:disabled):active{background:color-mix(in srgb,var(--brand) 10%,transparent)}
+.ct-mv svg{width:18px;height:18px}.ct-mv .up svg{transform:rotate(90deg)}.ct-mv .dn svg{transform:rotate(-90deg)}
+.ct-hd{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px}
+.ct-pick{display:flex;align-items:center;gap:12px;margin:0;padding:10px 16px;font:inherit;font-weight:400;color:inherit;cursor:pointer;border-top:1px solid var(--line)}
+.ct-hd+.ct-pick{border-top:0}
+.ct-pick .mi-tx{flex:1}

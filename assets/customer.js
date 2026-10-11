@@ -1,9 +1,11 @@
 // Customer app: sign up / sign in, stamp card, offers.
 const sb = notReady() ? null : mkClient('lk-customer');
-let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, anim = -1, ip = null, pop = null, rt = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
+let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, ip = null, pop = null, rt = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
 let usedSeen = null;
 let daily = null, dailyPub = false, introShow = false, scratching = false, dailyT = null;
-let mdlPrev = null, mdlItv = null, stampTm = null;
+let mdlPrev = null, mdlItv = null, stampTm = null, stampRes = null;
+// hold: while a stamp is landing, the card shows this many stamps (the count before the new one) so the new slot can fill with the animation.
+let hold = null;
 
 const mail = p => `${p}.${CFG.slug}@${CFG.emailDomain}`;
 const fmtWait = s => s < 60 ? 'under a minute' : s < 5400 ? Math.ceil(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
@@ -84,29 +86,58 @@ function showInvalid() {
 }
 
 // ---------- Stamp press animation + confetti ----------
-function clearStamp() { if (stampTm) { clearTimeout(stampTm); stampTm = null } }
+function clearStamp() {
+  if (stampTm) { clearTimeout(stampTm); stampTm = null }
+  if (stampRes) { const f = stampRes; stampRes = null; f() }
+}
 function drawChk(el) {
   const p = el.querySelector('svg path'); if (!p) return;
   let L; try { L = p.getTotalLength() } catch (e) { return }
   p.style.strokeDasharray = L; p.style.strokeDashoffset = L; p.classList.add('drw');
   requestAnimationFrame(() => { p.style.strokeDashoffset = '0' });
 }
-function playStamp(i, big) {
+const stampImg = () => !!biz.stamp_url && (biz.stamp_url.startsWith('http') || biz.stamp_url.startsWith('data:'));
+const stampFace = () => stampImg() ? `<img src="${esc(biz.stamp_url)}" alt="stamp" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : IC.chk;
+const cntHtml = (s, need) => Math.min(s, need) + ' of ' + need + ' Stamps' + (s < need ? '<small>' + (need - s) + ' to go</small>' : '');
+function updHero(s) {
+  const need = +biz.need, c = document.querySelector('.c-count'), p = document.querySelector('.c-hero .prog i');
+  if (c) { c.innerHTML = cntHtml(s, need); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump') }
+  if (p) p.style.width = Math.min(100, s / need * 100) + '%';
+}
+// Fills slot i (if it is still empty), drops the stamp on it and resolves when the whole effect has finished.
+// It starts on the very next frame: all the waiting is done before this runs.
+function playStamp(i, big, to) {
   clearStamp();
-  const el = document.querySelectorAll('.grid .st.f')[i];
-  if (!el) return;
-  el.scrollIntoView({ block: 'center', behavior: scrOn() ? 'smooth' : 'auto' });
-  const step = (fn, ms) => { stampTm = setTimeout(() => { stampTm = null; if (!el.isConnected) return; fn() }, ms) };
-  step(() => el.classList.add('press'), 150);
-  el.addEventListener('animationend', e => {
-    if (e.animationName != 'pressDrop' || !el.isConnected) return;
-    el.classList.add('hit');
-    const card = el.closest('#app > .card'); if (card) card.classList.add('thud');
-    buzz(big ? [40, 60, 40, 60, 90] : 30);           // buzz() is the gesture-safe haptic path (queued until a tap on NFC opens)
-    drawChk(el);
-    const r = el.getBoundingClientRect(), vw = window.innerWidth || 360, vh = window.innerHeight || 640;
-    burst({ x: (r.left + r.width / 2) / vw, y: (r.top + r.height / 2) / vh }, big);
-    step(() => { el.classList.remove('press', 'hit'); if (card) card.classList.remove('thud') }, 760);
+  return new Promise(done => {
+    const el = document.querySelectorAll('.grid .st')[i];
+    if (!el) return done();
+    const r0 = el.getBoundingClientRect(), vh = window.innerHeight || 640;
+    if (r0.top < 80 || r0.bottom > vh - 120) el.scrollIntoView({ block: 'center' });
+    if (!el.classList.contains('f')) { el.classList.remove('next'); el.classList.add('f'); el.innerHTML = stampFace() }
+    const card = el.closest('#app > .card');
+    let hit = false;
+    stampRes = done;
+    const onHit = () => {
+      if (hit || !el.isConnected) return; hit = true;
+      el.classList.add('hit');
+      if (card) card.classList.add('thud');
+      buzz(big ? [40, 60, 40, 60, 90] : 30);           // buzz() is the gesture-safe haptic path (queued until a tap on NFC opens)
+      drawChk(el);
+      if (to != null) updHero(to);
+      const r = el.getBoundingClientRect(), vw = window.innerWidth || 360;
+      burst({ x: (r.left + r.width / 2) / vw, y: (r.top + r.height / 2) / vh }, big);
+      stampTm = setTimeout(() => {
+        stampTm = null; stampRes = null;
+        el.classList.remove('press', 'hit'); if (card) card.classList.remove('thud');
+        done();
+      }, 620);
+    };
+    el.addEventListener('animationend', e => { if (e.animationName == 'pressDrop') onHit() });
+    requestAnimationFrame(() => {
+      if (!el.isConnected) return done();
+      el.classList.add('press');
+      stampTm = setTimeout(onHit, 700);                // safety net if the browser never reports animationend
+    });
   });
 }
 
@@ -116,7 +147,6 @@ const scrMem = new Set();
 const scrDone = id => { if (scrMem.has(id)) return true; try { return localStorage.getItem('lk-scr-' + id) == '1' } catch (e) { return false } };
 const scrOn = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
 const scrLocked = x => scrOn() && x.type == 'Surprise' && !scrDone(x.id);
-let prevPct = 0;
 
 
 function scrV(x, more) {
@@ -301,7 +331,7 @@ function goTo(p) { pg = p; view = 'home'; fx = true; render(); window.scrollTo(0
 
 
 function ctx() {
-  const m = card.member, need = +biz.need, s = m.stamps, ready = s >= need, of = card.offers || [];
+  const m = card.member, need = +biz.need, s = hold !== null ? hold : m.stamps, ready = s >= need, of = card.offers || [];
   const liveAll = of.filter(x => !x.used_at && !isExp(x)), past = of.filter(x => x.used_at || isExp(x));
   const locked = liveAll.filter(scrLocked), live = liveAll.filter(x => !scrLocked(x));
   return { m, need, s, ready, past, locked, live };
@@ -310,11 +340,11 @@ function ctx() {
 
 function heroV() {
   const { need, s } = ctx();
-  const pct = Math.min(100, s / need * 100), from = anim >= 0 ? prevPct : pct;
+  const pct = Math.min(100, s / need * 100);
   const slim = pg != 'home' || view == 'pw';
   return `<header class="c-hero${slim ? ' slim' : ''}"><div class="c-brand"><div class="c-logo">${mark(biz)}</div><div class="c-bt"><b>${esc(biz.name)}</b><span>${esc(biz.tagline)}</span></div></div>
-  <div class="c-count">${Math.min(s, need)} of ${need} Stamps${s < need ? '<small>' + (need - s) + ' to go</small>' : ''}</div>
-  <div class="prog"><i style="width:${from}%" data-to="${pct}"></i></div></header>`;
+  <div class="c-count">${cntHtml(s, need)}</div>
+  <div class="prog"><i style="width:${pct}%"></i></div></header>`;
 }
 
 
@@ -356,8 +386,7 @@ function homePgV() {
   const soon = live.filter(x => !isEarly(x) && x.expires_at && daysTo(x.expires_at) <= 3);
   const left = m.card_ends_at && !ready ? daysTo(m.card_ends_at) : null;
   const wait = m.last_stamp && biz.cooldown_min > 0 ? Math.ceil((new Date(m.last_stamp).getTime() + biz.cooldown_min * 6e4 - Date.now()) / 1000) : 0;
-  const img = biz.stamp_url && (biz.stamp_url.startsWith('http') || biz.stamp_url.startsWith('data:'));
-  let g = ''; for (let i = 0; i < need; i++) g += i < s ? `<div class="st f ${intro ? 'in' : ''}" style="--i:${i}">${img ? `<img src="${esc(biz.stamp_url)}" alt="stamp" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : IC.chk}</div>` : `<div class="st">${i + 1}</div>`;
+  let g = ''; for (let i = 0; i < need; i++) g += i < s ? `<div class="st f ${intro && hold === null ? 'in' : ''}" style="--i:${i}">${stampFace()}</div>` : `<div class="st${hold !== null && i == s ? ' next' : ''}">${i + 1}</div>`;
   let o = newsV() + `<div class="card"><div class="eyebrow">Hello, ${esc(m.name.split(' ')[0])}</div><div class="grid">${g}</div>
   <p class="rule">Collect ${need} stamps to earn <b>${esc(biz.reward)}</b>.</p>`;
   if (m.card_ends_at && !ready) o += `<p class="mut sm">${left <= 14 ? '<span class="expiry">Card ends in ' + Math.max(left, 0) + (left == 1 ? ' day' : ' days') + '</span> · finish it before ' + fd(m.card_ends_at) : 'Card valid until ' + fd(m.card_ends_at)}</p>`;
@@ -383,37 +412,72 @@ function offersPgV() {
 }
 
 
-// ---------- Menu: list view + bottom sheet ----------
-// menu: null (not asked yet) | 'loading' | 'err' | array of { id, title, description, price, image_url }.
-let menu = null;
+// ---------- Menu: category chips + list + bottom sheet ----------
+// menu: null (not asked yet) | 'loading' | 'err' | { categories: [{id,name}], items: [{ id, title, description, price, image_url, category_id }] }.
+let menu = null, mcat = 'all';
 const priceTxt = p => { p = String(p || '').trim(); return /^\d+([.,]\d+)?$/.test(p) ? '₹' + p : p };
 const dishImg = u => typeof u == 'string' && (u.startsWith('https://') || u.startsWith('data:image/')) ? u : '';
 async function loadMenu() {
-  if (!Array.isArray(menu)) menu = 'loading';
+  if (!menu || typeof menu == 'string') menu = 'loading';
   try {
-    const fresh = await rpc(sb, 'get_menu', { p_slug: CFG.slug });
+    const raw = await rpc(sb, 'get_menu', { p_slug: CFG.slug });
+    // Old database: get_menu returned a plain list of items. New one returns { categories, items }.
+    const fresh = Array.isArray(raw) ? { categories: [], items: raw } : { categories: (raw && raw.categories) || [], items: (raw && raw.items) || [] };
     if (JSON.stringify(fresh) != JSON.stringify(menu)) { menu = fresh; if (pg == 'menu' && card) render() }
-  } catch (e) { if (!Array.isArray(menu)) { menu = 'err'; if (pg == 'menu' && card) render() } }
+  } catch (e) { if (typeof menu == 'string') { menu = 'err'; if (pg == 'menu' && card) render() } }
+}
+// Only categories that have something to order are shown. Items without a category go under "Others".
+const mnInCat = c => menu.items.filter(i => i.category_id == c);
+const mnCats = () => menu.categories.filter(c => mnInCat(c.id).length);
+const mnLoose = () => menu.items.filter(i => !i.category_id || !menu.categories.some(c => c.id == i.category_id));
+const mnRow = x => { const im = dishImg(x.image_url); return `<li><button type="button" class="mn-row" onclick="openDish('${esc(x.id)}')" aria-haspopup="dialog">
+    <span class="mn-ph">${im ? `<img src="${esc(im)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}</span>
+    <span class="mn-tx"><b>${esc(x.title)}</b></span>${x.price ? `<span class="mn-pr">${esc(priceTxt(x.price))}</span>` : ''}</button></li>` };
+const mnList = L => `<ul class="mn-list">${L.map(mnRow).join('')}</ul>`;
+function mnItems() {
+  if (mcat == 'none') return mnLoose();
+  if (mcat != 'all') return mnInCat(mcat);
+  return menu.items;
+}
+function mnBody() {
+  const cats = mnCats();
+  if (!cats.length || mcat != 'all') return mnList(mnItems());
+  const sec = (n, L) => `<section class="mn-sec"><h3 class="mn-h">${esc(n)}<span>${L.length}</span></h3>${mnList(L)}</section>`;
+  const loose = mnLoose();
+  return cats.map(c => sec(c.name, mnInCat(c.id))).join('') + (loose.length ? sec('Others', loose) : '');
 }
 function menuPgV() {
   if (menu == null || menu == 'loading') return `<div class="card sk" aria-busy="true" aria-label="Loading menu"><i></i><i style="width:70%"></i><i></i><i style="width:55%"></i></div>`;
   if (menu == 'err') return `<div class="card"><h2>Menu</h2><p class="sub" style="margin:0">The menu could not be loaded. Check your connection and try again.</p><button class="btn alt" style="margin-top:14px" onclick="menu=null;loadMenu();render()">Try again</button></div>`;
-  if (!menu.length) return `<div class="card"><h2>Menu</h2><p class="sub" style="margin:0">The menu is not up yet. Check back soon.</p></div>`;
-  return `<div class="card mn"><div class="row2"><h2>Menu</h2><span class="pill">${menu.length}</span></div>
-  <ul class="mn-list">${menu.map((x, i) => { const im = dishImg(x.image_url); return `<li><button type="button" class="mn-row" onclick="openDish(${i})" aria-haspopup="dialog">
-    <span class="mn-ph">${im ? `<img src="${esc(im)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}</span>
-    <span class="mn-tx"><b>${esc(x.title)}</b></span>${x.price ? `<span class="mn-pr">${esc(priceTxt(x.price))}</span>` : ''}</button></li>`; }).join('')}</ul></div>`;
+  if (!menu.items.length) return `<div class="card"><h2>Menu</h2><p class="sub" style="margin:0">The menu is not up yet. Check back soon.</p></div>`;
+  const cats = mnCats(), loose = mnLoose();
+  if (mcat != 'all' && !(mcat == 'none' ? cats.length && loose.length : cats.some(c => c.id == mcat))) mcat = 'all';
+  const chip = (id, label) => `<button type="button" role="tab" aria-selected="${mcat == id}" class="mn-chip${mcat == id ? ' on' : ''}" data-c="${esc(id)}" onclick="setCat('${esc(id)}')">${esc(label)}</button>`;
+  const bar = cats.length ? `<div class="mn-bar"><div class="mn-chips" role="tablist" aria-label="Menu categories">${chip('all', 'All')}${cats.map(c => chip(c.id, c.name)).join('')}${loose.length ? chip('none', 'Others') : ''}</div></div>` : '';
+  return bar + `<div class="card mn"><div class="row2"><h2>Menu</h2><span class="pill" id="mn-n">${mnItems().length}</span></div><div id="mn-body">${mnBody()}</div></div>`;
+}
+// Switching a category updates the list in place, so the chip row keeps its scroll position and nothing flashes.
+function setCat(id) {
+  mcat = id;
+  document.querySelectorAll('.mn-chip').forEach(b => {
+    const on = b.dataset.c == id; b.classList.toggle('on', on); b.setAttribute('aria-selected', on);
+    if (on) { try { b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: scrOn() ? 'smooth' : 'auto' }) } catch (e) { } }
+  });
+  const el = document.getElementById('mn-body'); if (!el || !Array.isArray(menu.items)) return;
+  el.innerHTML = mnBody(); el.classList.remove('mn-in'); void el.offsetWidth; el.classList.add('mn-in');
+  const n = document.getElementById('mn-n'); if (n) n.textContent = mnItems().length;
+  const c = document.querySelector('.card.mn'); if (c && c.getBoundingClientRect().top < 56) window.scrollTo(0, window.scrollY + c.getBoundingClientRect().top - 64);
 }
 // The sheet lives outside #app so a re-render (realtime sync, stamp) never replays its animation or closes it.
-function openDish(i) {
-  const x = Array.isArray(menu) && menu[i]; if (!x) return;
+function openDish(id) {
+  const x = menu && menu.items && menu.items.find(i => i.id == id); if (!x) return;
   closeDish(true);
-  const im = dishImg(x.image_url), w = document.createElement('div');
+  const im = dishImg(x.image_url), w = document.createElement('div'), cat = (menu.categories.find(c => c.id == x.category_id) || {}).name;
   w.className = 'ms-wrap'; w.id = 'dish';
   w.innerHTML = `<div class="ms-bk"></div><div class="msheet" role="dialog" aria-modal="true" aria-label="${esc(x.title)}">
     <div class="ms-grab" aria-hidden="true"><i></i></div>
     ${im ? `<div class="ms-img"><img src="${esc(im)}" alt="${esc(x.title)}" decoding="async" onerror="this.parentNode.remove()"></div>` : ''}
-    <div class="ms-body"><div class="ms-top"><h2>${esc(x.title)}</h2>${x.price ? `<span class="ms-pr">${esc(priceTxt(x.price))}</span>` : ''}</div>
+    <div class="ms-body">${cat ? `<span class="ms-cat">${esc(cat)}</span>` : ''}<div class="ms-top"><h2>${esc(x.title)}</h2>${x.price ? `<span class="ms-pr">${esc(priceTxt(x.price))}</span>` : ''}</div>
     ${x.description ? `<p class="ms-ds">${esc(x.description)}</p>` : ''}
     <button type="button" class="btn alt ms-x">Close</button></div></div>`;
   document.body.appendChild(w); document.body.classList.add('modal-open');
@@ -448,9 +512,10 @@ function profilePgV() {
 }
 
 async function load({ withDaily = true } = {}) {
-  card = await rpc(sb, 'my_card', { p_slug: CFG.slug });
+  const [c, d] = await Promise.all([rpc(sb, 'my_card', { p_slug: CFG.slug }), withDaily ? dailyStatus() : Promise.resolve(undefined)]);
+  card = c;
   if (card && card.granted) sur = { t: 'Happy birthday', x: biz.bday_offer };
-  if (withDaily) daily = await dailyStatus();
+  if (withDaily) daily = d;
 }
 
 // Re-fetch the card and pop up a message if any coupon became "used" since last time.
@@ -506,27 +571,51 @@ async function ensureCard() {
   return !!card;
 }
 
-async function scan() {
+function explainStamp(r, err) {
+  if (err || !r) return toast(nice(err || 'Something went wrong. Please try again.'));
+  if (r.error == 'cooldown') showCooldown(r.wait);
+  else if (r.error == 'nomember') toast('No card found for this account. Please join first.');
+  else if (r.error == 'auth') toast('Please sign in again.');
+  else showInvalid();
+}
+
+// Tap -> ONE call (add_stamp now returns the fresh card) -> card appears with the old count -> the new stamp drops in.
+async function scan(again) {
   const t = pend; pend = null; sur = null; reward = null;
-  let got = false, full = false, surprise = false;
   closeModal(); clearStamp();
   try { history.replaceState(null, '', location.pathname + location.search) } catch (e) { }
+  let r = null, err = null;
+  try { r = await rpc(sb, 'add_stamp', { p_slug: CFG.slug, p_token: t }) } catch (e) { err = e }
+  if (r && r.error == 'nomember' && !again) {
+    // signed in, but the join was cut off: finish it from the sign-up details, then stamp
+    try { if (await ensureCard()) { pend = t; return scan(true) } } catch (e) { err = e }
+  }
+  await landStamp(r, err);
+}
+
+async function landStamp(r, err) {
+  let prev = null, big = false;
   try {
-    const r = await rpc(sb, 'add_stamp', { p_slug: CFG.slug, p_token: t });
-    if (r.ok) {
-      if (r.surprise) { sur = { t: 'Surprise unlocked', x: r.surprise, scratch: scrOn() }; surprise = true }
-      await load();
-      anim = Math.min(card.member.stamps, +biz.need) - 1;
-      full = card.member.stamps >= +biz.need;
-      got = true;
+    if (err || !r || !r.ok) { explainStamp(r, err) }
+    else {
+      sur = r.surprise ? { t: 'Surprise unlocked', x: r.surprise, scratch: scrOn() } : null;
+      if (r.card) { card = r.card; card.lost = r.lost || 0; if (card.granted) sur = { t: 'Happy birthday', x: biz.bday_offer } }
+      else await load({ withDaily: false });           // database not updated yet: fall back to the old extra call
+      markUsed();
+      const need = +biz.need, s = card.member.stamps;
+      prev = r.lost > 0 ? 0 : s - 1;
+      big = s >= need || !!r.surprise;
       pg = 'home'; view = 'home';
-    } else if (r.error == 'cooldown') showCooldown(r.wait);
-    else if (r.error == 'nomember') toast('No card found for this account. Please join first.');
-    else if (r.error == 'auth') toast('Please sign in again.');
-    else showInvalid();
+      if (!daily) dailyStatus().then(d => { daily = d; if (hold === null && card && pg == 'home' && view == 'home') render() });
+    }
   } catch (e) { toast(nice(e)) }
+  if (prev === null) { if (!card) { try { await ensureCard() } catch (e) { } } render(); return }
+  const need = +biz.need;
+  if (prev >= need) { render(); buzz(); toast('Stamp added. Your card is full: claim your reward below.'); return }
+  hold = prev;
   render();
-  if (got) playStamp(anim, full || surprise);
+  try { await playStamp(prev, big, card.member.stamps) } finally { hold = null }
+  render();
 }
 
 async function reg(btn) {
@@ -547,11 +636,10 @@ async function reg(btn) {
       markUsed();
       const w = card.offers.find(o => o.type == 'Welcome');
       if (w && !sur) sur = { t: 'Welcome gift', x: w.text };
-      if (card.member.stamps > 0) anim = Math.min(card.member.stamps, +biz.need) - 1;
     }
     try { localStorage.setItem('lk-seen', '1') } catch (e) { }
     view = 'home'; form = 'new';
-    let a = anim;
+    let a = card && card.member.stamps > 0 ? Math.min(card.member.stamps, +biz.need) - 1 : -1;
     if (pend && biz.join_stamp) {
       // The NFC tap WAS the join stamp: don't scan again, so a new member ends with exactly one stamp.
       pend = null;
@@ -560,10 +648,15 @@ async function reg(btn) {
       // No free join stamp: the tag's tap itself adds the first stamp below.
       a = -1;
     }
-    render();
-    if (pend) await scan();
-    else if (a >= 0) playStamp(a, card.member.stamps >= +biz.need);
-    else { confetti(); buzz() }
+    if (!pend && a >= 0) {
+      hold = a; render();
+      try { await playStamp(a, card.member.stamps >= +biz.need, card.member.stamps) } finally { hold = null }
+      render();
+    } else {
+      render();
+      if (pend) await scan();
+      else { confetti(); buzz() }
+    }
   } catch (e) {
     const msg = String((e && e.message) || e);
     // signUp may have worked while join failed on a rule: remove the half-made login so they can retry
@@ -734,7 +827,7 @@ function render() {
     const app = $('#app');
     y = window.scrollY;
     if (wasCard !== !!card) { fx = true; wasCard = !!card }
-    app.className = (card ? 'has-nav' : '') + (fx ? ' fx' : '');
+    app.className = (card ? 'has-nav' : '') + (fx && hold === null ? ' fx' : '');
     keep = scratching ? document.getElementById('daily-scr') : null;
     fx = false;
     clearStamp();   // a re-render replaces the slots mid-animation: drop any pending stamp timers
@@ -751,10 +844,7 @@ function render() {
   if (card) {
     initScratch();
     initDailyScr();
-    const p = $('.prog i');
-    if (p) { const to = +p.dataset.to; requestAnimationFrame(() => requestAnimationFrame(() => { p.style.width = to + '%' })); prevPct = to }
   }
-  if (anim >= 0) setTimeout(() => anim = -1, 900);
   if (pop && !pop.fired) { pop.fired = true; confetti() }
   if (y) window.scrollTo(0, y);
 }
@@ -772,7 +862,7 @@ addEventListener('hashchange', () => {
 });
 // Coming back to the page (e.g. after staff taps the tag, or a day later) shows fresh stamps and offers.
 document.addEventListener('visibilitychange', async () => {
-  if (document.hidden || !card || view != 'home' || pend) return;
+  if (document.hidden || !card || view != 'home' || pend || hold !== null) return;
   try {
     const before = JSON.stringify(card);
     await load();
@@ -780,6 +870,19 @@ document.addEventListener('visibilitychange', async () => {
     if (JSON.stringify(card) !== before && !document.querySelector('.scr-cv:not(.gone)')) render();
   } catch (e) { }
 });
+
+// ---------- First paint ----------
+// The last visit's branding is kept on the phone, so the page shows the brand colours and a card-shaped placeholder
+// the instant it opens (an NFC tap otherwise stares at a blank page while the network wakes up).
+const bizKey = () => 'lk-biz-' + CFG.slug;
+function readBiz() { try { const j = JSON.parse(localStorage.getItem(bizKey()) || 'null'); return j && j.name ? j : null } catch (e) { return null } }
+function writeBiz(b) { try { const t = JSON.stringify(b); if (localStorage.getItem(bizKey()) !== t) localStorage.setItem(bizKey(), t) } catch (e) { } }
+function skelV() {
+  const need = biz && +biz.need > 1 ? +biz.need : 8;
+  const hero = biz ? `<header class="c-hero"><div class="c-brand"><div class="c-logo">${mark(biz)}</div><div class="c-bt"><b>${esc(biz.name)}</b><span>${esc(biz.tagline)}</span></div></div><div class="c-count">&nbsp;</div><div class="prog"><i style="width:0"></i></div></header>` : '';
+  let g = ''; for (let i = 0; i < need; i++) g += '<div class="st shim"></div>';
+  return hero + `<div class="card" aria-busy="true" aria-label="Opening your card"><div class="eyebrow">&nbsp;</div><div class="grid">${g}</div></div>`;
+}
 
 (async () => {
   // Ask for durable storage so the browser does not evict the saved login.
@@ -789,21 +892,45 @@ document.addEventListener('visibilitychange', async () => {
     const m = location.hash.match(/scan=([\w-]+)/); if (m) pend = m[1];
     const jm = location.hash.match(/join=([\w-]+)/);
     try { if (jm) sessionStorage.setItem('lk-join', jm[1]); joinTok = jm ? jm[1] : sessionStorage.getItem('lk-join') } catch (e) { joinTok = jm ? jm[1] : null }
-    biz = await rpc(sb, 'get_business', { p_slug: CFG.slug });
+    const cached = readBiz();
+    if (cached) { biz = cached; brand(biz) }
+    $('#app').innerHTML = skelV();
+
+    // Start everything that does not depend on anything else at the same moment.
+    const bizP = rpc(sb, 'get_business', { p_slug: CFG.slug });
+    const pubP = rpc(sb, 'daily_public', { p_slug: CFG.slug }).then(x => !!x, () => false);
+    const { data: { session } } = await sb.auth.getSession();   // read from the phone: no network
+    // A tap from the stamp tag: ask for the stamp right away. It needs only the login, not the branding.
+    let tok = null, stampP = null;
+    if (session && pend) { tok = pend; pend = null; stampP = rpc(sb, 'add_stamp', { p_slug: CFG.slug, p_token: tok }).then(r => ({ r }), e => ({ e })) }
+
+    biz = await bizP;
     if (!biz) { $('#app').innerHTML = '<div class="card"><h2>Not found</h2><p class="sub">This business is not set up yet.</p></div>'; return }
-    brand(biz); pwa();
-    try { dailyPub = !!(await rpc(sb, 'daily_public', { p_slug: CFG.slug })) } catch (e) { dailyPub = false }
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) {
-      let noCard = false, err = null;
-      try { noCard = !(await ensureCard()) } catch (e) { err = e }   // only a clean "my_card returned no card" may sign out
-      if (err) throw err;                                            // network/server error: show it and keep the session
-      if (noCard) await sb.auth.signOut();
+    writeBiz(biz); brand(biz); setTimeout(pwa, 800);
+    try { if (stampImg()) { const im = new Image(); im.src = biz.stamp_url } } catch (e) { }   // ready before the stamp drops
+    dailyPub = await pubP;
+
+    const x = stampP ? await stampP : null;
+    if (x && x.r && x.r.ok) {
+      try { history.replaceState(null, '', location.pathname + location.search) } catch (e) { }
+      await landStamp(x.r, null);
+    } else {
+      if (session) {
+        let noCard = false, err = null;
+        try { noCard = !(await ensureCard()) } catch (e) { err = e }   // only a clean "my_card returned no card" may sign out
+        if (err) throw err;                                            // network/server error: show it and keep the session
+        if (noCard) await sb.auth.signOut();
+      }
+      if (!card && pend && !joinTok) joinTok = pend;   // the NFC tag can also open the sign-up form
+      if (!card && lkSeen()) form = 'in';              // returning members land on the Login tab
+      if (!card && !introSeen()) introShow = true;
+      render();
+      if (x) {
+        try { history.replaceState(null, '', location.pathname + location.search) } catch (e) { }
+        if (card && x.r && x.r.error == 'nomember') { pend = tok; await scan(true) }
+        else explainStamp(x.r, x.e);
+      } else if (card && pend) await scan();
     }
-    if (!card && pend && !joinTok) joinTok = pend;   // the NFC tag can also open the sign-up form
-    if (!card && lkSeen()) form = 'in';              // returning members land on the Login tab
-    if (!card && !introSeen()) introShow = true;
-    render();
-    if (card && pend) await scan();
-  } catch (e) { $('#app').innerHTML = `<div class="card"><h2>Something went wrong</h2><p class="sub">${esc(nice(e))}</p></div>` }
+    if (card) setTimeout(loadMenu, 1500);              // so the Menu tab opens already filled
+  } catch (e) { $('#app').innerHTML = `<div class="card"><h2>Something went wrong</h2><p class="sub">${esc(nice(e))}</p><button class="btn" onclick="location.reload()">Try again</button></div>` }
 })();
