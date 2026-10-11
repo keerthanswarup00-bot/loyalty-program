@@ -69,8 +69,8 @@ async function load() {
       brand(biz); document.title = 'Owner dashboard · ' + biz.name;
       M = await pages(() => sb.from('members').select('*,offers(id,type,text,code,valid_from,used_at,expires_at,created_at)').eq('business_id', biz.id).order('joined', { ascending: false }).order('id'));
       const mr = await sb.from('messages').select('member_id,created_at,returned_at').eq('business_id', biz.id).order('created_at', { ascending: false }).limit(1000);
-      if (mr.error) throw mr.error;
-      MSG = mr.data;
+      MSG = mr.error ? [] : mr.data;   // win-back table may not exist until 2026-10-08-winback.sql is run
+      if (biz.lapsed_days == null) biz.lapsed_days = 10;
       try {
         const since = new Date(Date.now() - 14 * 864e5).toISOString();
         V = (await pages(() => sb.from('visits').select('id,created_at').eq('business_id', biz.id).gte('created_at', since).order('id'))).map(x => x.created_at);
