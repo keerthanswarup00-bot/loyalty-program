@@ -1,4 +1,5 @@
--- Remove the reference to the non-existent "messages" table. Stamps were failing for everyone.create or replace function public._do_stamp(p_member uuid) returns json
+-- Remove the reference to the non-existent "messages" table. Stamps were failing for everyone.
+create or replace function public._do_stamp(p_member uuid) returns json
 language plpgsql security definer set search_path = public as $$
 declare b businesses; m members; pos int; surprise text := null; lost int; need_visits int;
 begin
