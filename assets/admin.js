@@ -425,8 +425,8 @@ async function bCopyImg() {
 }
 function bsendV() {
   const n = bto().length, ok = n > 0 && bmsg.trim();
-  return `<h2>Send</h2><p class="sub">${n} recipient${n == 1 ? '' : 's'}. WhatsApp only lets you send one chat at a time from a web page, so this goes through your customers quickly: open the chat, press send in WhatsApp, come back, next.</p>
-  <button class="btn" ${ok ? '' : 'disabled'} onclick="bStart()">Start sending to ${n}</button>
+  return `<h2>Prepare messages</h2><p class="sub">${n} recipient${n == 1 ? '' : 's'}. This opens each WhatsApp chat with a message ready to review. You must press Send in WhatsApp; opening a chat does not confirm delivery.</p>
+  <button class="btn" ${ok ? '' : 'disabled'} onclick="bStart()">Prepare messages for ${n}</button>
   <div class="row" style="margin-top:14px"><button class="btn sm alt" ${n ? '' : 'disabled'} onclick="bVcf()">Download contacts (.vcf)</button><button class="btn sm alt" ${n ? '' : 'disabled'} onclick="bCopyNums()">Copy numbers</button>${bfile ? `${canShareImg() ? '<button class="btn sm alt" onclick="bShare()">Share image…</button>' : ''}<button class="btn sm alt" onclick="bCopyImg()">Copy image</button>` : ''}</div>
   <p class="hint">Sending one image to everyone at once: download the contacts, import them on your phone, then create a WhatsApp Broadcast list with them. Each person gets it as a normal message. Image links pasted in the message also show a preview.</p>`;
 }
@@ -453,7 +453,7 @@ function bStart() {
   if (!bmsg.trim()) return toast('Write a message first');
   const ids = bto().map(u => u.id);
   if (!ids.length) return toast('Select at least one customer');
-  bq = { ids, i: 0, opened: false, sent: 0 }; render(); window.scrollTo({ top: 0 });
+  bq = { ids, i: 0, opened: false, openedCount: 0, sent: 0, skipped: 0 }; render(); window.scrollTo({ top: 0 });
 }
 function queueV() {
   const U = bq.ids.map(id => M.find(u => u.id == id)).filter(Boolean), n = U.length, u = U[bq.i];
@@ -461,21 +461,26 @@ function queueV() {
   return `<div class="a-card"><div class="row2"><h2>Customer ${bq.i + 1} of ${n}</h2><button class="lnk" onclick="bStop()">Stop</button></div>
   <div class="prog"><i style="width:${bq.i / n * 100}%"></i></div>
   <div class="rw"><small>To</small><b>${esc(u.name)}</b><span class="mut">${esc(u.phone)}</span></div>
-  <div class="lb" style="margin-top:16px">Message</div><div class="bubble">${esc(bText(u))}</div>
+  <div class="lb" style="margin-top:16px">Message to review</div><div class="bubble">${esc(bText(u))}</div>
   ${bq.opened
-      ? `<button class="btn" onclick="bNext()">${bq.i + 1 < n ? 'Sent. Next customer' : 'Sent. Finish'}</button><button class="btn alt" onclick="bOpen()">Open this chat again</button>`
-      : `<button class="btn" data-go onclick="bOpen()">Open WhatsApp chat</button><button class="btn alt" onclick="bNext()">Skip this customer</button>`}
-  <p class="hint">The message is already typed in WhatsApp. Press send there, then come back to this page.</p></div>`;
+      ? `<p class="hint">WhatsApp chat opened. Confirm below only after you press Send in WhatsApp.</p><button class="btn" onclick="bNext(true)">I sent it — next customer</button><button class="btn alt" onclick="bNext(false)">Not sent — next customer</button><button class="lnk" onclick="bOpen()">Open this chat again</button>`
+      : `<button class="btn" data-go onclick="bOpen()">Open WhatsApp chat</button><button class="btn alt" onclick="bNext(false)">Skip — not sent</button>`}
+  <p class="hint">The message is only prepared here. WhatsApp handles sending; this dashboard cannot verify delivery.</p></div>`;
 }
 function bOpen() {
   const u = bq.ids.map(id => M.find(x => x.id == id)).filter(Boolean)[bq.i]; if (!u) return;
   window.open(waLink(u.phone, bText(u)), '_blank', 'noopener');
-  if (!bq.opened) bq.sent++;
+  if (!bq.opened) bq.openedCount++;
   bq.opened = true; render();
 }
-function bNext() {
+function bNext(confirmedSent) {
+  if (bq.opened && confirmedSent) bq.sent++;
+  else bq.skipped++;
   bq.i++; bq.opened = false;
-  if (bq.i >= bq.ids.length) { toast('Done. You opened ' + bq.sent + (bq.sent == 1 ? ' chat.' : ' chats.')); bq = null; burst() }
+  if (bq.i >= bq.ids.length) {
+    const summary = 'Finished. Confirmed sent: ' + bq.sent + '. Chats opened: ' + bq.openedCount + '. Not confirmed sent: ' + bq.skipped + '.';
+    toast(summary); bq = null; burst();
+  }
   render(); window.scrollTo({ top: 0 });
 }
 function bStop() { bq = null; render() }

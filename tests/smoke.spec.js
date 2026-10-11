@@ -98,6 +98,15 @@ test.describe('Royalty Program smoke tests', () => {
     const rewardCode = (await code.innerText()).trim();
     expect(rewardCode).toMatch(/^[A-Z0-9]{6}$/);
 
+    // Reward-code copy must be usable without a pointer.
+    await code.focus();
+    await expect(code).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#t')).toContainText(/Code copied|Press and hold to copy/);
+    await code.focus();
+    await page.keyboard.press('Space');
+    await expect(page.locator('#t')).toContainText(/Code copied|Press and hold to copy/);
+
     // Use a second browser context for the owner so customer and owner sessions are isolated.
     const adminContext = await browser.newContext();
     const admin = await adminContext.newPage();

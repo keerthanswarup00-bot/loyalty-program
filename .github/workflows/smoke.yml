@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
@@ -48,8 +50,32 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run smoke tests
+        id: smoke
         if: env.SMOKE_BASE_URL != ''
         run: npm run test:smoke
+
+      - name: Report end-to-end test coverage
+        if: always()
+        shell: bash
+        run: |
+          if [[ -z "$SMOKE_BASE_URL" ]]; then
+            {
+              echo "## End-to-end browser tests: NOT RUN"
+              echo "JavaScript syntax checks ran, but live customer/admin flows were skipped because the SMOKE_BASE_URL repository secret is not configured. This run is not a full end-to-end pass."
+              echo "Configure the dedicated smoke business secrets to enable Playwright tests."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=End-to-end tests not run::Syntax checks passed, but browser smoke tests were skipped because SMOKE_BASE_URL is unset."
+          elif [[ "${{ steps.smoke.outcome }}" == "success" ]]; then
+            {
+              echo "## End-to-end browser tests: PASSED"
+              echo "Playwright smoke tests ran against the configured dedicated smoke business."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## End-to-end browser tests: FAILED OR INCOMPLETE"
+              echo "Review the Playwright smoke-test step and report artifact."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload Playwright report
         if: always() && env.SMOKE_BASE_URL != ''

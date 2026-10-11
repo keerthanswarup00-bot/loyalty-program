@@ -46,7 +46,22 @@ function closeModal() {
   if (mdlPrev && mdlPrev.focus) { try { mdlPrev.focus() } catch (e) { } }
   mdlPrev = null;
 }
-document.addEventListener('keydown', e => { const r = $('#modal'); if (e.key == 'Escape' && r && r.innerHTML) { e.preventDefault(); closeModal() } }, true);
+function trapTab(e, dialog) {
+  if (e.key !== 'Tab' || !dialog) return;
+  const items = Array.from(dialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+    .filter(el => !el.hidden && el.getAttribute('aria-hidden') !== 'true');
+  if (!items.length) { e.preventDefault(); dialog.setAttribute('tabindex', '-1'); dialog.focus(); return; }
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
+}
+document.addEventListener('keydown', e => {
+  const code = e.target && e.target.closest && e.target.closest('.code[role="button"]');
+  if (code && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); code.click(); return; }
+  const r = $('#modal'), dialog = r && r.querySelector('[role="dialog"]');
+  if (e.key === 'Escape' && r && r.innerHTML) { e.preventDefault(); closeModal(); return; }
+  if (dialog) trapTab(e, dialog);
+}, true);
 function showCooldown(wait) {
   const tot = Math.max(0, Math.ceil(Number(wait) || 0));
   const end = Date.now() + tot * 1000, C = 2 * Math.PI * 52;
@@ -407,8 +422,10 @@ function menuPgV() {
 // The sheet lives outside #app so a re-render (realtime sync, stamp) never replays its animation or closes it.
 function openDish(i) {
   const x = Array.isArray(menu) && menu[i]; if (!x) return;
+  const returnFocus = document.activeElement;
   closeDish(true);
   const im = dishImg(x.image_url), w = document.createElement('div');
+  w._returnFocus = returnFocus;
   w.className = 'ms-wrap'; w.id = 'dish';
   w.innerHTML = `<div class="ms-bk"></div><div class="msheet" role="dialog" aria-modal="true" aria-label="${esc(x.title)}">
     <div class="ms-grab" aria-hidden="true"><i></i></div>
@@ -425,14 +442,15 @@ function openDish(i) {
   gr.addEventListener('pointermove', e => { if (y0 == null) return; dy = Math.max(0, e.clientY - y0); sh.style.transform = 'translateY(' + dy + 'px)' });
   const end = () => { if (y0 == null) return; y0 = null; sh.style.transition = ''; if (dy > 90) close(); else sh.style.transform = '' };
   gr.addEventListener('pointerup', end); gr.addEventListener('pointercancel', end);
-  w._k = e => { if (e.key == 'Escape') close() }; document.addEventListener('keydown', w._k);
+  w._k = e => { if (e.key === 'Escape') { e.preventDefault(); close(); } else trapTab(e, sh); }; document.addEventListener('keydown', w._k);
   setTimeout(() => { try { w.querySelector('.ms-x').focus({ preventScroll: true }) } catch (_) { } }, 280);
 }
 function closeDish(now) {
   const w = document.getElementById('dish'); if (!w) return;
   document.removeEventListener('keydown', w._k); document.body.classList.remove('modal-open');
-  if (now || matchMedia('(prefers-reduced-motion: reduce)').matches) return w.remove();
-  w.classList.add('out'); setTimeout(() => w.remove(), 220);
+  const restoreFocus = () => { const target = w._returnFocus; w.remove(); if (target && target.isConnected && typeof target.focus === 'function') { try { target.focus({ preventScroll: true }) } catch (_) { target.focus() } } };
+  if (now || matchMedia('(prefers-reduced-motion: reduce)').matches) return restoreFocus();
+  w.classList.add('out'); setTimeout(restoreFocus, 220);
 }
 
 
