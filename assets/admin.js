@@ -539,7 +539,7 @@ function editorV() {
 // ---------- images ----------
 // Images live in the public Supabase Storage bucket "brand" (folder = business id). If the bucket is not set up yet
 // (schema.sql not re-run), small images fall back to being stored inside the database as before.
-const IMG_OK = /^image\/(png|jpeg|webp|gif)$/i, EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
+const IMG_OK = /^image\/(png|jpeg|webp|gif)$/i, MENU_IMG_OK = /^image\/(png|jpeg|webp)$/i, EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
 const toDataUrl = file => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject('read'); r.readAsDataURL(file) });
 const inBucket = u => typeof u == 'string' && u.includes('/storage/v1/object/public/brand/' + biz.id + '/');
 async function dropOld(u) {
@@ -547,12 +547,21 @@ async function dropOld(u) {
   try { await sb.storage.from('brand').remove([decodeURIComponent(u.split('/brand/')[1].split('?')[0])]) } catch (e) { }
 }
 async function readImg(file, kind) {
-  if (!IMG_OK.test(file.type || '')) throw 'type';
+  const allowed = kind == 'menu' ? MENU_IMG_OK : IMG_OK;
+  if (!allowed.test(file.type || '')) throw 'type';
+  if (!file.size || file.size > 5e6) throw 'too big';
+  // Decode before upload: MIME labels alone can be spoofed by a renamed file.
+  let bitmap;
+  try { bitmap = await createImageBitmap(file); } catch (_) { throw 'invalid image'; }
+  if (!bitmap.width || !bitmap.height || bitmap.width > 6000 || bitmap.height > 6000 || bitmap.width * bitmap.height > 20000000) { bitmap.close(); throw 'dimensions'; }
+  bitmap.close();
   file = await shrink(file);
   if (file.size > 2e6) throw 'too big';
   const path = biz.id + '/' + kind + '-' + Date.now().toString(36) + '.' + EXT[file.type.toLowerCase()];
   const { error } = await sb.storage.from('brand').upload(path, file, { contentType: file.type, cacheControl: '31536000' });
   if (!error) return sb.storage.from('brand').getPublicUrl(path).data.publicUrl;
+  // Menu images must be stored in the trusted bucket; never fall back to data: URLs.
+  if (kind == 'menu') throw 'no bucket';
   if (file.size > 300000) throw 'no bucket';
   return toDataUrl(file);
 }
@@ -591,7 +600,7 @@ function pvImg(fid, pvid, hid) {
   $('#' + hid).value = '0';
 }
 function rmImg(hid, pvid) { $('#' + hid).value = '1'; const p = $('#' + pvid); p.hidden = true; p.innerHTML = '' }
-const imgErr = e => toast(e == 'too big' ? 'Image too big (max 2 MB)' : e == 'no bucket' ? 'Storage is not set up yet: run the latest supabase/schema.sql, or use an image under 300 KB' : e == 'type' ? 'Use a PNG, JPG, WebP or GIF image' : 'Could not read that image');
+const imgErr = e => toast(e == 'too big' ? 'Choose an image under 5 MB (2 MB after optimization)' : e == 'no bucket' ? 'Menu photos must upload to the Supabase brand storage bucket. Set up storage before saving.' : e == 'type' ? 'Menu photos must be PNG, JPG or WebP. GIF is not supported.' : e == 'dimensions' ? 'Image dimensions are too large (maximum 6000 × 6000, 20 megapixels).' : 'Could not read a valid image file');
 
 // ---------- saving ----------
 async function save(patch, btn, after) {
