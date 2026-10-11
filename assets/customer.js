@@ -422,8 +422,8 @@ function menuPgV() {
 // The sheet lives outside #app so a re-render (realtime sync, stamp) never replays its animation or closes it.
 function openDish(i) {
   const x = Array.isArray(menu) && menu[i]; if (!x) return;
-  closeDish(true);
   const returnFocus = document.activeElement;
+  closeDish(true);
   const im = dishImg(x.image_url), w = document.createElement('div');
   w._returnFocus = returnFocus;
   w.className = 'ms-wrap'; w.id = 'dish';
