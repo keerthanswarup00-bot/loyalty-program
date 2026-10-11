@@ -1,15 +1,17 @@
-name: Royalty Program smoke tests
+name: Innondu CI and smoke tests
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  smoke:
-    if: ${{ secrets.SMOKE_BASE_URL != '' }}
+  checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       SMOKE_BASE_URL: ${{ secrets.SMOKE_BASE_URL }}
       SMOKE_ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
@@ -20,6 +22,7 @@ jobs:
       SMOKE_PHONE_PREFIX: ${{ secrets.SMOKE_PHONE_PREFIX }}
       SMOKE_DAILY_ENABLED: ${{ secrets.SMOKE_DAILY_ENABLED }}
       SMOKE_STAMP_COUNT: ${{ secrets.SMOKE_STAMP_COUNT }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,21 +31,30 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: package.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
 
       - name: Validate JavaScript syntax
         run: npm run check:js
 
+      - name: Explain skipped smoke tests
+        if: env.SMOKE_BASE_URL == ''
+        run: |
+          echo "::notice title=Smoke tests skipped::Set the SMOKE_BASE_URL repository secret to enable the live Playwright smoke tests. JavaScript syntax validation still ran."
+
       - name: Install Chromium
+        if: env.SMOKE_BASE_URL != ''
         run: npx playwright install --with-deps chromium
 
       - name: Run smoke tests
+        if: env.SMOKE_BASE_URL != ''
         run: npm run test:smoke
 
       - name: Upload Playwright report
-        if: always()
+        if: always() && env.SMOKE_BASE_URL != ''
         uses: actions/upload-artifact@v4
         with:
           name: playwright-smoke-report
