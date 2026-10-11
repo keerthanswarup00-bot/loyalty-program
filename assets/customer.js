@@ -293,11 +293,11 @@ let pg = 'home', nfcRd = null;
 const NI = {
   home: ico('<path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>'),
   gift: ico('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2 0-4-1-4-3s3-2.5 4 3c1-5.5 4-5 4-3s-2 3-4 3"/>'),
-  star: ico('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'),
+  menu: ico('<path d="M7 3v7a2 2 0 0 0 2 2v9M11 3v7a2 2 0 0 1-2 2M9 3v6M17 21V3c-2.2 1.2-3.5 3.6-3.5 6.5 0 2 1.2 3.5 3.5 3.5"/>'),
   user: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>'),
   tap: ico('<path d="M7 9a6 6 0 0 1 0 6M11 6.5a10 10 0 0 1 0 11M15 4a14 14 0 0 1 0 16"/>')
 };
-function goTo(p) { pg = p; view = 'home'; fx = true; render(); window.scrollTo(0, 0) }
+function goTo(p) { pg = p; view = 'home'; fx = true; render(); window.scrollTo(0, 0); if (p == 'menu') loadMenu() }
 
 
 function ctx() {
@@ -323,7 +323,7 @@ function navV() {
   const t = (id, lab, ic, badge) => `<button type="button" class="t${cur == id ? ' on' : ''}" onclick="goTo('${id}')">${ic}<span>${lab}</span>${badge ? `<i class="bd">${badge}</i>` : ''}</button>`;
   return `<nav class="c-nav"><div>${t('home', 'Home', NI.home)}${t('offers', 'Offers', NI.gift, n)}
   <button type="button" class="go" aria-label="Collect a stamp" onclick="tapStamp()">${NI.tap}</button>
-  ${t('rewards', 'Rewards', NI.star)}${t('profile', 'Profile', NI.user)}</div></nav>`;
+  ${t('menu', 'Menu', NI.menu)}${t('profile', 'Profile', NI.user)}</div></nav>`;
 }
 
 
@@ -383,13 +383,56 @@ function offersPgV() {
 }
 
 
-function rewardsPgV() {
-  const { m, need, s, ready } = ctx();
-  let o = `<div class="card"><div class="row2"><h2>${esc(biz.reward)}</h2><span class="st-chip${ready ? ' ok' : ''}">${ready ? 'Achieved' : (need - s) + ' to go'}</span></div>
-  <p class="sub">Collect ${need} stamps to earn this reward.${m.redeemed ? ' You have earned it ' + m.redeemed + (m.redeemed == 1 ? ' time.' : ' times.') : ''}</p>`;
-  if (reward) o += `<div class="rw"><small>Show this code to staff</small><div class="code" role="button" tabindex="0" onclick="copyText('${esc(reward)}','Code copied')">${esc(reward)}</div><span class="mut">Tap the code to copy it. It is also saved in Offers.</span></div>`;
-  if (ready) o += `<button class="btn" onclick="claim()">Get my reward code</button>`;
-  return o + '</div>' + (refV() || '<div class="card"><p class="sub" style="margin:0">More ways to earn rewards are coming soon.</p></div>');
+// ---------- Menu: list view + bottom sheet ----------
+// menu: null (not asked yet) | 'loading' | 'err' | array of { id, title, description, price, image_url }.
+let menu = null;
+const priceTxt = p => { p = String(p || '').trim(); return /^\d+([.,]\d+)?$/.test(p) ? '₹' + p : p };
+const dishImg = u => typeof u == 'string' && (u.startsWith('https://') || u.startsWith('data:image/')) ? u : '';
+async function loadMenu() {
+  if (!Array.isArray(menu)) menu = 'loading';
+  try {
+    const fresh = await rpc(sb, 'get_menu', { p_slug: CFG.slug });
+    if (JSON.stringify(fresh) != JSON.stringify(menu)) { menu = fresh; if (pg == 'menu' && card) render() }
+  } catch (e) { if (!Array.isArray(menu)) { menu = 'err'; if (pg == 'menu' && card) render() } }
+}
+function menuPgV() {
+  if (menu == null || menu == 'loading') return `<div class="card sk" aria-busy="true" aria-label="Loading menu"><i></i><i style="width:70%"></i><i></i><i style="width:55%"></i></div>`;
+  if (menu == 'err') return `<div class="card"><h2>Menu</h2><p class="sub" style="margin:0">The menu could not be loaded. Check your connection and try again.</p><button class="btn alt" style="margin-top:14px" onclick="menu=null;loadMenu();render()">Try again</button></div>`;
+  if (!menu.length) return `<div class="card"><h2>Menu</h2><p class="sub" style="margin:0">The menu is not up yet. Check back soon.</p></div>`;
+  return `<div class="card mn"><div class="row2"><h2>Menu</h2><span class="pill">${menu.length}</span></div>
+  <ul class="mn-list">${menu.map((x, i) => { const im = dishImg(x.image_url); return `<li><button type="button" class="mn-row" onclick="openDish(${i})" aria-haspopup="dialog">
+    <span class="mn-ph">${im ? `<img src="${esc(im)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}</span>
+    <span class="mn-tx"><b>${esc(x.title)}</b></span>${x.price ? `<span class="mn-pr">${esc(priceTxt(x.price))}</span>` : ''}</button></li>`; }).join('')}</ul></div>`;
+}
+// The sheet lives outside #app so a re-render (realtime sync, stamp) never replays its animation or closes it.
+function openDish(i) {
+  const x = Array.isArray(menu) && menu[i]; if (!x) return;
+  closeDish(true);
+  const im = dishImg(x.image_url), w = document.createElement('div');
+  w.className = 'ms-wrap'; w.id = 'dish';
+  w.innerHTML = `<div class="ms-bk"></div><div class="msheet" role="dialog" aria-modal="true" aria-label="${esc(x.title)}">
+    <div class="ms-grab" aria-hidden="true"><i></i></div>
+    ${im ? `<div class="ms-img"><img src="${esc(im)}" alt="${esc(x.title)}" decoding="async" onerror="this.parentNode.remove()"></div>` : ''}
+    <div class="ms-body"><div class="ms-top"><h2>${esc(x.title)}</h2>${x.price ? `<span class="ms-pr">${esc(priceTxt(x.price))}</span>` : ''}</div>
+    ${x.description ? `<p class="ms-ds">${esc(x.description)}</p>` : ''}
+    <button type="button" class="btn alt ms-x">Close</button></div></div>`;
+  document.body.appendChild(w); document.body.classList.add('modal-open');
+  const sh = w.querySelector('.msheet'), close = () => closeDish();
+  w.querySelector('.ms-bk').onclick = close; w.querySelector('.ms-x').onclick = close;
+  // Drag the sheet down to dismiss.
+  const gr = w.querySelector('.ms-grab'); let y0 = null, dy = 0;
+  gr.addEventListener('pointerdown', e => { y0 = e.clientY; dy = 0; sh.style.transition = 'none'; try { gr.setPointerCapture(e.pointerId) } catch (_) { } });
+  gr.addEventListener('pointermove', e => { if (y0 == null) return; dy = Math.max(0, e.clientY - y0); sh.style.transform = 'translateY(' + dy + 'px)' });
+  const end = () => { if (y0 == null) return; y0 = null; sh.style.transition = ''; if (dy > 90) close(); else sh.style.transform = '' };
+  gr.addEventListener('pointerup', end); gr.addEventListener('pointercancel', end);
+  w._k = e => { if (e.key == 'Escape') close() }; document.addEventListener('keydown', w._k);
+  setTimeout(() => { try { w.querySelector('.ms-x').focus({ preventScroll: true }) } catch (_) { } }, 280);
+}
+function closeDish(now) {
+  const w = document.getElementById('dish'); if (!w) return;
+  document.removeEventListener('keydown', w._k); document.body.classList.remove('modal-open');
+  if (now || matchMedia('(prefers-reduced-motion: reduce)').matches) return w.remove();
+  w.classList.add('out'); setTimeout(() => w.remove(), 220);
 }
 
 
@@ -401,7 +444,7 @@ function profilePgV() {
   <button class="btn alt" onclick="waPref()">${m.wa_optout ? 'Turn WhatsApp offers on' : 'Stop WhatsApp offers'}</button>
   <button class="btn alt" onclick="view='pw';render()">Change password</button>
   <button class="btn alt" onclick="out()">Sign out</button>
-  <p class="note"><a href="#" onclick="delMe();return false" style="color:#b91c1c">Delete my account</a></p></div>`;
+  <p class="note"><a href="#" onclick="delMe();return false" style="color:#b91c1c">Delete my account</a></p></div>` + refV();
 }
 
 async function load({ withDaily = true } = {}) {
@@ -695,7 +738,7 @@ function render() {
     keep = scratching ? document.getElementById('daily-scr') : null;
     fx = false;
     clearStamp();   // a re-render replaces the slots mid-animation: drop any pending stamp timers
-    app.innerHTML = (!card ? authV() : heroV() + (view == 'pw' ? pwV() : pg == 'offers' ? offersPgV() : pg == 'rewards' ? rewardsPgV() : pg == 'profile' ? profilePgV() : homePgV())) + (card ? navV() : '') + (introShow && !card ? introV() : '') + (pop ? popV() : '');
+    app.innerHTML = (!card ? authV() : heroV() + (view == 'pw' ? pwV() : pg == 'offers' ? offersPgV() : pg == 'menu' ? menuPgV() : pg == 'profile' ? profilePgV() : homePgV())) + (card ? navV() : '') + (introShow && !card ? introV() : '') + (pop ? popV() : '');
   } catch (e) {
     $('#app').innerHTML = `<div class="card"><h2>Something went wrong</h2><p class="sub">${esc(e.message)}</p><button class="btn" onclick="location.reload()">Reload</button></div>`;
   }

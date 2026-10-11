@@ -1,6 +1,6 @@
 # Loyalty Kit (Phase 2: shared backend)
 
-Landing page at `/`, customer app at `/app/`, owner dashboard at `/admin/`. One free Supabase database serves every client. Plain HTML/CSS/JS, no build step.
+Website at `/` (plus `/about/` and `/contact/`), customer app at `/app/`, owner dashboard at `/admin/`. One free Supabase database serves every client. Plain HTML/CSS/JS, no build step.
 
 ```
 index.html            Innondu landing page (public site root)
@@ -29,7 +29,8 @@ and the docs out of the published site.
 1. Authentication -> Users -> **Add user**: the owner's email + password, tick *Auto Confirm User*.
 2. SQL Editor: open `supabase/new-client.sql`, change the slug, name and owner email, Run.
 3. In `assets/config.js` set `supabaseUrl`, `supabaseKey` and `slug` (same slug as step 2).
-4. Test locally (VS Code Live Server, open the folder root). Landing: `/`. Customer app: `/app/`. Owner: `/admin/`.
+4. Test locally (VS Code Live Server, open the folder root). Website: `/`, `/about/`, `/contact/`. Customer app: `/app/`. Owner: `/admin/`.
+   Menu and the Contact form need one extra SQL run: `supabase/2026-10-11-menu-leads.sql` (already folded into `schema.sql` for new projects). Contact messages land in Table Editor -> `leads`. To show a WhatsApp button on the Contact page, set `WHATSAPP` in `assets/site.js`.
 
 Branding, offers, cooldown, expiry, first stamp and card length are then edited by the owner in **/admin -> Offers and More** and apply to everyone instantly. No redeploy needed.
 

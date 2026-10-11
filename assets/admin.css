@@ -80,3 +80,15 @@ a.btn.sm{display:inline-block}
 .dg-row{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}
 .dg-n{flex:1 1 180px;min-width:0}
 .dg-c{display:flex;align-items:center;gap:4px}.dg-c input{width:76px}
+
+/* Menu tab + 7-item bottom nav */
+.a-nav button{font-size:10.5px;padding-inline:0}.a-nav button i{width:40px}
+@media (max-width:400px){.a-nav .a-in{padding:0 2px}.a-nav button{font-size:10px}.a-nav button i{width:34px}}
+.mi-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.mi-row+.mi-row{border-top:1px solid var(--line)}.mi-row:active{background:color-mix(in srgb,var(--brand) 7%,transparent)}
+.mi-ph{flex:none;width:52px;height:52px;border-radius:14px;overflow:hidden;background:color-mix(in srgb,var(--brand) 10%,var(--bg));border:1px solid var(--line)}
+.mi-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.mi-tx{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mi-tx b{font-weight:600;overflow-wrap:anywhere}
+.mi-tx em{font-style:normal;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--line);color:var(--mut)}
+.mi-pr{flex:none;font-weight:600;font-variant-numeric:tabular-nums}
+.mi-ch{flex:none;color:var(--mut);display:grid}.mi-ch svg{width:18px;height:18px}

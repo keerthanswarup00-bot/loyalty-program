@@ -1,8 +1,8 @@
 // Owner app (v2): mobile-first dashboard.
 // Tabs: Home (sign-up QR, stats, chart, reminders) · Customers (sort, select, CSV) · Redeem ·
-// Message (WhatsApp queue) · Offers (visual editors) · More (brand, news, refer, tag, account).
+// Message (WhatsApp queue) · Offers (visual editors) · Menu (items with photos) · More (brand, news, refer, tag, account).
 const sb = notReady() ? null : mkClient('lk-admin');
-let signed = false, recover = false, biz = null, M = [], V = [], MSG = [], tab = 'h', ov = null, openId = null, selMode = false, visCache = {};
+let signed = false, recover = false, biz = null, M = [], V = [], MSG = [], MENU = null, tab = 'h', ov = null, openId = null, selMode = false, visCache = {};
 let q = '', rq = '', rc = '', rp = '', rd = null, rbusy = false;
 // Customers selection (feeds the Message tab) + Message tab state
 let sel = new Set(), bsel = new Set(), sortBy = 'joined', bseg = 'all', bmsg = 'Hi {name}! ', bimg = '', bfile = null, blink = true, bstop = true, bq = null, binit = false;
@@ -41,6 +41,9 @@ const AI = {
   refresh: ico('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>'),
   back: ico('<path d="M15 5l-7 7 7 7"/>'),
   trend: ico('<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>'),
+  menu: ico('<path d="M7 3v7a2 2 0 0 0 2 2v9M11 3v7a2 2 0 0 1-2 2M9 3v6M17 21V3c-2.2 1.2-3.5 3.6-3.5 6.5 0 2 1.2 3.5 3.5 3.5"/>'),
+  plus: ico('<path d="M12 5v14M5 12h14"/>'),
+  chev: ico('<path d="M9 5l7 7-7 7"/>'),
   repeat: ico('<path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/>')
 };
 
@@ -89,7 +92,7 @@ async function login(btn) {
 }
 async function out() {
   await sb.auth.signOut();
-  signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null;
+  signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null; MENU = null;
   sel = new Set(); bsel = new Set(); selMode = false; bq = null; binit = false; impRows = null; visCache = {}; MSG = [];
   render();
 }
@@ -132,7 +135,7 @@ function hero() {
   </div></header>`;
 }
 function nav() {
-  const T = [['h', 'Home', AI.home], ['c', 'Customers', AI.users], ['r', 'Redeem', AI.ok], ['b', 'Message', AI.send], ['o', 'Offers', AI.gift], ['m', 'More', AI.cog]];
+  const T = [['h', 'Home', AI.home], ['c', 'Customers', AI.users], ['r', 'Redeem', AI.ok], ['b', 'Message', AI.send], ['o', 'Offers', AI.gift], ['p', 'Menu', AI.menu], ['m', 'More', AI.cog]];
   return `<nav class="a-nav"><div class="a-in">${T.map(t => `<button class="${tab == t[0] ? 'on' : ''}" onclick="go('${t[0]}')"><i>${t[2]}</i><span>${t[1]}</span></button>`).join('')}</div></nav>`;
 }
 
@@ -820,6 +823,59 @@ async function impGo(btn) {
   } catch (e) { btn.disabled = false; toast(/function|schema cache/i.test(String(e && e.message || e)) ? 'Run the latest supabase/schema.sql first' : nice(e)) }
 }
 
+// ---------- MENU ----------
+// Items live in public.menu_items (owner reads via RLS, writes only through save_menu_item / delete_menu_item).
+const priceShow = p => { p = String(p || '').trim(); return /^\d+([.,]\d+)?$/.test(p) ? '₹' + p : p };
+const mthumb = u => `<span class="mi-ph">${u ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}</span>`;
+async function loadMenuAdm() {
+  const { data, error } = await sb.from('menu_items').select('id,title,description,price,image_url,available,sort,created_at')
+    .eq('business_id', biz.id).order('sort').order('created_at');
+  MENU = error ? 'err' : data;
+  if (tab == 'p') render();
+}
+function menuV() {
+  if (MENU == null) { loadMenuAdm(); return `<h2 class="a-title">Menu</h2><div class="a-card"><p class="sub" style="margin:0">Loading…</p></div>` }
+  if (MENU == 'err') return `<h2 class="a-title">Menu</h2><div class="a-card"><p class="sub" style="margin:0">The menu is not set up in your database yet. Run <b>supabase/2026-10-11-menu-leads.sql</b> in the Supabase SQL editor, then reload.</p></div>`;
+  if (ov) return menuEditV();
+  return `<h2 class="a-title">Menu</h2><p class="sub" style="margin-bottom:14px">Add what you sell. Customers see it in the Menu tab of their app.</p>
+  <button class="btn" onclick="go('p','new')">Add an item</button>
+  ${MENU.length ? `<div class="a-card flush" style="margin-top:14px">${MENU.map(x => `<button type="button" class="mi-row" onclick="go('p','${x.id}')">${mthumb(x.image_url)}
+    <span class="mi-tx"><b>${esc(x.title)}</b>${x.available ? '' : '<em>Hidden</em>'}</span><span class="mi-pr">${esc(priceShow(x.price))}</span><i class="mi-ch">${AI.chev}</i></button>`).join('')}</div>`
+  : `<div class="a-card" style="margin-top:14px"><p class="sub" style="margin:0">No items yet. Add your first one: a name, a price and a photo is enough.</p></div>`}`;
+}
+function menuEditV() {
+  const x = ov == 'new' ? { title: '', description: '', price: '', image_url: '', available: true } : MENU.find(i => i.id == ov);
+  if (!x) { ov = null; return menuV() }
+  return `<button class="a-back" onclick="go('p')">${AI.back}<span>Back to menu</span></button><h2 class="a-title">${ov == 'new' ? 'New item' : 'Edit item'}</h2>
+  <div class="a-card">${fld('mt', 'Name', x.title, 'maxlength="80" autocomplete="off"', 'e.g. Masala dosa')}
+    ${fld('mp', 'Price', x.price, 'maxlength="24" autocomplete="off"', 'e.g. 120')}
+    <p class="hint">A plain number shows with a ₹. For sizes you can type "80 / 120".</p>
+    <label class="lb">Description <span>(optional)</span></label><textarea id="md" rows="4" maxlength="600" placeholder="What is it, what is in it?">${esc(x.description)}</textarea>
+    ${upl('mfile', 'mx', x.image_url, 'Photo')}
+    <label class="lb">Show on the menu</label><select id="mav"><option value="1"${x.available ? ' selected' : ''}>Yes</option><option value="0"${x.available ? '' : ' selected'}>Hidden for now</option></select></div>
+  <button class="btn" data-go onclick="svMenu(this)">Save item</button>
+  ${ov == 'new' ? '' : `<button class="btn alt" style="margin-top:10px" onclick="delMenu(this)">Delete this item</button>`}`;
+}
+async function svMenu(btn) {
+  const isNew = ov == 'new', cur = isNew ? null : MENU.find(i => i.id == ov), title = v('mt').trim();
+  if (!title) return toast('Give the item a name');
+  btn.disabled = true;
+  try {
+    let img = v('mx') == '1' ? '' : (cur && cur.image_url) || '';
+    const f = $('#mfile').files[0];
+    if (f) img = await readImg(f, 'menu');
+    await rpc(sb, 'save_menu_item', { p_slug: CFG.slug, p_id: isNew ? null : ov, p_title: title, p_description: v('md').trim(), p_price: v('mp').trim(), p_image: img, p_available: v('mav') != '0' });
+    if (cur && cur.image_url && cur.image_url != img) await dropOld(cur.image_url);
+    MENU = null; toast('Saved'); go('p');
+  } catch (e) { btn.disabled = false; typeof e == 'string' ? imgErr(e) : toast(/function|schema cache/i.test(String(e && e.message || e)) ? 'Run supabase/2026-10-11-menu-leads.sql first' : nice(e)) }
+}
+async function delMenu(btn) {
+  const cur = MENU.find(i => i.id == ov); if (!cur || !confirm('Delete "' + cur.title + '" from the menu?')) return;
+  btn.disabled = true;
+  try { await rpc(sb, 'delete_menu_item', { p_id: ov }); await dropOld(cur.image_url); MENU = null; toast('Deleted'); go('p') }
+  catch (e) { btn.disabled = false; toast(nice(e)) }
+}
+
 // ---------- render ----------
 function view() {
   if (tab == 'h') return homeV();
@@ -827,6 +883,7 @@ function view() {
   if (tab == 'r') return redeemV();
   if (tab == 'b') { if (!binit) { bpick(); binit = true } return msgV() }
   if (tab == 'o') return offersV();
+  if (tab == 'p') return menuV();
   return moreV();
 }
 function render() {
