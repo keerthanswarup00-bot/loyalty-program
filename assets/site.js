@@ -11,3 +11,23 @@ window.INNONDU = { WHATSAPP: '' };
   }, { threshold: .12 });
   els.forEach(function (e) { io.observe(e); });
 })();
+
+(function () {
+  // Shared header menu. The toggle only exists under 560px; on wider screens the links show inline.
+  var toggle = document.querySelector('.nav-toggle'), menu = document.getElementById('site-menu');
+  if (!toggle || !menu) return;
+  function setOpen(open) {
+    menu.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  }
+  toggle.addEventListener('click', function () { setOpen(!menu.classList.contains('open')); });
+  menu.addEventListener('click', function (e) { if (e.target.closest('a')) setOpen(false); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && menu.classList.contains('open')) { setOpen(false); toggle.focus(); }
+  });
+  document.addEventListener('click', function (e) {
+    if (menu.classList.contains('open') && !e.target.closest('header')) setOpen(false);
+  });
+  window.addEventListener('resize', function () { if (innerWidth > 560) setOpen(false); });
+})();
