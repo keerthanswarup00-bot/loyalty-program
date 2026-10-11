@@ -1,0 +1,44 @@
+name: Database migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - ".github/workflows/database-migrations.yml"
+  pull_request:
+    paths:
+      - "supabase/**"
+      - ".github/workflows/database-migrations.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-database:
+    name: Apply migrations to a fresh database
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start -x studio,inbucket,imgproxy,edge-runtime,logflare,vector,analytics
+
+      - name: Rebuild database from migrations
+        run: supabase db reset
+
+      - name: Lint database schema
+        run: supabase db lint --local
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup

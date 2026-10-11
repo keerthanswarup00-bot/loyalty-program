@@ -9,13 +9,18 @@ admin/index.html      owner dashboard       assets/admin.js + assets/admin.css
 assets/config.js      per-deployment settings (the only file you edit)
 assets/common.js, style.css   shared
 assets/vendor/        supabase-js and qrcode-generator, served from this site (no CDN)
-supabase/schema.sql   run once        supabase/new-client.sql   run per client
+supabase/migrations/   canonical, version-controlled database changes
+supabase/schema.sql   compatibility snapshot        supabase/new-client.sql   run per client
 archive/              unused old code, kept for reference only (never deployed)
 ```
 
 `archive/` holds the retired Phase 1 app (`app.js`, `config.js`, `style.css`) and an old
 copy of the project. Nothing loads from it. `.vercelignore` keeps `archive/`, `supabase/`
 and the docs out of the published site.
+
+## Database migrations
+
+New database changes are managed through the Supabase CLI and the timestamped SQL files in `supabase/migrations/`. See [the migration guide](supabase/MIGRATIONS.md) for fresh-project setup, local rebuilds, CI validation, and the safe process for reconciling an existing production database. Do not run the older dated SQL files in `supabase/` as a second migration stream.
 
 ## One-time setup (about 10 minutes)
 
