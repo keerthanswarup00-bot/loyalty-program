@@ -1,0 +1,3 @@
+# Public contact form endpoint; requests are validated and rate-limited server-side.
+[functions.submit-lead]
+verify_jwt = false
