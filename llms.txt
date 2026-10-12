@@ -1,0 +1,14 @@
+# Innondu
+
+> Innondu (ಇನ್ನೊಂದು, Kannada for "one more") is a small rewards web app for neighbourhood shops. It gives shops digital stamp cards, a daily scratch card and offers that customers use in their phone browser. Nothing to install, and it works alongside the shop's existing billing system.
+
+## Pages
+- [Home](https://www.innondu.com/): what Innondu does, live stamp demo, owner dashboard preview
+- [About](https://www.innondu.com/about/): why it was built and what it believes
+- [Contact](https://www.innondu.com/contact/): tell us about your shop; replies within a day
+
+## Key facts
+- Customers: join with a phone number, collect stamps by tapping an NFC tag or scanning a QR code, claim rewards and offers.
+- Owners: customer list, one-tap WhatsApp messages, menu, redeem codes, offers.
+- A free NFC stamp and a QR poster are provided to every shop; a branded 3D stand is optional.
+- Built by Aryan Swaroop (https://aryanswaroop.com).

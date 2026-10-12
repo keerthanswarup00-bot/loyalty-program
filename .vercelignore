@@ -2,5 +2,9 @@
 # schema.sql exposes the full database structure, so the supabase/ folder is not public.
 archive/
 supabase/
+seo/
+innondu-stamp-menu-update/
+tests/
+scripts/
 *.md
 .DS_Store
