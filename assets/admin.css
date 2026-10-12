@@ -131,3 +131,6 @@ a.btn.sm{display:inline-block}
 .br-b{padding:14px 16px 16px}.br-s{display:flex;gap:8px}.br-s i{flex:1;aspect-ratio:1;border-radius:50%;border:1.5px dashed var(--line)}.br-s i.f{border:0;background:var(--brand)}
 .br-b button{display:block;width:100%;margin-top:12px;padding:11px;border:0;border-radius:var(--r-btn);background:var(--brand);color:var(--on-brand);font:600 14px Inter,system-ui,sans-serif}
 .br-b p{margin:10px 0 0;color:var(--brand-t);font-weight:600;font-size:13.5px}
+
+/* support mode */
+.a-support{background:#111;color:#fff;font-size:12.5px;padding:8px 12px;border-radius:12px;margin-bottom:12px}.a-support a{color:#fff;text-decoration:underline;margin-left:4px}

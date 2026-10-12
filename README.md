@@ -92,6 +92,15 @@ Instead of one Vercel project per client, one deployment can serve every shop; t
 4. In Vercel add the wildcard domain `*.yourplatform.com` to the project (needs the domain's nameservers on Vercel).
 5. Open `/platform/`, sign in, press **Create shop**. The shop opens at `<address>.yourplatform.com` (customers at `/app/`, owner at `/admin/`).
 
+### Platform page (`/platform/`): running many shops
+
+- **All shops:** search, sort (needs attention / most active / newest / name), and flags for shops that are quiet (no stamps for 14 days), have no customers, have no owner or have an overdue renewal. Search any customer by phone or name across every shop.
+- **One shop:** numbers for the last 7 and 30 days, a customer list with search (WhatsApp link, reset a locked-out customer's password), CSV export of customers, every stamp and coupons (also your backup), private notes (plan, contact, renewal date), domains, owner change, and a password reset email to the owner.
+- **Work as the owner:** "Open dashboard as owner" opens `/admin/?as=<shop>`. You get the full owner dashboard for that shop (offers, brand, menu, customers, Insights) using your platform login. A banner shows you are in support mode.
+- **Accountability:** every support session, every change to shop settings (the field names), customer deletions, password resets, imports, exports, customer-list views and domain/owner changes are recorded. You see them in Activity log; the shop owner sees their shop's entries in More -> Support access. The log records what was done, not the customers' data.
+- **Needs** the latest `supabase/schema.sql` (re-run it; it is safe). It extends every owner check to platform admins and adds the audit and notes tables.
+- **Protect the platform login:** it can reach every shop's customers. Use a long unique password and turn on two-step verification for that Supabase account.
+
 **Custom domains:** in `/platform/` add the domain to the shop, then add the same domain to the Vercel project and point the client's DNS at Vercel (CNAME `cname.vercel-dns.com`). Both steps are manual: the repo holds no Vercel token. A domain not added in `/platform/` shows "Shop not found".
 
 Limits to know: platform admins cannot see a shop's customers, and cannot open a shop's dashboard unless they are its owner (use **Change owner** for support). There is no suspend switch: write functions do not check a paused flag, so a flag would only look like protection. Existing single-shop deployments keep working unchanged (leave `slug` set). Customer logins are keyed by shop address, so the same phone number can join several shops separately.
