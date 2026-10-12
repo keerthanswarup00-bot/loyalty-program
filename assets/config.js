@@ -4,7 +4,8 @@
 window.LK = {
   supabaseUrl: 'https://qgechlsujyzgivwnvdwf.supabase.co',
   supabaseKey: 'sb_publishable_oEWnni9aBtWuwqF_aS6duQ_gF0B55r3',
-  slug: 'cheesora-bliss',                    // must match the business slug in the database
+  slug: 'cheesora-bliss',                    // must match the business slug in the database. Leave '' for a multi-shop deployment (see README -> Many shops, one deployment)
+  baseDomain: '',                       // multi-shop only: shops open at <slug>.<baseDomain>; custom domains are added in /platform/
   emailDomain: 'members.example.com',   // internal login address for phone sign-ins; never receives mail
   countryCode: '91'                     // added to 10-digit phone numbers for the owner's WhatsApp reminder buttons
 };
