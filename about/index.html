@@ -68,10 +68,80 @@
 }
 </script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Kannada:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=2">
+<link rel="preload" href="/fonts/57fd1acf8d96.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+/* Critical CSS inlined for performance. Keep in sync with assets/site.css. */
+/* Innondu marketing site: shared tokens, header, footer, buttons. Pages add their own small sections inline. */
+:root{
+  --bg:#0e1116; --surface:#161a21; --fg:#f2f4f8; --mut:#9aa3b2; --line:#232830;
+  --accent:#8b7bff; --accent-fg:#0e1116; --soft:#1e1c3f; --good:#4ade80;
+  /* aliases used by the About page's page-specific styles */
+  --card:var(--surface); --tx:var(--fg); --ac:var(--accent);
+  --display:'Figtree','Noto Sans Kannada',system-ui,sans-serif;
+  --body:'Figtree','Noto Sans Kannada',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+}
+
+*{box-sizing:border-box}
+html{color-scheme:dark;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 17px/1.6 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.wrap{max-width:1120px;margin-inline:auto;padding-inline:20px}
+section{padding-block:clamp(48px,8vw,96px)}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.02em}
+h1{font-size:clamp(2.7rem,6.6vw,5.2rem);line-height:1.02;font-weight:800;letter-spacing:-.035em}
+h2{font-size:clamp(1.8rem,3.6vw,2.7rem);line-height:1.1;font-weight:700}
+h3{font-size:1.12rem;line-height:1.25;font-weight:700}
+p{margin:0}
+.lead{font-size:clamp(1.05rem,1.6vw,1.2rem);color:var(--mut);max-width:46ch}
+.eyebrow{font:500 .76rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+.sec-head{display:grid;gap:12px;max-width:640px;margin-bottom:clamp(28px,4vw,48px)}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:6px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 24px;border-radius:999px;border:1.5px solid var(--fg);background:var(--fg);color:var(--bg);font:600 .98rem/1 var(--body);text-decoration:none;cursor:pointer;transition:transform .2s ease,opacity .2s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+.btn.sm{padding:10px 18px;font-size:.9rem}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+
+header{position:sticky;top:0;padding-top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav{position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:62px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font:800 1.3rem/1 var(--display);letter-spacing:-.02em}
+.mark{width:36px;height:36px;color:var(--accent);flex:none}
+.mark .ring{transform-origin:center;animation:spin 14s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.nav-toggle{display:none;align-items:center;justify-content:center;width:42px;height:42px;padding:0;border:1px solid var(--line);border-radius:12px;background:transparent;color:var(--fg);cursor:pointer}
+.nav-toggle:hover{border-color:var(--mut)}
+.nav nav{display:flex;align-items:center;gap:22px;font-size:.95rem;font-weight:500}
+.nav nav a:not(.btn){text-decoration:none;color:var(--mut)}
+.nav nav a:not(.btn):hover,.nav nav a[aria-current="page"]{color:var(--fg)}
+
+footer{padding-block:36px calc(48px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);color:var(--mut);font-size:.92rem}
+footer .wrap{display:flex;gap:14px 40px;justify-content:space-between;flex-wrap:wrap;align-items:center}
+footer b{font-family:var(--display);color:var(--fg)}
+footer nav{display:flex;gap:20px;flex-wrap:wrap}
+footer a{text-decoration:none}footer a:hover{color:var(--fg)}
+.credit{width:100%;text-align:center;padding-top:22px;margin-top:4px;border-top:1px solid var(--line);font-size:.84rem}
+.credit a{color:var(--accent)}
+.credit a:hover{color:var(--fg)}
+
+.cta-band{background:var(--fg);color:var(--bg);border-radius:28px;padding:clamp(32px,6vw,72px);display:grid;gap:22px;justify-items:start}
+.cta-band .btn{background:var(--bg);color:var(--fg);border-color:var(--bg)}
+
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .7s ease,transform .7s ease}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.reveal{opacity:1;transform:none;transition:none}.btn{transition:none}.mark .ring{animation:none}}
+@media (max-width:560px){
+  .nav-toggle{display:inline-flex}
+  .nav nav{position:absolute;left:0;right:0;top:100%;display:none;flex-direction:column;align-items:stretch;gap:2px;padding:10px 20px 16px;background:var(--bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line);box-shadow:0 24px 40px -30px rgba(0,0,0,.9)}
+  .nav nav.open{display:flex}
+  .nav nav a:not(.btn){padding:12px 4px}
+  .nav nav .btn{margin-top:8px}
+}
+.btn{white-space:nowrap}
+</style>
+<link rel="stylesheet" href="/assets/fonts.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="/assets/fonts.css"></noscript>
 <style>
 /* about: page-specific styles. Shared tokens, header, footer and base come from site.css. */
 main .wrap{max-width:900px}
@@ -244,7 +314,7 @@ section.hero{border:0;padding:110px 0 100px;overflow:hidden}
     <div class="credit">Created by <a href="https://aryanswaroop.com" target="_blank" rel="noopener">aryanswaroop.com</a></div>
   </div>
 </footer>
-<script src="/assets/site.js?v=2"></script>
+<script defer src="/assets/site.js?v=2"></script>
 <script>
 (function(){
  var rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
