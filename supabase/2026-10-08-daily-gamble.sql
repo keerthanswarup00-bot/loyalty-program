@@ -190,6 +190,7 @@ end $$;
 revoke execute on function public._daily_days(text), public._daily_guard(),
                            public.daily_public(text), public.daily_status(text), public.play_daily(text)
   from public, anon, authenticated;
+revoke execute on function public.daily_public(text), public.daily_status(text), public.play_daily(text) from public, anon, authenticated;
 grant execute on function public.daily_public(text) to anon, authenticated;
 grant execute on function public.daily_status(text) to authenticated;
 grant execute on function public.play_daily(text) to authenticated;
