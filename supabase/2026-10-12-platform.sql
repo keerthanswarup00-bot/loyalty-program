@@ -101,9 +101,11 @@ begin
   delete from business_domains where host = lower(btrim(coalesce(p_host, '')));
 end $$;
 
-revoke execute on function public._is_platform_admin(), public.resolve_host(text), public.platform_overview(),
+revoke execute on function public.resolve_host(text), public.platform_overview(),
   public.platform_create_business(text, text, text, text, text), public.platform_set_owner(text, text),
   public.platform_set_domain(text, text), public.platform_remove_domain(text) from public, anon, authenticated;
+revoke execute on function public._is_platform_admin() from public, anon;
+grant execute on function public._is_platform_admin() to authenticated;
 grant execute on function public.resolve_host(text) to anon, authenticated;
 grant execute on function public.platform_overview() to authenticated;
 grant execute on function public.platform_create_business(text, text, text, text, text) to authenticated;

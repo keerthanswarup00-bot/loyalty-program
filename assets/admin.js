@@ -1,7 +1,10 @@
 // Owner app (v2): mobile-first dashboard.
 // Tabs: Home (sign-up QR, stats, chart, reminders) · Customers (sort, select, CSV) · Redeem ·
 // Message (WhatsApp queue) · Offers (visual editors) · Menu (items with photos) · More (brand, news, refer, tag, account).
-const sb = notReady() ? null : mkClient('lk-admin');
+// Support mode: a platform admin opens /admin/?as=<shop> and works as that shop's owner (shares the /platform/ login). Everything they do is logged.
+const SUPPORT_AS = (new URLSearchParams(location.search).get('as') || '').toLowerCase();
+const sb = notReady() ? null : mkClient(SUPPORT_AS ? 'lk-platform' : 'lk-admin');
+let support = null, SUP = [];
 let signed = false, recover = false, biz = null, M = [], V = [], MSG = [], MENU = null, tab = 'h', ov = null, openId = null, selMode = false, visCache = {};
 let q = '', rq = '', rc = '', rp = '', rd = null, rbusy = false;
 // Customers selection (feeds the Message tab) + Message tab state
@@ -59,7 +62,15 @@ async function pages(make) {
   }
   return out;
 }
-async function enter() { signed = true; await load(); render() }
+async function enter() {
+  signed = true;
+  if (/^[a-z0-9-]+$/.test(SUPPORT_AS)) {
+    try { await rpc(sb, 'platform_support_open', { p_slug: SUPPORT_AS }); CFG.slug = SUPPORT_AS; support = SUPPORT_AS }
+    catch (e) { toast('Support mode needs a platform admin account') }
+  }
+  await load(); render();
+  if (support && new URLSearchParams(location.search).get('tab') == 'ins') openIns();
+}
 async function load() {
   try {
     const { data, error } = await sb.from('businesses').select('*').eq('slug', CFG.slug).maybeSingle();
@@ -71,6 +82,7 @@ async function load() {
       const mr = await sb.from('messages').select('member_id,created_at,returned_at').eq('business_id', biz.id).order('created_at', { ascending: false }).limit(1000);
       MSG = mr.error ? [] : mr.data;   // win-back table may not exist until 2026-10-08-winback.sql is run
       if (biz.lapsed_days == null) biz.lapsed_days = 10;
+      try { SUP = await rpc(sb, 'my_support_log', { p_slug: CFG.slug }) } catch (e) { SUP = [] }   // owner's view of support access; absent until the platform SQL is run
       try {
         const since = new Date(Date.now() - 14 * 864e5).toISOString();
         V = (await pages(() => sb.from('visits').select('id,created_at').eq('business_id', biz.id).gte('created_at', since).order('id'))).map(x => x.created_at);
@@ -92,7 +104,7 @@ async function login(btn) {
 }
 async function out() {
   await sb.auth.signOut();
-  signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null; MENU = null; CATS = null; INS = null;
+  signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null; MENU = null; CATS = null; INS = null; SUP = []; support = null;
   sel = new Set(); bsel = new Set(); selMode = false; bq = null; binit = false; impRows = null; visCache = {}; MSG = [];
   render();
 }
@@ -129,6 +141,7 @@ function hero() {
   const rep = n ? Math.round(M.filter(u => u.total >= 2).length / n * 100) : 0;
   const chip = (ic, val, lab) => `<div class="a-chip">${ic}<b>${val}</b><span>${lab}</span></div>`;
   return `<header class="a-hero${home ? '' : ' slim'}"><div class="a-in">
+    ${support ? `<div class="a-support"><b>Support mode</b> · you are managing this shop for its owner. Changes are logged. <a href="/platform/#shop=${esc(support)}">Back to platform</a></div>` : ''}
     <div class="a-brand"><div class="a-logo">${mark(biz)}</div><div class="a-bt"><b>${esc(biz.name)}</b><span>Owner dashboard</span></div>
     <button class="a-ib" aria-label="Refresh" onclick="refresh()">${AI.refresh}</button></div>
     ${home ? `<div class="a-chips">${chip(AI.trend, tot, 'Stamps')}${chip(AI.users, n, 'Members')}${chip(AI.gift, rw, 'Rewards')}${chip(AI.repeat, rep + '%', 'Repeat')}</div>` : ''}
@@ -748,6 +761,13 @@ async function pickLogo(btn) {
 document.addEventListener('input', e => { if (e.target && /^(cc|cn|ct|brr|brf|brh)$/.test(e.target.id)) brPv() });
 document.addEventListener('change', e => { if (e.target && (e.target.id == 'brr' || e.target.id == 'brf' || e.target.id == 'brh' || e.target.id == 'clfile')) setTimeout(brPv, 0) });
 
+// ---------- Support access log (what the platform team did in this shop) ----------
+const SUPL = { support_open: 'Support opened your dashboard', settings_changed: 'Settings changed', view_customers: 'Customer list viewed', export: 'Data exported', delete_customer: 'A customer was deleted', reset_customer_password: 'A customer password was reset', import_customers: 'Customers imported', domain_added: 'Domain added', domain_removed: 'Domain removed', owner_changed: 'Owner changed', shop_created: 'Shop created', owner_reset_email: 'Password reset email sent' };
+function supV() {
+  if (!SUP || !SUP.length || support) return '';
+  return `<div class="a-card"><h2>Support access</h2><p class="sub">If you ask Innondu to change something for you, they open your dashboard and it shows up here. Nothing else touches your account.</p>
+    ${SUP.slice(0, 10).map(x => `<div class="of"><div><b>${esc(SUPL[x.action] || x.action)}</b>${x.detail && x.detail.fields ? `<div class="mut sm">${esc(x.detail.fields.join(', '))}</div>` : ''}</div><span class="mut sm">${esc(fdt(x.created_at))}</span></div>`).join('')}</div>`;
+}
 // ---------- MORE ----------
 function moreV() {
   return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${brandKit()}${dbHint()}</div>
@@ -789,6 +809,7 @@ function moreV() {
     <p class="hint">Current address: ${esc(location.origin)}</p>
     <details class="a-det2"><summary>Rewrite each NFC tag</summary><ol class="sub" style="margin-top:8px"><li>Install a free NFC app such as NFC Tools.</li><li>Tap Write, then Add a record and choose URL / URI.</li><li>Paste the stamp link copied above.</li><li>Hold the phone on the tag and tap Write.</li><li>Lock the tag so it cannot be overwritten.</li><li>Test the tag on one iPhone and one Android phone.</li></ol></details>
     <p class="hint">Keep any old printed QR in place until the new one replaces it: download the new QR above and print it at the counter.</p></div>
+${supV()}
   <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="/app/">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
 }
 async function regen(col) {

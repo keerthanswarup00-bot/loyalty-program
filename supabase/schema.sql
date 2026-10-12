@@ -188,6 +188,20 @@ create table if not exists public.messages (
 create index if not exists messages_member_idx on public.messages (member_id, created_at desc);
 create index if not exists messages_business_idx on public.messages (business_id, created_at desc);
 
+-- ---------- Platform admins (who may support every shop). Defined early because the row rules below use it. ----------
+create table if not exists public.platform_admins (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.platform_admins enable row level security;
+revoke all on public.platform_admins from anon, authenticated;
+
+create or replace function public._is_platform_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from platform_admins where user_id = auth.uid());
+$$;
+
+
 -- ---------- Row level security ----------
 -- Customers can read only their own rows. Owners can read only their business's rows.
 -- Nobody writes to members/offers/visits directly: all writes go through the functions below.
@@ -199,32 +213,32 @@ alter table public.messages enable row level security;
 
 drop policy if exists biz_owner_select on public.businesses;
 create policy biz_owner_select on public.businesses for select to authenticated
-  using (owner_id = auth.uid());
+  using ((owner_id = auth.uid() or (select public._is_platform_admin())));
 drop policy if exists biz_owner_update on public.businesses;
 create policy biz_owner_update on public.businesses for update to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+  using (owner_id = auth.uid() or (select public._is_platform_admin())) with check (owner_id = auth.uid() or (select public._is_platform_admin()));
 
 drop policy if exists member_self_select on public.members;
 create policy member_self_select on public.members for select to authenticated
   using (user_id = auth.uid());
 drop policy if exists member_owner_select on public.members;
 create policy member_owner_select on public.members for select to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+  using (exists (select 1 from public.businesses b where b.id = business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin()))));
 
 drop policy if exists offer_self_select on public.offers;
 create policy offer_self_select on public.offers for select to authenticated
   using (member_id in (select id from public.members where user_id = auth.uid()));
 drop policy if exists offer_owner_select on public.offers;
 create policy offer_owner_select on public.offers for select to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+  using (exists (select 1 from public.businesses b where b.id = business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin()))));
 
 drop policy if exists visit_owner_select on public.visits;
 create policy visit_owner_select on public.visits for select to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+  using (exists (select 1 from public.businesses b where b.id = business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin()))));
 
 drop policy if exists message_owner_select on public.messages;
 create policy message_owner_select on public.messages for select to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+  using (exists (select 1 from public.businesses b where b.id = business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin()))));
 
 -- Table privileges: read-only for members/offers/visits; owners may edit only these business columns.
 revoke all on public.businesses, public.members, public.offers, public.visits, public.messages from anon, authenticated;
@@ -367,7 +381,7 @@ create or replace function public.winback_message(p_slug text, p_member uuid) re
 language plpgsql security definer set search_path = public as $$
 declare b businesses; m members; c text; oid uuid; ex timestamptz; recent timestamptz;
 begin
-  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
   select * into m from members where id = p_member and business_id = b.id for update;
   if not found then raise exception 'Customer not found'; end if;
@@ -635,7 +649,7 @@ create or replace function public.redeem_code(p_slug text, p_code text, p_phone 
 returns json language plpgsql security definer set search_path = public as $$
 declare b businesses; x offers; m members; c text; ph text;
 begin
-  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
   c := upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'));
   ph := right(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), 10);
@@ -677,9 +691,10 @@ language plpgsql security definer set search_path = public as $$
 declare uid uuid;
 begin
   select m.user_id into uid from members m join businesses b on b.id = m.business_id
-   where m.id = p_member and b.owner_id = auth.uid();
+   where m.id = p_member and (b.owner_id = auth.uid() or (select public._is_platform_admin()));
   if uid is null then raise exception 'Not allowed'; end if;
   if exists (select 1 from businesses where owner_id = uid) then raise exception 'Not allowed'; end if;
+  perform _support_log((select business_id from members where id = p_member), 'delete_customer', '{}'::jsonb);
   delete from auth.users where id = uid;
 end $$;
 
@@ -690,9 +705,10 @@ declare uid uuid;
 begin
   if length(coalesce(p_password, '')) < 6 then raise exception 'Password must be at least 6 characters'; end if;
   select m.user_id into uid from members m join businesses b on b.id = m.business_id
-   where m.id = p_member and b.owner_id = auth.uid();
+   where m.id = p_member and (b.owner_id = auth.uid() or (select public._is_platform_admin()));
   if uid is null then raise exception 'Not allowed'; end if;
   if exists (select 1 from businesses where owner_id = uid) then raise exception 'Not allowed'; end if;
+  perform _support_log((select business_id from members where id = p_member), 'reset_customer_password', '{}'::jsonb);
   update auth.users set encrypted_password = crypt(p_password, gen_salt('bf')), updated_at = now() where id = uid;
 end $$;
 
@@ -701,9 +717,10 @@ create or replace function public.import_members(p_slug text, p_rows json) retur
 language plpgsql security definer set search_path = public as $$
 declare b businesses; r json; ph text; added int := 0; skipped int := 0; bd date;
 begin
-  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
   if json_array_length(p_rows) > 1000 then raise exception 'Import at most 1000 rows at a time'; end if;
+  perform _support_log(b.id, 'import_customers', json_build_object('rows', json_array_length(p_rows))::jsonb);
   for r in select * from json_array_elements(p_rows) loop
     ph := coalesce(r->>'phone', '');
     if ph !~ '^[0-9]{10}$' or exists (select 1 from members where business_id = b.id and phone = ph) then skipped := skipped + 1; continue; end if;
@@ -726,7 +743,7 @@ language plpgsql security definer set search_path = public as $$
 begin
   update members m set wa_optout = coalesce(p_optout, false),
          wa_optout_at = case when coalesce(p_optout, false) then now() end
-   where m.id = p_member and exists (select 1 from businesses b where b.id = m.business_id and b.owner_id = auth.uid());
+   where m.id = p_member and exists (select 1 from businesses b where b.id = m.business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin())));
   if not found then raise exception 'Not allowed'; end if;
 end $$;
 
@@ -779,15 +796,15 @@ on conflict (id) do update set public = true, file_size_limit = 2097152,
 drop policy if exists brand_owner_insert on storage.objects;
 create policy brand_owner_insert on storage.objects for insert to authenticated
   with check (bucket_id = 'brand' and exists (
-    select 1 from public.businesses b where b.owner_id = auth.uid() and b.id::text = (storage.foldername(name))[1]));
+    select 1 from public.businesses b where (b.owner_id = auth.uid() or (select public._is_platform_admin())) and b.id::text = (storage.foldername(name))[1]));
 drop policy if exists brand_owner_update on storage.objects;
 create policy brand_owner_update on storage.objects for update to authenticated
   using (bucket_id = 'brand' and exists (
-    select 1 from public.businesses b where b.owner_id = auth.uid() and b.id::text = (storage.foldername(name))[1]));
+    select 1 from public.businesses b where (b.owner_id = auth.uid() or (select public._is_platform_admin())) and b.id::text = (storage.foldername(name))[1]));
 drop policy if exists brand_owner_delete on storage.objects;
 create policy brand_owner_delete on storage.objects for delete to authenticated
   using (bucket_id = 'brand' and exists (
-    select 1 from public.businesses b where b.owner_id = auth.uid() and b.id::text = (storage.foldername(name))[1]));
+    select 1 from public.businesses b where (b.owner_id = auth.uid() or (select public._is_platform_admin())) and b.id::text = (storage.foldername(name))[1]));
 
 -- ---------- Menu and website enquiries (see supabase/2026-10-11-menu-leads.sql) ----------
 -- ---------- Menu ----------
@@ -809,7 +826,7 @@ revoke all on public.menu_items from anon, authenticated;
 grant select on public.menu_items to authenticated;
 drop policy if exists menu_owner_select on public.menu_items;
 create policy menu_owner_select on public.menu_items for select to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+  using (exists (select 1 from public.businesses b where b.id = business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin()))));
 
 create table if not exists public.menu_categories (
   id          uuid primary key default gen_random_uuid(),
@@ -829,7 +846,7 @@ revoke all on public.menu_categories from anon, authenticated;
 grant select on public.menu_categories to authenticated;
 drop policy if exists menucat_owner_select on public.menu_categories;
 create policy menucat_owner_select on public.menu_categories for select to authenticated
-  using (exists (select 1 from public.businesses b where b.id = business_id and b.owner_id = auth.uid()));
+  using (exists (select 1 from public.businesses b where b.id = business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin()))));
 
 -- What customers see: the categories (in the owner's order) and the available items.
 create or replace function public.get_menu(p_slug text) returns json
@@ -849,7 +866,7 @@ create or replace function public.save_menu_category(p_slug text, p_id uuid, p_n
 language plpgsql security definer set search_path = public as $$
 declare b businesses; n text := trim(coalesce(p_name, '')); r uuid;
 begin
-  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
   if char_length(n) < 1 or char_length(n) > 40 then raise exception 'Give the category a name (up to 40 characters)'; end if;
   if exists (select 1 from menu_categories where business_id = b.id and lower(name) = lower(n) and (p_id is null or id <> p_id)) then
@@ -872,7 +889,7 @@ create or replace function public.delete_menu_category(p_id uuid) returns void
 language plpgsql security definer set search_path = public as $$
 begin
   delete from menu_categories c using businesses b
-   where c.id = p_id and b.id = c.business_id and b.owner_id = auth.uid();
+   where c.id = p_id and b.id = c.business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin()));
 end $$;
 
 -- Owner: put the categories in this order (first id = first chip on the customer's menu).
@@ -880,7 +897,7 @@ create or replace function public.reorder_menu_categories(p_slug text, p_ids uui
 language plpgsql security definer set search_path = public as $$
 declare b businesses;
 begin
-  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
   update menu_categories c set sort = x.ord
     from unnest(coalesce(p_ids, '{}'::uuid[])) with ordinality as x(id, ord)
@@ -892,7 +909,7 @@ create or replace function public.set_category_items(p_slug text, p_category uui
 language plpgsql security definer set search_path = public as $$
 declare b businesses; ids uuid[] := coalesce(p_items, '{}'::uuid[]);
 begin
-  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
   if not exists (select 1 from menu_categories where id = p_category and business_id = b.id) then
     raise exception 'Category not found';
@@ -910,7 +927,7 @@ create or replace function public.save_menu_item(
 language plpgsql security definer set search_path = public as $$
 declare b businesses; t text := trim(coalesce(p_title, '')); img text := coalesce(p_image, ''); r uuid;
 begin
-  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
   if char_length(t) < 1 or char_length(t) > 80 then raise exception 'Give the item a name (up to 80 characters)'; end if;
   if char_length(coalesce(p_description, '')) > 600 then raise exception 'Description is too long (600 characters max)'; end if;
@@ -939,7 +956,7 @@ create or replace function public.delete_menu_item(p_id uuid) returns void
 language plpgsql security definer set search_path = public as $$
 begin
   delete from menu_items i using businesses b
-   where i.id = p_id and b.id = i.business_id and b.owner_id = auth.uid();
+   where i.id = p_id and b.id = i.business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin()));
 end $$;
 
 revoke execute on function public.get_menu(text), public.save_menu_item(text, uuid, text, text, text, text, boolean, uuid),
@@ -988,7 +1005,7 @@ declare
   b businesses; d int; since timestamptz;
   daily json; weekly json; hours json; ret json; cohorts json; coupons json; wb json; tot json;
 begin
-  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
   d := greatest(7, least(coalesce(p_days, 90), 365));
   since := now() - make_interval(days => d);
@@ -1085,13 +1102,6 @@ end $$;
 
 
 -- ---------- Multi-business platform (also shipped as supabase/2026-10-12-platform.sql) ----------
-create table if not exists public.platform_admins (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  created_at timestamptz not null default now()
-);
-alter table public.platform_admins enable row level security;
-revoke all on public.platform_admins from anon, authenticated;
-
 -- A web address (custom domain or subdomain) that opens a particular shop.
 create table if not exists public.business_domains (
   host text primary key check (length(host) <= 253 and host ~ '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'),
@@ -1101,11 +1111,6 @@ create table if not exists public.business_domains (
 create index if not exists business_domains_biz_idx on public.business_domains (business_id);
 alter table public.business_domains enable row level security;
 revoke all on public.business_domains from anon, authenticated;
-
-create or replace function public._is_platform_admin() returns boolean
-language sql stable security definer set search_path = public as $$
-  select exists (select 1 from platform_admins where user_id = auth.uid());
-$$;
 
 -- Public: which shop does this web address belong to? (null = unknown). The address-to-shop link is public by nature.
 create or replace function public.resolve_host(p_host text) returns text
@@ -1144,6 +1149,7 @@ begin
   if uid is null then raise exception 'No account exists for that owner email yet'; end if;
   insert into businesses (slug, name, tagline, color, owner_id)
     values (s, left(btrim(p_name), 80), left(coalesce(p_tagline, ''), 120), col, uid) returning id into bid;
+  perform _support_log(bid, 'shop_created', '{}'::jsonb);
   return json_build_object('id', bid, 'slug', s);
 end $$;
 
@@ -1156,6 +1162,7 @@ begin
   if uid is null then raise exception 'No account exists for that owner email yet'; end if;
   update businesses set owner_id = uid where slug = p_slug;
   if not found then raise exception 'Shop not found'; end if;
+  perform _support_log((select id from businesses where slug = p_slug), 'owner_changed', '{}'::jsonb);
 end $$;
 
 create or replace function public.platform_set_domain(p_slug text, p_host text) returns void
@@ -1170,21 +1177,190 @@ begin
   if exists (select 1 from business_domains where host = h and business_id <> bid) then
     raise exception 'That domain already belongs to another shop'; end if;
   insert into business_domains (host, business_id) values (h, bid) on conflict (host) do nothing;
+  perform _support_log(bid, 'domain_added', jsonb_build_object('host', h));
 end $$;
 
 create or replace function public.platform_remove_domain(p_host text) returns void
 language plpgsql security definer set search_path = public as $$
+declare bid uuid;
 begin
   if not _is_platform_admin() then raise exception 'Not allowed'; end if;
-  delete from business_domains where host = lower(btrim(coalesce(p_host, '')));
+  delete from business_domains where host = lower(btrim(coalesce(p_host, ''))) returning business_id into bid;
+  if bid is not null then perform _support_log(bid, 'domain_removed', jsonb_build_object('host', lower(btrim(p_host)))); end if;
 end $$;
 
-revoke execute on function public._is_platform_admin(), public.resolve_host(text), public.platform_overview(),
+revoke execute on function public.resolve_host(text), public.platform_overview(),
   public.platform_create_business(text, text, text, text, text), public.platform_set_owner(text, text),
   public.platform_set_domain(text, text), public.platform_remove_domain(text) from public, anon, authenticated;
+-- The row rules call this as the signed-in user; it only ever says whether *you* are a platform admin.
+revoke execute on function public._is_platform_admin() from public, anon;
+grant execute on function public._is_platform_admin() to authenticated;
 grant execute on function public.resolve_host(text) to anon, authenticated;
 grant execute on function public.platform_overview() to authenticated;
 grant execute on function public.platform_create_business(text, text, text, text, text) to authenticated;
 grant execute on function public.platform_set_owner(text, text) to authenticated;
 grant execute on function public.platform_set_domain(text, text) to authenticated;
 grant execute on function public.platform_remove_domain(text) to authenticated;
+
+-- ---------- Platform v2: audit trail, shop notes, cross-shop search, owner-visible support log ----------
+-- Every platform-admin change and every support session is recorded here. Owners can read their own shop's entries.
+create table if not exists public.platform_audit (
+  id bigint generated always as identity primary key,
+  business_id uuid references public.businesses(id) on delete set null,
+  slug text,
+  admin_id uuid,
+  admin_email text,
+  action text not null,
+  detail jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists platform_audit_biz_idx on public.platform_audit (business_id, created_at desc);
+alter table public.platform_audit enable row level security;
+revoke all on public.platform_audit from anon, authenticated;
+
+-- Your own bookkeeping per shop: plan, contact, notes, renewal date. Never shown to the shop.
+create table if not exists public.platform_shop_meta (
+  business_id uuid primary key references public.businesses(id) on delete cascade,
+  plan text not null default '',
+  contact text not null default '',
+  notes text not null default '',
+  renews_on date,
+  updated_at timestamptz not null default now()
+);
+alter table public.platform_shop_meta enable row level security;
+revoke all on public.platform_shop_meta from anon, authenticated;
+
+-- Records an action only when a platform admin is acting on a shop they do not own (an owner's own actions are not support).
+create or replace function public._support_log(p_biz uuid, p_action text, p_detail jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare b businesses;
+begin
+  if auth.uid() is null or not _is_platform_admin() then return; end if;
+  select * into b from businesses where id = p_biz;
+  if not found or b.owner_id = auth.uid() then return; end if;
+  insert into platform_audit (business_id, slug, admin_id, admin_email, action, detail)
+  values (b.id, b.slug, auth.uid(), (select email from auth.users where id = auth.uid()), p_action, coalesce(p_detail, '{}'::jsonb));
+end $$;
+
+-- Any change to a shop's settings made by a platform admin who is not its owner is logged with the names of the fields that changed.
+create or replace function public._audit_business_change() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare ch text[];
+begin
+  if auth.uid() is not null and _is_platform_admin() and new.owner_id is not distinct from old.owner_id and old.owner_id is distinct from auth.uid() then
+    select array_agg(n.key order by n.key) into ch
+      from jsonb_each(to_jsonb(new)) n join jsonb_each(to_jsonb(old)) o on o.key = n.key
+     where n.value is distinct from o.value;
+    if ch is not null then
+      insert into platform_audit (business_id, slug, admin_id, admin_email, action, detail)
+      values (new.id, new.slug, auth.uid(), (select email from auth.users where id = auth.uid()), 'settings_changed', jsonb_build_object('fields', to_jsonb(ch)));
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists businesses_audit on public.businesses;
+create trigger businesses_audit after update on public.businesses for each row execute function public._audit_business_change();
+
+-- Support session opened from the platform page (Open dashboard as the owner).
+create or replace function public.platform_support_open(p_slug text) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare b businesses;
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  select * into b from businesses where slug = p_slug;
+  if not found then raise exception 'Shop not found'; end if;
+  perform _support_log(b.id, 'support_open', '{}'::jsonb);
+  return true;
+end $$;
+
+-- Client-reported events that read data: opening a customer list or exporting. (Changes are logged by the database itself.)
+create or replace function public.platform_log(p_slug text, p_action text, p_detail jsonb default '{}'::jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare b businesses;
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  if p_action not in ('view_customers', 'export', 'owner_reset_email', 'note') then raise exception 'Unknown action'; end if;
+  select * into b from businesses where slug = p_slug;
+  if not found then raise exception 'Shop not found'; end if;
+  perform _support_log(b.id, p_action, p_detail);
+end $$;
+
+create or replace function public.platform_audit_list(p_slug text default null, p_limit int default 100) returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  return (select coalesce(json_agg(x order by x.created_at desc), '[]'::json) from (
+    select a.id, a.slug, a.admin_email, a.action, a.detail, a.created_at from platform_audit a
+     where p_slug is null or a.slug = p_slug order by a.created_at desc limit least(greatest(coalesce(p_limit, 100), 1), 500)) x);
+end $$;
+
+-- The shop owner can see when support accessed or changed their account.
+create or replace function public.my_support_log(p_slug text) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare b businesses;
+begin
+  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  if not found then raise exception 'Not allowed'; end if;
+  return (select coalesce(json_agg(x order by x.created_at desc), '[]'::json) from (
+    select a.action, a.detail, a.created_at from platform_audit a where a.business_id = b.id order by a.created_at desc limit 30) x);
+end $$;
+
+create or replace function public.platform_save_meta(p_slug text, p_plan text, p_contact text, p_notes text, p_renews date) returns void
+language plpgsql security definer set search_path = public as $$
+declare bid uuid;
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  select id into bid from businesses where slug = p_slug;
+  if bid is null then raise exception 'Shop not found'; end if;
+  insert into platform_shop_meta (business_id, plan, contact, notes, renews_on, updated_at)
+  values (bid, left(coalesce(p_plan, ''), 60), left(coalesce(p_contact, ''), 200), left(coalesce(p_notes, ''), 4000), p_renews, now())
+  on conflict (business_id) do update set plan = excluded.plan, contact = excluded.contact, notes = excluded.notes,
+    renews_on = excluded.renews_on, updated_at = now();
+end $$;
+
+-- "Which shop is this customer in?" across every shop. Matches part of a phone number or name (3+ characters).
+create or replace function public.platform_find_member(p_q text) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare q text := btrim(coalesce(p_q, '')); digits text := regexp_replace(coalesce(p_q, ''), '\D', '', 'g');
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  if length(q) < 3 then return '[]'::json; end if;
+  return (select coalesce(json_agg(x), '[]'::json) from (
+    select m.id, b.slug, b.name as shop, m.name, m.phone, m.stamps, m.total, m.last_stamp, m.joined
+      from members m join businesses b on b.id = m.business_id
+     where m.name ilike '%' || replace(replace(q, '%', ''), '_', '') || '%' or (length(digits) >= 3 and m.phone like '%' || digits || '%')
+     order by m.joined desc limit 25) x);
+end $$;
+
+-- Replaces the first version: adds activity numbers and the bookkeeping fields.
+create or replace function public.platform_overview() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  return (select coalesce(json_agg(json_build_object(
+      'id', b.id, 'slug', b.slug, 'name', b.name, 'color', b.color, 'logo_url', b.logo_url, 'created_at', b.created_at,
+      'owner_email', u.email, 'tz', b.tz, 'need', b.need, 'reward', b.reward,
+      'members', (select count(*) from members m where m.business_id = b.id),
+      'new_members_7d', (select count(*) from members m where m.business_id = b.id and m.joined > now() - interval '7 days'),
+      'stamps_7d', (select count(*) from visits v where v.business_id = b.id and v.created_at > now() - interval '7 days'),
+      'stamps_30d', (select count(*) from visits v where v.business_id = b.id and v.created_at > now() - interval '30 days'),
+      'last_stamp', (select max(v.created_at) from visits v where v.business_id = b.id),
+      'coupons_30d', (select count(*) from offers o where o.business_id = b.id and o.created_at > now() - interval '30 days'),
+      'redeemed_30d', (select count(*) from offers o where o.business_id = b.id and o.used_at > now() - interval '30 days'),
+      'domains', coalesce((select json_agg(d.host order by d.host) from business_domains d where d.business_id = b.id), '[]'::json),
+      'plan', coalesce(pm.plan, ''), 'contact', coalesce(pm.contact, ''), 'notes', coalesce(pm.notes, ''), 'renews_on', pm.renews_on
+    ) order by b.created_at desc), '[]'::json)
+    from businesses b left join auth.users u on u.id = b.owner_id left join platform_shop_meta pm on pm.business_id = b.id);
+end $$;
+
+revoke execute on function public._support_log(uuid, text, jsonb), public._audit_business_change(),
+  public.platform_support_open(text), public.platform_log(text, text, jsonb), public.platform_audit_list(text, int),
+  public.my_support_log(text), public.platform_save_meta(text, text, text, text, date), public.platform_find_member(text),
+  public.platform_overview() from public, anon, authenticated;
+grant execute on function public.platform_support_open(text) to authenticated;
+grant execute on function public.platform_log(text, text, jsonb) to authenticated;
+grant execute on function public.platform_audit_list(text, int) to authenticated;
+grant execute on function public.my_support_log(text) to authenticated;
+grant execute on function public.platform_save_meta(text, text, text, text, date) to authenticated;
+grant execute on function public.platform_find_member(text) to authenticated;
+grant execute on function public.platform_overview() to authenticated;

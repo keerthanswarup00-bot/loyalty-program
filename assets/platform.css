@@ -1,0 +1,16 @@
+/* Platform admin only. Uses the shared variables from style.css. */
+main.wide{max-width:760px}
+.pf-top{display:flex;justify-content:space-between;align-items:center;margin:0 0 12px}.pf-brand{background:none;border:0;padding:0;font:600 20px var(--f-d,Fraunces,Georgia,serif);color:var(--tx);cursor:pointer}
+.pf-bar{display:flex;gap:10px;margin:0 0 12px;align-items:center;flex-wrap:wrap}.pf-bar input{flex:1 1 180px;min-width:0}.pf-bar select{flex:none;width:auto;max-width:160px}.pf-bar .btn.sm{flex:none;white-space:nowrap}
+.pf-row{width:100%;display:flex;gap:12px;align-items:center;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:10px;cursor:pointer;color:var(--tx);font:inherit}
+.pf-row:hover{border-color:var(--brand)}
+.pf-dot{width:14px;height:14px;border-radius:50%;flex:none;display:inline-block}.pf-dot.big{width:34px;height:34px}
+.pf-main{flex:1;min-width:0;display:block}.pf-main b{display:block;font-weight:600}.pf-main small{display:block;color:var(--mut);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-nums{display:flex;gap:14px;flex:none;text-align:right}.pf-nums span{display:block;font-size:11px;color:var(--mut)}.pf-nums b{display:block;font-size:15px;color:var(--tx)}
+@media (max-width:560px){.pf-row{flex-wrap:wrap}.pf-nums{width:100%;justify-content:space-between;text-align:left}}
+.pf-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.pf-chip{font-size:11px;font-weight:600;padding:2px 9px;border-radius:99px;background:color-mix(in srgb,var(--mut) 16%,transparent);color:var(--tx)}
+.pf-chip.l1{background:color-mix(in srgb,#d97706 20%,transparent);color:color-mix(in srgb,#d97706 80%,var(--tx))}.pf-chip.l2{background:color-mix(in srgb,#dc2626 20%,transparent);color:color-mix(in srgb,#dc2626 80%,var(--tx))}
+.pf-head{display:flex;gap:12px;align-items:center;margin:10px 0 0}
+.pf-res{margin-top:10px;display:grid;gap:6px}.pf-res button{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--tx);font:inherit;cursor:pointer}.pf-res small{color:var(--mut);width:100%}.pf-res span{color:var(--mut);font-size:13px}
+.pf-cu{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line)}.pf-cu:first-of-type{border-top:0}
+.pf-act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.pf-act .btn.sm{padding:7px 11px;font-size:12.5px}
