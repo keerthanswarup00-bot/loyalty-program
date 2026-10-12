@@ -134,3 +134,5 @@ a.btn.sm{display:inline-block}
 
 /* support mode */
 .a-support{background:#111;color:#fff;font-size:12.5px;padding:8px 12px;border-radius:12px;margin-bottom:12px}.a-support a{color:#fff;text-decoration:underline;margin-left:4px}
+
+.a-paused{background:#b91c1c;color:#fff;font-size:13px;padding:10px 12px;border-radius:12px;margin-bottom:12px}

@@ -907,6 +907,7 @@ function skelV() {
 
     biz = await bizP;
     if (!biz) { $('#app').innerHTML = '<div class="card"><h2>Not found</h2><p class="sub">This business is not set up yet.</p></div>'; return }
+    if (biz.suspended) { brand(biz); $('#app').innerHTML = head(biz) + '<div class="card"><h2>Rewards are paused</h2><p class="sub">' + esc(biz.name) + ' has paused its rewards programme for now. Your stamps and coupons are safe. Please check with the shop.</p></div>'; return }
     writeBiz(biz); brand(biz); setTimeout(pwa, 800);
     try { if (stampImg()) { const im = new Image(); im.src = biz.stamp_url } } catch (e) { }   // ready before the stamp drops
     dailyPub = await pubP;

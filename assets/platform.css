@@ -14,3 +14,13 @@ main.wide{max-width:760px}
 .pf-res{margin-top:10px;display:grid;gap:6px}.pf-res button{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--tx);font:inherit;cursor:pointer}.pf-res small{color:var(--mut);width:100%}.pf-res span{color:var(--mut);font-size:13px}
 .pf-cu{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line)}.pf-cu:first-of-type{border-top:0}
 .pf-act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.pf-act .btn.sm{padding:7px 11px;font-size:12.5px}
+
+main.a.plat{max-width:760px}.pf-nav .a-in{max-width:760px}
+.pf-h{margin:4px 0 14px;font:600 26px/1.15 var(--f-d,Fraunces,Georgia,serif)}.pf-hd{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}.pf-hd .pf-h{margin:0}
+div.pf-row{cursor:pointer}.pf-row .btn.sm{flex:none}
+.pf-badge{font-style:normal;background:#dc2626;color:#fff;border-radius:99px;padding:0 6px;font-size:10px;margin-left:2px}
+.pf-bill{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--line);flex-wrap:wrap}.pf-bill:first-of-type{border-top:0}
+.pf-bn{display:flex;gap:10px;align-items:center;background:none;border:0;padding:0;color:var(--tx);font:inherit;text-align:left;cursor:pointer;min-width:0;flex:1 1 220px}.pf-bn small{display:block;color:var(--mut);font-size:12.5px}
+.pf-state{border-radius:14px;padding:12px 14px;font-size:14px}.pf-state.ok{background:color-mix(in srgb,#16a34a 14%,transparent)}.pf-state.bad{background:color-mix(in srgb,#dc2626 16%,transparent)}
+.pf-danger{border-color:color-mix(in srgb,#dc2626 45%,var(--line))}.a-delbtn{background:#b91c1c}
+.tabs button{white-space:nowrap}
