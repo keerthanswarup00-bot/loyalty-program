@@ -51,8 +51,36 @@ function nice(e) {
   return m;
 }
 
+// ---- Branding: one colour plus a few fixed look options ----
+// Everything derived from the brand colour is computed here so any colour stays readable:
+//   --on-brand  text on top of the colour (white or near-black, whichever contrasts more)
+//   --brand-t-l / --brand-t-d  the colour as TEXT on a light / dark card (darkened or lightened until it reaches 4.5:1)
+//   --brand-2   the second stop of the header gradient
+const HEX6 = /^#[0-9a-f]{6}$/i;
+const _ch = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const _hex = a => '#' + a.map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
+const _lum = a => { const f = x => (x /= 255) <= .03928 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4); return .2126 * f(a[0]) + .7152 * f(a[1]) + .0722 * f(a[2]) };
+const contrast = (h1, h2) => { const a = _lum(_ch(h1)), b = _lum(_ch(h2)); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05) };
+const _mix = (h, to, t) => { const a = _ch(h), b = _ch(to); return _hex(a.map((x, i) => x + (b[i] - x) * t)) };
+// Move a colour towards `to` in small steps until it reaches 4.5:1 against `bg` (or hits `to`).
+const _legible = (h, bg, to) => { let c = h; for (let t = 0; t <= 1.0001 && contrast(c, bg) < 4.5; t += .05) c = _mix(h, to, t); return c };
+const RADII = { sharp: ['8px', '6px', '6px'], soft: ['22px', '12px', '12px'], round: ['30px', '99px', '16px'] };
+// The CSS variables for a colour and theme. Used for the live app and for the preview in the owner's editor.
+function themeVars(color, theme) {
+  const c = HEX6.test(color || '') ? color : '#8a4b2a', t = theme && typeof theme == 'object' ? theme : {};
+  const on = contrast(c, '#ffffff') >= contrast(c, '#111111') ? '#ffffff' : '#111111';
+  const r = RADII[t.radius] || RADII.soft;
+  return {
+    '--brand': c, '--on-brand': on,
+    '--brand-t-l': _legible(c, '#fffdfa', '#000000'), '--brand-t-d': _legible(c, '#1d1b19', '#ffffff'),
+    '--brand-2': t.hero == 'solid' ? c : on == '#ffffff' ? _mix(c, '#000000', .45) : _mix(c, '#ffffff', .3),
+    '--r-card': r[0], '--r-btn': r[1], '--r-in': r[2],
+    '--f-d': t.font == 'sans' ? 'Inter,system-ui,sans-serif' : 'Fraunces,Georgia,serif'
+  };
+}
 function brand(b) {
-  document.documentElement.style.setProperty('--brand', b.color || '#8a4b2a');
+  const st = document.documentElement.style;
+  Object.entries(themeVars(b.color, b.theme)).forEach(([k, x]) => st.setProperty(k, x));
   document.title = b.name + ' Rewards';
 }
 const mark = b => (b.logo_url && (b.logo_url.startsWith('http') || b.logo_url.startsWith('data:'))) ? `<img src="${esc(b.logo_url)}" alt="">` : esc((b.name || '?').trim().slice(0, 1).toUpperCase());
@@ -61,6 +89,27 @@ function socials(b) {
   const L = [['Instagram', b.ig, 'ig'], ['Facebook', b.fb, 'fb'], ['WhatsApp', b.wa, 'wa'], ['Website', b.web, 'web']].filter(x => /^https?:\/\//.test(x[1]));
   return L.length ? `<div class="soc">${L.map(x => `<a href="${esc(x[1])}" target="_blank" rel="noopener" aria-label="${x[0]}">${IC[x[2]]}</a>`).join('')}</div>` : '';
 }
+// ---- Which shop is this page for? ----
+// Single-shop deployment: config.js sets `slug` and nothing changes.
+// Multi-shop deployment: leave `slug` empty. The shop comes from the address:
+//   1) subdomain of config.js `baseDomain`   (cheesora.example.com -> "cheesora", needs no database lookup)
+//   2) a custom domain registered for the shop (looked up once with resolve_host(), remembered for the tab)
+//   3) ?shop=slug, on localhost only (for testing)
+async function resolveShop() {
+  if (CFG.slug) return true;
+  const h = location.hostname.toLowerCase(), base = String(CFG.baseDomain || '').toLowerCase().replace(/^\./, '');
+  if (/^(localhost|127\.0\.0\.1)$/.test(h)) { const q = new URLSearchParams(location.search).get('shop'); if (q && /^[a-z0-9-]+$/.test(q)) { CFG.slug = q; return true } }
+  if (base && h.endsWith('.' + base)) { const s = h.slice(0, -base.length - 1); if (/^[a-z0-9-]+$/.test(s) && !['www', 'app', 'admin', 'platform'].includes(s)) { CFG.slug = s; return true } }
+  const key = 'lk-host-' + h;
+  try { const c = sessionStorage.getItem(key); if (c) { CFG.slug = c; return true } } catch (e) { }
+  try {
+    const r = await fetch(CFG.supabaseUrl + '/rest/v1/rpc/resolve_host', { method: 'POST', headers: { apikey: CFG.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_host: h }) });
+    const s = r.ok ? await r.json() : null;
+    if (typeof s == 'string' && /^[a-z0-9-]+$/.test(s)) { CFG.slug = s; try { sessionStorage.setItem(key, s) } catch (e) { } return true }
+  } catch (e) { }
+  return false;
+}
+const noShopMsg = '<div class="card"><h2>Shop not found</h2><p class="sub">This web address is not linked to a shop. Check the link, or ask the shop for their rewards link.</p></div>';
 const notReady = () => /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !window.supabase;
 const setupMsg = '<div class="card"><h2>Almost there</h2><p class="sub">Add your Supabase URL and key in <b>assets/config.js</b>, then reload. See README.md.</p></div>';
 

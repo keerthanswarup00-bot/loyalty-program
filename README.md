@@ -9,7 +9,8 @@ admin/index.html      owner dashboard       assets/admin.js + assets/admin.css
 assets/config.js      per-deployment settings (the only file you edit)
 assets/common.js, style.css   shared
 assets/vendor/        supabase-js and qrcode-generator, served from this site (no CDN)
-supabase/schema.sql   run once        supabase/new-client.sql   run per client
+supabase/schema.sql   run once        supabase/new-client.sql   run per client (single-shop deployments)
+platform/index.html   all-shops admin       assets/platform.js
 archive/              unused old code, kept for reference only (never deployed)
 ```
 
@@ -70,6 +71,30 @@ More -> Refer a friend (off by default). Every customer gets a personal code (e.
 ## Images (logo and stamp)
 
 Images are stored in a public Supabase Storage bucket called `brand` (one folder per business, up to 2 MB each), not inside the database. Re-run `supabase/schema.sql` once to create the bucket and its rules (only the business owner can write to their folder). Images saved earlier as inline data keep working; in **Offers -> Stamp image** (or **More -> Brand**) press **Move to storage** to convert them.
+
+## Insights (owner analytics)
+
+Home -> **Insights**: stamps per day and per week, a weekday-by-hour heatmap of busy times, 30-day retention and join-month cohorts, win-back results, and coupons issued against redeemed, for 30 days, 90 days or a year. Needs `supabase/2026-10-12-analytics.sql` (already in `schema.sql`). All times use the shop's own time zone.
+
+Read the numbers honestly: "came back" counts a stamp after the sign-up day within 30 days of joining, and only people who joined 30+ days ago are counted. The win-back "stamped within 30 days" figure also includes people who would have returned anyway; the coupon-redeemed figure is the reliable one. Bulk WhatsApp sends from the Message tab are not logged, so they are not in the win-back numbers.
+
+## Branding
+
+More -> **Brand**: logo, colour ("Pick from logo" reads the dominant colour), corner style, heading font, header style, and a live preview. Needs `supabase/2026-10-12-branding.sql` for the look options (colour and logo work without it). Any colour stays readable: text on the colour switches between white and dark automatically, and where the colour is used as text it is darkened (light mode) or lightened (dark mode) until it reaches 4.5:1 contrast. The look is a fixed set of choices checked by the database, never free CSS, so a shop cannot inject markup into its customers' app.
+
+## Many shops, one deployment
+
+Instead of one Vercel project per client, one deployment can serve every shop; the database already keeps shops apart.
+
+1. Run `supabase/2026-10-12-platform.sql` (already in `schema.sql`).
+2. Make yourself platform admin, once: `insert into public.platform_admins (user_id) select id from auth.users where email = 'you@example.com';` (the account must exist: Authentication -> Users -> Add user).
+3. In `assets/config.js` set `slug: ''` and `baseDomain: 'yourplatform.com'`.
+4. In Vercel add the wildcard domain `*.yourplatform.com` to the project (needs the domain's nameservers on Vercel).
+5. Open `/platform/`, sign in, press **Create shop**. The shop opens at `<address>.yourplatform.com` (customers at `/app/`, owner at `/admin/`).
+
+**Custom domains:** in `/platform/` add the domain to the shop, then add the same domain to the Vercel project and point the client's DNS at Vercel (CNAME `cname.vercel-dns.com`). Both steps are manual: the repo holds no Vercel token. A domain not added in `/platform/` shows "Shop not found".
+
+Limits to know: platform admins cannot see a shop's customers, and cannot open a shop's dashboard unless they are its owner (use **Change owner** for support). There is no suspend switch: write functions do not check a paused flag, so a flag would only look like protection. Existing single-shop deployments keep working unchanged (leave `slug` set). Customer logins are keyed by shop address, so the same phone number can join several shops separately.
 
 ## Libraries
 

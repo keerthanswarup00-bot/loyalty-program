@@ -888,6 +888,7 @@ function skelV() {
   // Ask for durable storage so the browser does not evict the saved login.
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { }) } catch (e) { }
   if (notReady()) { $('#app').innerHTML = setupMsg; return }
+  if (!(await resolveShop())) { $('#app').innerHTML = noShopMsg; return }
   try {
     const m = location.hash.match(/scan=([\w-]+)/); if (m) pend = m[1];
     const jm = location.hash.match(/join=([\w-]+)/);

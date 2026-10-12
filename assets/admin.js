@@ -78,7 +78,7 @@ async function load() {
     }
   } catch (e) { toast(nice(e)) }
 }
-async function refresh() { await load(); render(); toast('Updated') }
+async function refresh() { await load(); render(); toast('Updated'); if (tab == 'h' && ov == 'ins') loadIns() }
 function go(t, o) { tab = t; ov = o || null; openId = null; render(); window.scrollTo(0, 0) }
 
 // ---------- auth ----------
@@ -92,7 +92,7 @@ async function login(btn) {
 }
 async function out() {
   await sb.auth.signOut();
-  signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null; MENU = null; CATS = null;
+  signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null; MENU = null; CATS = null; INS = null;
   sel = new Set(); bsel = new Set(); selMode = false; bq = null; binit = false; impRows = null; visCache = {}; MSG = [];
   render();
 }
@@ -216,13 +216,14 @@ function homeV() {
       + stat(d.filter(x => !x.used_at && !isExp(x)).length, 'Daily coupons outstanding')
       + stat(d.filter(x => x.used_at).length, 'Daily coupons redeemed');
   }
-  return `<div class="a-card"><div class="a-h"><h2>Sign-up QR</h2><span class="a-tag">At the counter</span></div>
+  const kit = 'theme' in biz && !(biz.theme || {}).done && M.length < 5 ? `<div class="a-card"><div class="a-h"><h2>Make it yours</h2><span class="a-tag">2 minutes</span></div><p class="sub">Add your logo and pick your colour so the app looks like your shop.</p><button class="btn sm" onclick="go('m')">Set up branding</button></div>` : '';
+  return kit + `<div class="a-card"><div class="a-h"><h2>Sign-up QR</h2><span class="a-tag">At the counter</span></div>
     <p class="sub">Print this for the counter or door. Scanning it lets a new customer join and get their first stamp — it cannot add any later stamps.</p>
     <label class="lb">Sign-up link</label><input readonly class="ro" value="${esc(joinUrl())}" onclick="this.select()">
     <div class="qr" id="qrb"></div>
     <div class="row"><button class="btn sm" onclick="dlQR()">Download</button><button class="btn sm alt" onclick="cpL('j')">Copy link</button><button class="btn sm alt" onclick="regen('join_token')">Regenerate</button></div>
     <p class="hint">Later stamps come from the NFC tag set up in More → Stamp tag.</p></div>
-  <div class="a-quick"><button onclick="go('r')">${AI.ok}<b>Redeem a coupon</b><span>Enter a customer's code</span></button><button onclick="go('b')">${AI.send}<b>Message customers</b><span>WhatsApp group send</span></button><button onclick="go('o')">${AI.gift}<b>Edit offers</b><span>Stamps, welcome, birthday</span></button></div>
+  <div class="a-quick"><button onclick="go('r')">${AI.ok}<b>Redeem a coupon</b><span>Enter a customer's code</span></button><button onclick="go('b')">${AI.send}<b>Message customers</b><span>WhatsApp group send</span></button><button onclick="go('o')">${AI.gift}<b>Edit offers</b><span>Stamps, welcome, birthday</span></button><button onclick="openIns()">${AI.trend}<b>Insights</b><span>Busy hours, retention</span></button></div>
   ${comeBack()}
   <div class="a-card"><h2>At a glance</h2><div class="a-sts">${stat(M.filter(u => u.last_stamp && new Date(u.last_stamp) > wk).length, 'Active, 7 days')}${stat(redeemedToday, 'Redeemed today')}${stat(M.reduce((a, u) => a + heldOffers(u), 0), 'Coupons out')}${stat(ending, 'Cards ending')}${stat(M.filter(u => sameMonth(u.bday)).length, 'Birthdays this month')}${daily}</div></div>
   ${chartV()}
@@ -638,7 +639,10 @@ async function svBrand(btn) {
   const f = $('#clfile').files[0];
   if (f) { try { logoUrl = await readImg(f, 'logo') } catch (e) { return imgErr(e) } }
   const nw = t('nw').slice(0, 280);
+  if (!HEX6.test(v('cc') || biz.color)) return toast('Pick the brand colour with the colour box');
+  const themeP = 'theme' in biz ? { theme: Object.assign({}, brLook(), { done: true }) } : {};   // only if the 2026-10-12-branding.sql update has been run
   await save({
+    ...themeP,
     name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl, color: v('cc') || biz.color,
     ig: t('ci'), fb: t('cf'), wa: t('cw'), web: t('cs'),
     news_text: nw, news_at: nw ? (nw == (biz.news_text || '') && biz.news_at ? biz.news_at : new Date().toISOString()) : null,
@@ -701,9 +705,52 @@ function dgAdd() { const d = dgGet(); if (d.prizes.length < 12) d.prizes.push({ 
 function dgDel(i) { dgGet().prizes.splice(i, 1); dgRefresh(); }
 function dgDay(n) { const d = dgGet(); d.days = d.days.includes(n) ? d.days.filter(x => x != n) : [...d.days, n].sort((a, b) => a - b); dgRefresh(); }
 function dailyWarn() { dgSum() }
+// ---------- Brand kit: colour, look, live preview ----------
+const LOOKS = { radius: [['sharp', 'Sharp'], ['soft', 'Soft'], ['round', 'Round']], font: [['serif', 'Classic (serif)'], ['sans', 'Clean (sans)']], hero: [['gradient', 'Gradient'], ['solid', 'Solid']] };
+const brLook = () => { const t = biz.theme || {}; return { radius: v('brr') || t.radius || 'soft', font: v('brf') || t.font || 'serif', hero: v('brh') || t.hero || 'gradient' } };
+function brandKit() {
+  const t = biz.theme || {}, sel = (id, k, lab) => `<label class="lb">${lab}</label><select id="${id}">${LOOKS[k].map(o => `<option value="${o[0]}"${(t[k] || LOOKS[k][k == 'radius' ? 1 : 0][0]) == o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select>`;
+  return `<label class="lb">Brand colour</label><div class="row"><input id="cc" type="color" value="${esc(HEX6.test(biz.color) ? biz.color : '#8a4b2a')}"><button type="button" class="btn sm alt" onclick="pickLogo(this)">Pick from logo</button></div>
+  ${'theme' in biz ? sel('brr', 'radius', 'Corners') + sel('brf', 'font', 'Headings') + sel('brh', 'hero', 'Header') : '<p class="hint">Run supabase/2026-10-12-branding.sql to unlock corner, font and header options.</p>'}
+  <label class="lb">Preview <span>(what customers see)</span></label><div id="brpv" class="br"></div><p class="hint" id="brinfo"></p>`;
+}
+function brPv() {
+  const el = $('#brpv'); if (!el) return;
+  const c = HEX6.test(v('cc')) ? v('cc') : biz.color, vars = themeVars(c, brLook());
+  Object.entries(vars).forEach(([k, x]) => el.style.setProperty(k, x));
+  const im = $('#clfilepv img'), pv = $('#clfilepv'), logo = im && pv && !pv.hidden ? im.src : '', name = v('cn') || biz.name;
+  el.innerHTML = `<div class="br-h"><div class="br-lg">${logo ? `<img src="${esc(logo)}" alt="">` : esc((name || '?').trim().slice(0, 1).toUpperCase())}</div><div><b>${esc(name)}</b><span>${esc(v('ct'))}</span></div></div>
+    <div class="br-b"><div class="br-s">${[1, 1, 1, 0, 0, 0].map(f => `<i class="${f ? 'f' : ''}"></i>`).join('')}</div><button type="button" tabindex="-1">Collect stamp</button><p>Offer text in the brand colour</p></div>`;
+  const on = vars['--on-brand'], r = contrast(c, on).toFixed(1), tx = vars['--brand-t-l'] != c.toLowerCase();
+  const i = $('#brinfo'); if (i) i.textContent = `Button text is ${on == '#ffffff' ? 'white' : 'dark'} (${r}:1 contrast).` + (tx ? ' Where the colour is used as text it is darkened a little so it stays readable.' : '');
+}
+async function pickLogo(btn) {
+  const im = $('#clfilepv img'), pv = $('#clfilepv');
+  if (!im || pv.hidden) return toast('Add a logo first');
+  btn.disabled = true;
+  try {
+    const img = new Image(); img.crossOrigin = 'anonymous'; img.src = im.src; await img.decode();
+    const c = document.createElement('canvas'); c.width = c.height = 48;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, 48, 48);
+    const d = x.getImageData(0, 0, 48, 48).data, bins = {};
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b), sat = (mx - mn) / (mx || 1), l = (mx + mn) / 510;
+      if (d[i + 3] < 200 || l > .92 || l < .08 || sat < .25) continue;      // skip transparent, near-white, near-black and grey pixels
+      const k = (r >> 5) << 6 | (g >> 5) << 3 | (b >> 5), e = bins[k] || (bins[k] = [0, 0, 0, 0]);
+      e[0]++; e[1] += r; e[2] += g; e[3] += b;
+    }
+    const top = Object.values(bins).sort((a, b) => b[0] - a[0])[0];
+    if (!top) return toast('This logo has no clear colour (it is black, white or grey). Pick one by hand.');
+    $('#cc').value = _hex([top[1] / top[0], top[2] / top[0], top[3] / top[0]]); brPv();
+  } catch (e) { toast('Could not read the logo colours here. Pick one by hand.') }
+  finally { btn.disabled = false }
+}
+document.addEventListener('input', e => { if (e.target && /^(cc|cn|ct|brr|brf|brh)$/.test(e.target.id)) brPv() });
+document.addEventListener('change', e => { if (e.target && (e.target.id == 'brr' || e.target.id == 'brf' || e.target.id == 'brh' || e.target.id == 'clfile')) setTimeout(brPv, 0) });
+
 // ---------- MORE ----------
 function moreV() {
-  return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${fld('cc', 'Brand colour', biz.color, 'type=color')}${dbHint()}</div>
+  return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${brandKit()}${dbHint()}</div>
   <div class="a-card"><h2>Links</h2>${fld('ci', 'Instagram', biz.ig, '', 'https://…')}${fld('cf', 'Facebook', biz.fb, '', 'https://…')}${fld('cw', 'WhatsApp', biz.wa, '', 'https://wa.me/…')}${fld('cs', 'Website', biz.web, '', 'https://…')}</div>
   <div class="a-card"><h2>What's new</h2><p class="sub">A short note shown at the top of every customer's card (an event, new menu item, holiday hours). Leave blank to hide it.</p><textarea id="nw" rows="3" maxlength="280">${esc(biz.news_text || '')}</textarea><p class="hint">Up to 280 characters. Customers who already closed the old note see the new one.</p></div>
   <div class="a-card"><h2>Refer a friend</h2><p class="sub">Each customer gets a personal code. A friend who enters it when joining gets this offer, and the customer gets it too after the friend's next stamp.</p>
@@ -968,9 +1015,93 @@ async function delMenu(btn) {
   catch (e) { btn.disabled = false; toast(nice(e)) }
 }
 
+// ---------- INSIGHTS (owner analytics from the analytics() SQL function) ----------
+let INS = null, insDays = 90, insBusy = false, insErr = '';
+function openIns() { go('h', 'ins'); loadIns() }
+async function loadIns(days) {
+  if (days) insDays = days;
+  insBusy = true; insErr = ''; render();
+  try { INS = await rpc(sb, 'analytics', { p_slug: CFG.slug, p_days: insDays }) }
+  catch (e) { INS = null; insErr = /function|schema cache/i.test(String(e && e.message || e)) ? 'Run supabase/2026-10-12-analytics.sql in Supabase first.' : nice(e) }
+  insBusy = false; if (tab == 'h' && ov == 'ins') render();
+}
+const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + '%' : '—';
+const ymd = k => new Date(k + 'T00:00:00Z');                     // a YYYY-MM-DD key as a UTC date (no time zone drift)
+const keyOf = d => d.toISOString().slice(0, 10);
+const hr12 = h => (h % 12 || 12) + (h < 12 ? 'am' : 'pm');
+const DOWN = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+function insBars(items, cap) {
+  const max = Math.max(1, ...items.map(i => i.n)), few = items.length <= 14;
+  return `<div class="in-bars" role="img" aria-label="${esc(cap)}">${items.map((i, k) => `<div class="in-b" title="${esc(i.tip)}: ${i.n}">${few ? `<b>${i.n || ''}</b>` : ''}<i style="height:${i.n ? Math.max(3, Math.round(i.n / max * 90)) : 2}px"></i><span>${i.lab}</span></div>`).join('')}</div>`;
+}
+function insDailyV(I) {
+  const n = Math.min(I.days, 30), by = {}; I.daily.forEach(x => by[x.d] = x.n);
+  const items = [...Array(n)].map((_, i) => {
+    const k = bizDay(Date.now() - (n - 1 - i) * 864e5), d = ymd(k);
+    return { n: by[k] || 0, tip: d.toLocaleDateString(undefined, { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }), lab: (i % 5 == 0 || n <= 14) ? d.getUTCDate() : '' };
+  });
+  const tot = items.reduce((a, x) => a + x.n, 0);
+  return `<div class="a-card"><div class="a-h"><h2>Stamps per day</h2><span class="mut sm">last ${n} days · ${tot}</span></div>${tot ? insBars(items, 'Stamps per day') : '<p class="a-empty">No stamps in this period.</p>'}</div>`;
+}
+function insWeeklyV(I) {
+  const by = {}; I.weekly.forEach(x => by[x.d] = x.n);
+  const wk = k => { const d = ymd(k); d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7); return keyOf(d) };
+  const keys = []; for (let i = I.days; i >= 0; i--) { const k = wk(bizDay(Date.now() - i * 864e5)); if (keys[keys.length - 1] != k) keys.push(k) }
+  const items = keys.map((k, i) => ({ n: by[k] || 0, tip: 'Week of ' + ymd(k).toLocaleDateString(undefined, { timeZone: 'UTC', day: 'numeric', month: 'short' }), lab: (i % 2 == 0 || keys.length <= 8) ? ymd(k).toLocaleDateString(undefined, { timeZone: 'UTC', day: 'numeric', month: 'short' }) : '' }));
+  const part = '<p class="hint">The first and last weeks may be partial.</p>';
+  return `<div class="a-card"><div class="a-h"><h2>Stamps per week</h2><span class="mut sm">weeks start Monday</span></div>${items.some(x => x.n) ? insBars(items, 'Stamps per week') + part : '<p class="a-empty">No stamps in this period.</p>'}</div>`;
+}
+function insHoursV(I) {
+  const g = {}; let max = 0; const dayTot = Array(8).fill(0), hrTot = Array(24).fill(0), cells = [];
+  I.hours.forEach(([d, h, n]) => { g[d + '-' + h] = n; max = Math.max(max, n); dayTot[d] += n; hrTot[h] += n; cells.push({ d, h, n }) });
+  if (!cells.length) return '<div class="a-card"><h2>Busiest times</h2><p class="a-empty">No stamps in this period.</p></div>';
+  const top = cells.sort((a, b) => b.n - a.n).slice(0, 3).map(c => `${DOWN[c.d]} ${hr12(c.h)}–${hr12((c.h + 1) % 24)} (${c.n})`);
+  const bestDay = dayTot.indexOf(Math.max(...dayTot));
+  let grid = '<span></span>' + [...Array(24)].map((_, h) => `<em>${h % 6 == 0 ? hr12(h) : ''}</em>`).join('');
+  for (let d = 1; d <= 7; d++) {
+    grid += `<span>${DOWN[d].slice(0, 3)}</span>` + [...Array(24)].map((_, h) => { const n = g[d + '-' + h] || 0; return `<i style="${n ? '--v:' + (0.18 + 0.82 * n / max).toFixed(2) : ''}" class="${n ? 'on' : ''}" title="${DOWN[d]} ${hr12(h)}: ${n}"></i>` }).join('');
+  }
+  return `<div class="a-card"><div class="a-h"><h2>Busiest times</h2><span class="mut sm">${esc(I.tz)}</span></div>
+    <p class="sub">Busiest slots: <b>${top.map(esc).join(' · ')}</b>. Best day overall: <b>${DOWN[bestDay]}</b>.</p>
+    <div class="in-hm" role="img" aria-label="Heatmap of stamps by weekday and hour">${grid}</div><p class="hint">Darker means more stamps. Hover or tap a cell for the count.</p></div>`;
+}
+function insRetentionV(I) {
+  const r = I.retention, c = I.cohorts;
+  const rows = c.map(x => `<div class="of"><div><b>${esc(ymd(x.m + '-01').toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', year: 'numeric' }))}</b><div class="mut sm">${x.joined} joined</div></div><span>${x.mature ? pct(x.back, x.joined) : '<span class="mut sm">too recent</span>'}</span></div>`).join('');
+  return `<div class="a-card"><h2>Do customers come back?</h2>
+    <p class="sub">"Came back" means a stamp after the sign-up day, within 30 days of joining. Only people who joined 30+ days ago are counted, so nobody is judged too early.</p>
+    <div class="a-sts"><div class="a-st"><b>${pct(r.back30, r.mature)}</b><span>Came back in 30 days${r.mature ? ' (of ' + r.mature + ')' : ''}</span></div>
+    <div class="a-st"><b>${pct(r.repeat, r.members)}</b><span>Have 2+ visits</span></div>
+    <div class="a-st"><b>${r.active30}</b><span>Stamped in last 30 days</span></div></div>
+    ${r.mature < 20 && r.mature > 0 ? '<p class="hint">Small sample: with fewer than 20 people, one customer moves this by several points.</p>' : ''}
+    ${rows ? '<h2 style="font-size:16px;margin-top:16px">By month joined</h2>' + rows : ''}</div>`;
+}
+function insWinbackV(I) {
+  const w = I.winback;
+  return `<div class="a-card"><h2>Win-back messages</h2>
+    ${w.sent ? `<div class="a-sts"><div class="a-st"><b>${w.sent}</b><span>Messages</span></div><div class="a-st"><b>${pct(w.returned, w.sent)}</b><span>Stamped within 30 days (${w.returned})</span></div><div class="a-st"><b>${pct(w.redeemed, w.sent)}</b><span>Used their coupon (${w.redeemed})</span></div></div>
+    <p class="hint">Honest reading: the coupon-used figure is the solid one. "Stamped within 30 days" also counts people who would have come back anyway, and the app only knows you opened WhatsApp, not that the message was delivered or read.</p>`
+      : '<p class="a-empty">No win-back messages in this period. Send some from Home → Come back.</p>'}</div>`;
+}
+function insCouponsV(I) {
+  const rows = I.coupons.map(c => `<div class="of"><div><b>${esc(c.type)}</b><div class="mut sm">${c.issued} issued · ${c.redeemed} redeemed · ${c.expired} expired · ${c.open} open</div></div><b>${pct(c.redeemed, c.issued)}</b></div>`).join('');
+  const t = I.coupons.reduce((a, c) => ({ i: a.i + c.issued, r: a.r + c.redeemed }), { i: 0, r: 0 });
+  return `<div class="a-card"><div class="a-h"><h2>Coupons</h2><span class="mut sm">${t.r} of ${t.i} redeemed</span></div>
+    <p class="sub">Coupons created in this period, by type. "Open" ones can still be used, so recent coupons look lower than they will end up.</p>${rows || '<p class="a-empty">No coupons in this period.</p>'}</div>`;
+}
+function insightsV() {
+  const head = `<div class="a-h" style="margin:4px 0 12px"><button class="lnk" onclick="go('h')">← Home</button><div class="chips" style="margin:0">${[30, 90, 365].map(d => `<button class="chip${insDays == d ? ' on' : ''}" aria-pressed="${insDays == d}" onclick="loadIns(${d})">${d == 365 ? '1 year' : d + ' days'}</button>`).join('')}</div></div>`;
+  if (insBusy && !INS) return head + '<div class="a-card sk" aria-busy="true"><i></i><i style="width:60%"></i><i></i></div>';
+  if (insErr) return head + `<div class="a-card"><h2>Insights unavailable</h2><p class="sub">${esc(insErr)}</p><button class="btn sm" onclick="loadIns()">Try again</button></div>`;
+  if (!INS) return head;
+  const I = INS, t = I.totals;
+  return head + `<div class="a-card"><div class="a-sts"><div class="a-st"><b>${t.stamps}</b><span>Stamps, ${I.days} days</span></div><div class="a-st"><b>${t.people}</b><span>Different customers</span></div><div class="a-st"><b>${(t.stamps / I.days).toFixed(1)}</b><span>Stamps a day</span></div></div></div>`
+    + insDailyV(I) + insWeeklyV(I) + insHoursV(I) + insRetentionV(I) + insWinbackV(I) + insCouponsV(I);
+}
+
 // ---------- render ----------
 function view() {
-  if (tab == 'h') return homeV();
+  if (tab == 'h') return ov == 'ins' ? insightsV() : homeV();
   if (tab == 'c') return customersV();
   if (tab == 'r') return redeemV();
   if (tab == 'b') { if (!binit) { bpick(); binit = true } return msgV() }
@@ -985,13 +1116,14 @@ function render() {
   const m = $('#app'); m.className = sg ? 'a' : '';
   m.innerHTML = recover ? recoverV() : !signed ? loginV() : !biz ? deniedV() : view();
   if (sg && tab == 'h') drawQR();
-  if (sg && tab == 'm') dgSum();
+  if (sg && tab == 'm') { dgSum(); brPv() }
   if (sg && tab == 'o' && ov == 'stamp') pvStamps();
   if (y) window.scrollTo(0, y);
 }
 
 (async () => {
   if (notReady()) { $('#app').innerHTML = setupMsg; return }
+  if (!(await resolveShop())) { $('#app').innerHTML = noShopMsg; return }
   sb.auth.onAuthStateChange(ev => { if (ev == 'PASSWORD_RECOVERY') { recover = true; signed = true; render() } });
   const { data: { session } } = await sb.auth.getSession();
   if (session) await enter(); else render();
