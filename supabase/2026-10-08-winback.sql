@@ -98,5 +98,6 @@ begin
 end $$;
 
 
+revoke execute on function public._do_stamp(uuid) from public, anon, authenticated;
 revoke execute on function public.winback_message(text, uuid) from public, anon, authenticated;
 grant execute on function public.winback_message(text, uuid) to authenticated;

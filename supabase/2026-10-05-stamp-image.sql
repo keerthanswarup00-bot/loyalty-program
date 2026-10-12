@@ -22,4 +22,5 @@ language sql stable security definer set search_path = public as $$
   from businesses where slug = p_slug;
 $$;
 
+revoke execute on function public.get_business(text) from public, anon, authenticated;
 grant execute on function public.get_business(text) to anon, authenticated;
