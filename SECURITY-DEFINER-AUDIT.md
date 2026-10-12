@@ -37,6 +37,8 @@ The SQL file is read-only; it does not alter schema or application data. It must
 
 ## Verification status
 
-- Static script: intended to run in CI with Node.js; report its actual result in the PR checks.
-- Runtime SQL: not executed; requires a deliberate connection to the target Supabase project.
+- Static source guard: **passed** in GitHub Actions on the current branch head (`7457252f353ecf8c049a91453c51e560613c1451`), scanning the active root SQL files. An earlier run failed because the scanner mishandled grouped revokes; the scanner was corrected and the current-head run passed.
+- JavaScript syntax check: passed in the same workflow.
+- Playwright smoke tests: skipped because `SMOKE_BASE_URL` is not configured.
+- Runtime SQL catalog audit: not executed; requires a deliberate connection to the target Supabase project.
 - Production state: unknown from this source-only pass.
