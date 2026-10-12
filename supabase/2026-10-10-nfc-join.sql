@@ -40,3 +40,7 @@ begin
   if b.join_stamp and not claimed then perform _do_stamp(m); end if;
 end
 $function$;
+
+-- Keep the security-definer join RPC callable only by signed-in customers.
+revoke execute on function public.join_business(text, text, text, date, boolean, text, text) from public, anon, authenticated;
+grant execute on function public.join_business(text, text, text, date, boolean, text, text) to authenticated;
