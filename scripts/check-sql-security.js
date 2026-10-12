@@ -40,10 +40,10 @@ for (const file of files) {
     const suffix = file.source.slice(match.index + header.length);
     const hasBroadCanonicalRevoke = file.name === 'schema.sql'
       && /revoke\s+execute\s+on\s+all\s+functions\s+in\s+schema\s+public\s+from\s+public\s*,\s*anon\s*,\s*authenticated/i.test(suffix);
-    const hasRoutineRevoke = new RegExp(
-      `revoke\\s+execute\\s+on\\s+function\\s+(?:public\\.)?${escapeRegex(functionName)}\\s*\\(`,
-      'i'
-    ).test(suffix);
+    const revokeStatements = [...suffix.matchAll(/revoke\\s+execute\\s+on\\s+function\\s+([\\s\\S]*?);/gi)];
+    const hasRoutineRevoke = revokeStatements.some((statement) =>
+      new RegExp(`(?:public\\\\.)?${escapeRegex(functionName)}\\\\s*\\\\(`, 'i').test(statement[1])
+    );
     if (!hasBroadCanonicalRevoke && !hasRoutineRevoke) {
       failures.push(`${file.name}: ${functionName} has no subsequent EXECUTE revoke in this source file`);
     }
