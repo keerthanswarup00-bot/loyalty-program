@@ -61,6 +61,10 @@ alter table public.businesses add column if not exists winback_offer text not nu
 alter table public.businesses add column if not exists winback_valid_days int not null default 7 check (winback_valid_days between 0 and 90);
 -- Look of the customer app: {"radius":"soft","font":"serif","hero":"gradient","done":true}. Validated by _theme_ok() below.
 alter table public.businesses add column if not exists theme jsonb not null default '{}'::jsonb;
+-- Subscription pause. Only platform admins can change these (they are not in the owner's column grant below).
+alter table public.businesses add column if not exists suspended boolean not null default false;
+alter table public.businesses add column if not exists suspended_at timestamptz;
+alter table public.businesses add column if not exists suspended_note text not null default '';
 
 
 create table if not exists public.members (
@@ -202,6 +206,15 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 
+-- Raised by every write path of a paused shop. Platform admins (support) are exempt.
+create or replace function public._require_active(p_biz uuid) returns void
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if exists (select 1 from businesses where id = p_biz and suspended) and not coalesce(public._is_platform_admin(), false) then
+    raise exception 'This shop is paused. Please contact support.';
+  end if;
+end $$;
+
 -- ---------- Row level security ----------
 -- Customers can read only their own rows. Owners can read only their business's rows.
 -- Nobody writes to members/offers/visits directly: all writes go through the functions below.
@@ -216,7 +229,8 @@ create policy biz_owner_select on public.businesses for select to authenticated
   using ((owner_id = auth.uid() or (select public._is_platform_admin())));
 drop policy if exists biz_owner_update on public.businesses;
 create policy biz_owner_update on public.businesses for update to authenticated
-  using (owner_id = auth.uid() or (select public._is_platform_admin())) with check (owner_id = auth.uid() or (select public._is_platform_admin()));
+  using ((owner_id = auth.uid() and not suspended) or (select public._is_platform_admin()))
+  with check ((owner_id = auth.uid() and not suspended) or (select public._is_platform_admin()));
 
 drop policy if exists member_self_select on public.members;
 create policy member_self_select on public.members for select to authenticated
@@ -268,7 +282,7 @@ language sql stable security definer set search_path = public as $$
     'welcome_offer', welcome_offer, 'bday_offer', bday_offer, 'exp_days', exp_days,
     'join_stamp', join_stamp, 'card_months', card_months, 'tz', tz,
     'news_text', news_text, 'news_at', news_at, 'ref_on', ref_on, 'ref_offer', ref_offer,
-    'theme', theme)
+    'theme', theme, 'suspended', suspended)
   from businesses where slug = p_slug;
 $$;
 
@@ -383,6 +397,7 @@ declare b businesses; m members; c text; oid uuid; ex timestamptz; recent timest
 begin
   select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
+  perform _require_active(b.id);
   select * into m from members where id = p_member and business_id = b.id for update;
   if not found then raise exception 'Customer not found'; end if;
   if coalesce(b.winback_offer, '') = '' then
@@ -413,6 +428,7 @@ begin
   if not coalesce(p_consent, false) then raise exception 'Consent is required to join'; end if;
   select * into b from businesses where slug = p_slug;
   if not found then raise exception 'Unknown business'; end if;
+  perform _require_active(b.id);
   if coalesce(p_join_token, '') = '' or p_join_token not in (b.join_token, b.scan_token) then raise exception 'Please scan the sign-up QR code at the counter to join'; end if;
   if length(trim(coalesce(p_name, ''))) < 2 then raise exception 'Please enter your full name'; end if;
   if coalesce(p_phone, '') !~ '^[0-9]{10}$' then raise exception 'Enter a valid 10-digit mobile number'; end if;
@@ -562,6 +578,7 @@ begin
   if auth.uid() is null then return json_build_object('ok', false, 'error', 'auth'); end if;
   select * into b from businesses where slug = p_slug;
   if not found or not b.daily_on then return json_build_object('ok', false, 'error', 'off', 'next_at', null); end if;
+  perform _require_active(b.id);
   select * into m from members where business_id = b.id and user_id = auth.uid() for update;
   if not found then return json_build_object('ok', false, 'error', 'auth'); end if;
   today := (now() at time zone b.tz)::date;
@@ -615,6 +632,7 @@ begin
   if not found or b.scan_token <> coalesce(p_token, '') then
     return json_build_object('ok', false, 'error', 'invalid');
   end if;
+  perform _require_active(b.id);
   select * into m from members where business_id = b.id and user_id = auth.uid() for update;
   if not found then return json_build_object('ok', false, 'error', 'nomember'); end if;
   if m.last_stamp is not null then
@@ -633,6 +651,7 @@ declare b businesses; m members; c text; rest int;
 begin
   if auth.uid() is null then raise exception 'Not signed in'; end if;
   select * into b from businesses where slug = p_slug;
+  perform _require_active(b.id);
   select * into m from members where business_id = b.id and user_id = auth.uid() for update;
   if not found or m.stamps < b.need then raise exception 'Your card is not full yet'; end if;
   rest := m.stamps - b.need;
@@ -651,6 +670,7 @@ declare b businesses; x offers; m members; c text; ph text;
 begin
   select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
+  perform _require_active(b.id);
   c := upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'));
   ph := right(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), 10);
   if c = '' then return json_build_object('ok', false, 'error', 'nocode'); end if;
@@ -694,6 +714,7 @@ begin
    where m.id = p_member and (b.owner_id = auth.uid() or (select public._is_platform_admin()));
   if uid is null then raise exception 'Not allowed'; end if;
   if exists (select 1 from businesses where owner_id = uid) then raise exception 'Not allowed'; end if;
+  perform _require_active((select business_id from members where id = p_member));
   perform _support_log((select business_id from members where id = p_member), 'delete_customer', '{}'::jsonb);
   delete from auth.users where id = uid;
 end $$;
@@ -708,6 +729,7 @@ begin
    where m.id = p_member and (b.owner_id = auth.uid() or (select public._is_platform_admin()));
   if uid is null then raise exception 'Not allowed'; end if;
   if exists (select 1 from businesses where owner_id = uid) then raise exception 'Not allowed'; end if;
+  perform _require_active((select business_id from members where id = p_member));
   perform _support_log((select business_id from members where id = p_member), 'reset_customer_password', '{}'::jsonb);
   update auth.users set encrypted_password = crypt(p_password, gen_salt('bf')), updated_at = now() where id = uid;
 end $$;
@@ -719,6 +741,7 @@ declare b businesses; r json; ph text; added int := 0; skipped int := 0; bd date
 begin
   select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
+  perform _require_active(b.id);
   if json_array_length(p_rows) > 1000 then raise exception 'Import at most 1000 rows at a time'; end if;
   perform _support_log(b.id, 'import_customers', json_build_object('rows', json_array_length(p_rows))::jsonb);
   for r in select * from json_array_elements(p_rows) loop
@@ -868,6 +891,7 @@ declare b businesses; n text := trim(coalesce(p_name, '')); r uuid;
 begin
   select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
+  perform _require_active(b.id);
   if char_length(n) < 1 or char_length(n) > 40 then raise exception 'Give the category a name (up to 40 characters)'; end if;
   if exists (select 1 from menu_categories where business_id = b.id and lower(name) = lower(n) and (p_id is null or id <> p_id)) then
     raise exception 'You already have a category with that name';
@@ -899,6 +923,7 @@ declare b businesses;
 begin
   select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
+  perform _require_active(b.id);
   update menu_categories c set sort = x.ord
     from unnest(coalesce(p_ids, '{}'::uuid[])) with ordinality as x(id, ord)
    where c.id = x.id and c.business_id = b.id;
@@ -911,6 +936,7 @@ declare b businesses; ids uuid[] := coalesce(p_items, '{}'::uuid[]);
 begin
   select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
+  perform _require_active(b.id);
   if not exists (select 1 from menu_categories where id = p_category and business_id = b.id) then
     raise exception 'Category not found';
   end if;
@@ -929,6 +955,7 @@ declare b businesses; t text := trim(coalesce(p_title, '')); img text := coalesc
 begin
   select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
   if not found then raise exception 'Not allowed'; end if;
+  perform _require_active(b.id);
   if char_length(t) < 1 or char_length(t) > 80 then raise exception 'Give the item a name (up to 80 characters)'; end if;
   if char_length(coalesce(p_description, '')) > 600 then raise exception 'Description is too long (600 characters max)'; end if;
   if char_length(coalesce(p_price, '')) > 24 then raise exception 'Price is too long'; end if;
@@ -1218,6 +1245,24 @@ create index if not exists platform_audit_biz_idx on public.platform_audit (busi
 alter table public.platform_audit enable row level security;
 revoke all on public.platform_audit from anon, authenticated;
 
+-- Payments you record against a shop (subscription). Kept even if the shop is deleted, for your accounts.
+create table if not exists public.platform_payments (
+  id bigint generated always as identity primary key,
+  business_id uuid references public.businesses(id) on delete set null,
+  slug text not null,
+  shop_name text not null default '',
+  amount numeric(10,2) not null check (amount >= 0),
+  paid_on date not null default current_date,
+  months int not null default 1 check (months between 0 and 36),
+  method text not null default '',
+  note text not null default '',
+  created_by text,
+  created_at timestamptz not null default now()
+);
+create index if not exists platform_payments_biz_idx on public.platform_payments (business_id, paid_on desc);
+alter table public.platform_payments enable row level security;
+revoke all on public.platform_payments from anon, authenticated;
+
 -- Your own bookkeeping per shop: plan, contact, notes, renewal date. Never shown to the shop.
 create table if not exists public.platform_shop_meta (
   business_id uuid primary key references public.businesses(id) on delete cascade,
@@ -1227,6 +1272,7 @@ create table if not exists public.platform_shop_meta (
   renews_on date,
   updated_at timestamptz not null default now()
 );
+alter table public.platform_shop_meta add column if not exists price numeric(10,2) not null default 0 check (price >= 0);
 alter table public.platform_shop_meta enable row level security;
 revoke all on public.platform_shop_meta from anon, authenticated;
 
@@ -1250,7 +1296,7 @@ begin
   if auth.uid() is not null and _is_platform_admin() and new.owner_id is not distinct from old.owner_id and old.owner_id is distinct from auth.uid() then
     select array_agg(n.key order by n.key) into ch
       from jsonb_each(to_jsonb(new)) n join jsonb_each(to_jsonb(old)) o on o.key = n.key
-     where n.value is distinct from o.value;
+     where n.value is distinct from o.value and n.key not in ('suspended', 'suspended_at', 'suspended_note');
     if ch is not null then
       insert into platform_audit (business_id, slug, admin_id, admin_email, action, detail)
       values (new.id, new.slug, auth.uid(), (select email from auth.users where id = auth.uid()), 'settings_changed', jsonb_build_object('fields', to_jsonb(ch)));
@@ -1305,17 +1351,18 @@ begin
     select a.action, a.detail, a.created_at from platform_audit a where a.business_id = b.id order by a.created_at desc limit 30) x);
 end $$;
 
-create or replace function public.platform_save_meta(p_slug text, p_plan text, p_contact text, p_notes text, p_renews date) returns void
+drop function if exists public.platform_save_meta(text, text, text, text, date);
+create or replace function public.platform_save_meta(p_slug text, p_plan text, p_contact text, p_notes text, p_renews date, p_price numeric default 0) returns void
 language plpgsql security definer set search_path = public as $$
 declare bid uuid;
 begin
   if not _is_platform_admin() then raise exception 'Not allowed'; end if;
   select id into bid from businesses where slug = p_slug;
   if bid is null then raise exception 'Shop not found'; end if;
-  insert into platform_shop_meta (business_id, plan, contact, notes, renews_on, updated_at)
-  values (bid, left(coalesce(p_plan, ''), 60), left(coalesce(p_contact, ''), 200), left(coalesce(p_notes, ''), 4000), p_renews, now())
+  insert into platform_shop_meta (business_id, plan, contact, notes, renews_on, price, updated_at)
+  values (bid, left(coalesce(p_plan, ''), 60), left(coalesce(p_contact, ''), 200), left(coalesce(p_notes, ''), 4000), p_renews, greatest(coalesce(p_price, 0), 0), now())
   on conflict (business_id) do update set plan = excluded.plan, contact = excluded.contact, notes = excluded.notes,
-    renews_on = excluded.renews_on, updated_at = now();
+    renews_on = excluded.renews_on, price = excluded.price, updated_at = now();
 end $$;
 
 -- "Which shop is this customer in?" across every shop. Matches part of a phone number or name (3+ characters).
@@ -1340,6 +1387,7 @@ begin
   return (select coalesce(json_agg(json_build_object(
       'id', b.id, 'slug', b.slug, 'name', b.name, 'color', b.color, 'logo_url', b.logo_url, 'created_at', b.created_at,
       'owner_email', u.email, 'tz', b.tz, 'need', b.need, 'reward', b.reward,
+      'suspended', b.suspended, 'suspended_at', b.suspended_at, 'suspended_note', b.suspended_note,
       'members', (select count(*) from members m where m.business_id = b.id),
       'new_members_7d', (select count(*) from members m where m.business_id = b.id and m.joined > now() - interval '7 days'),
       'stamps_7d', (select count(*) from visits v where v.business_id = b.id and v.created_at > now() - interval '7 days'),
@@ -1348,19 +1396,110 @@ begin
       'coupons_30d', (select count(*) from offers o where o.business_id = b.id and o.created_at > now() - interval '30 days'),
       'redeemed_30d', (select count(*) from offers o where o.business_id = b.id and o.used_at > now() - interval '30 days'),
       'domains', coalesce((select json_agg(d.host order by d.host) from business_domains d where d.business_id = b.id), '[]'::json),
-      'plan', coalesce(pm.plan, ''), 'contact', coalesce(pm.contact, ''), 'notes', coalesce(pm.notes, ''), 'renews_on', pm.renews_on
+      'plan', coalesce(pm.plan, ''), 'contact', coalesce(pm.contact, ''), 'notes', coalesce(pm.notes, ''), 'renews_on', pm.renews_on,
+      'price', coalesce(pm.price, 0),
+      'last_paid', (select max(pp.paid_on) from platform_payments pp where pp.business_id = b.id),
+      'paid_30d', coalesce((select sum(pp.amount) from platform_payments pp where pp.business_id = b.id and pp.paid_on > current_date - 30), 0)
     ) order by b.created_at desc), '[]'::json)
     from businesses b left join auth.users u on u.id = b.owner_id left join platform_shop_meta pm on pm.business_id = b.id);
 end $$;
 
+-- Pause or reactivate a shop (subscription not paid / paid). Enforced in the database: customers cannot join, stamp,
+-- scratch or claim, and the owner cannot redeem, message or edit, until it is reactivated.
+create or replace function public.platform_set_suspended(p_slug text, p_on boolean, p_note text default '') returns void
+language plpgsql security definer set search_path = public as $$
+declare b businesses;
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  select * into b from businesses where slug = p_slug;
+  if not found then raise exception 'Shop not found'; end if;
+  update businesses set suspended = coalesce(p_on, false), suspended_at = case when coalesce(p_on, false) then now() end,
+         suspended_note = case when coalesce(p_on, false) then left(coalesce(p_note, ''), 300) else '' end where id = b.id;
+  perform _support_log(b.id, case when coalesce(p_on, false) then 'shop_paused' else 'shop_reactivated' end, jsonb_build_object('note', left(coalesce(p_note, ''), 300)));
+end $$;
+
+-- Record a payment and move the renewal date forward. Extends from the current renewal date if it is still in the future,
+-- otherwise from the payment date. A paused shop is reactivated.
+create or replace function public.platform_record_payment(p_slug text, p_amount numeric, p_paid_on date, p_months int, p_method text default '', p_note text default '') returns json
+language plpgsql security definer set search_path = public as $$
+declare b businesses; cur date; base date; nxt date; paid date := coalesce(p_paid_on, current_date); mo int := least(greatest(coalesce(p_months, 1), 0), 36); was boolean;
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  if coalesce(p_amount, -1) < 0 then raise exception 'Enter the amount received'; end if;
+  select * into b from businesses where slug = p_slug;
+  if not found then raise exception 'Shop not found'; end if;
+  select renews_on into cur from platform_shop_meta where business_id = b.id;
+  base := case when cur is not null and cur > paid then cur else paid end;
+  nxt := case when mo > 0 then (base + make_interval(months => mo))::date else cur end;
+  insert into platform_payments (business_id, slug, shop_name, amount, paid_on, months, method, note, created_by)
+  values (b.id, b.slug, b.name, p_amount, paid, mo, left(coalesce(p_method, ''), 40), left(coalesce(p_note, ''), 300), (select email from auth.users where id = auth.uid()));
+  insert into platform_shop_meta (business_id, renews_on) values (b.id, nxt)
+  on conflict (business_id) do update set renews_on = excluded.renews_on, updated_at = now();
+  was := b.suspended;
+  if was then update businesses set suspended = false, suspended_at = null, suspended_note = '' where id = b.id; end if;
+  perform _support_log(b.id, 'payment_recorded', jsonb_build_object('amount', p_amount, 'months', mo));
+  return json_build_object('renews_on', nxt, 'reactivated', was);
+end $$;
+
+create or replace function public.platform_payments_list(p_slug text default null, p_limit int default 100) returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  return (select coalesce(json_agg(x order by x.paid_on desc, x.id desc), '[]'::json) from (
+    select id, slug, shop_name, amount, paid_on, months, method, note, created_by from platform_payments
+     where p_slug is null or slug = p_slug order by paid_on desc, id desc limit least(greatest(coalesce(p_limit, 100), 1), 1000)) x);
+end $$;
+
+-- Permanently delete a shop and everything in it (customers, stamps, coupons, menu, domains) and its customers' logins.
+-- Safety: the shop must be paused first and its address typed exactly. Payment records and the activity log are kept.
+create or replace function public.platform_delete_business(p_slug text, p_confirm text) returns json
+language plpgsql security definer set search_path = public as $$
+declare b businesses; uids uuid[]; n_members int; n_visits bigint;
+begin
+  if not _is_platform_admin() then raise exception 'Not allowed'; end if;
+  select * into b from businesses where slug = p_slug;
+  if not found then raise exception 'Shop not found'; end if;
+  if not b.suspended then raise exception 'Pause the shop first, then delete it'; end if;
+  if p_confirm is distinct from b.slug then raise exception 'Type the shop address exactly to confirm'; end if;
+  select array_agg(user_id), count(*) into uids, n_members from members where business_id = b.id;
+  select count(*) into n_visits from visits where business_id = b.id;
+  insert into platform_audit (business_id, slug, admin_id, admin_email, action, detail)
+  values (null, b.slug, auth.uid(), (select email from auth.users where id = auth.uid()), 'shop_deleted',
+          jsonb_build_object('name', b.name, 'customers', n_members, 'stamps', n_visits));
+  delete from businesses where id = b.id;
+  delete from auth.users u where u.id = any (coalesce(uids, '{}'::uuid[]))
+     and not exists (select 1 from businesses x where x.owner_id = u.id)
+     and not exists (select 1 from platform_admins pa where pa.user_id = u.id)
+     and not exists (select 1 from members mm where mm.user_id = u.id);
+  return json_build_object('ok', true, 'customers', n_members);
+end $$;
+
+-- What the shop owner may see about their own subscription (no price, plan or notes).
+create or replace function public.my_billing(p_slug text) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare b businesses; r date;
+begin
+  select * into b from businesses where slug = p_slug and owner_id = auth.uid();
+  if not found then raise exception 'Not allowed'; end if;
+  select renews_on into r from platform_shop_meta where business_id = b.id;
+  return json_build_object('renews_on', r, 'suspended', b.suspended, 'note', b.suspended_note);
+end $$;
+
 revoke execute on function public._support_log(uuid, text, jsonb), public._audit_business_change(),
   public.platform_support_open(text), public.platform_log(text, text, jsonb), public.platform_audit_list(text, int),
-  public.my_support_log(text), public.platform_save_meta(text, text, text, text, date), public.platform_find_member(text),
+  public.my_support_log(text), public.platform_save_meta(text, text, text, text, date, numeric), public.platform_find_member(text),
+  public.platform_set_suspended(text, boolean, text), public.platform_record_payment(text, numeric, date, int, text, text),
+  public.platform_payments_list(text, int), public.platform_delete_business(text, text), public.my_billing(text),
   public.platform_overview() from public, anon, authenticated;
 grant execute on function public.platform_support_open(text) to authenticated;
 grant execute on function public.platform_log(text, text, jsonb) to authenticated;
 grant execute on function public.platform_audit_list(text, int) to authenticated;
 grant execute on function public.my_support_log(text) to authenticated;
-grant execute on function public.platform_save_meta(text, text, text, text, date) to authenticated;
+grant execute on function public.platform_save_meta(text, text, text, text, date, numeric) to authenticated;
+grant execute on function public.platform_set_suspended(text, boolean, text) to authenticated;
+grant execute on function public.platform_record_payment(text, numeric, date, int, text, text) to authenticated;
+grant execute on function public.platform_payments_list(text, int) to authenticated;
+grant execute on function public.platform_delete_business(text, text) to authenticated;
+grant execute on function public.my_billing(text) to authenticated;
 grant execute on function public.platform_find_member(text) to authenticated;
 grant execute on function public.platform_overview() to authenticated;

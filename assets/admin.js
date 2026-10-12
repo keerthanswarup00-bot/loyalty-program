@@ -4,7 +4,7 @@
 // Support mode: a platform admin opens /admin/?as=<shop> and works as that shop's owner (shares the /platform/ login). Everything they do is logged.
 const SUPPORT_AS = (new URLSearchParams(location.search).get('as') || '').toLowerCase();
 const sb = notReady() ? null : mkClient(SUPPORT_AS ? 'lk-platform' : 'lk-admin');
-let support = null, SUP = [];
+let support = null, SUP = [], BILL = null;
 let signed = false, recover = false, biz = null, M = [], V = [], MSG = [], MENU = null, tab = 'h', ov = null, openId = null, selMode = false, visCache = {};
 let q = '', rq = '', rc = '', rp = '', rd = null, rbusy = false;
 // Customers selection (feeds the Message tab) + Message tab state
@@ -82,7 +82,8 @@ async function load() {
       const mr = await sb.from('messages').select('member_id,created_at,returned_at').eq('business_id', biz.id).order('created_at', { ascending: false }).limit(1000);
       MSG = mr.error ? [] : mr.data;   // win-back table may not exist until 2026-10-08-winback.sql is run
       if (biz.lapsed_days == null) biz.lapsed_days = 10;
-      try { SUP = await rpc(sb, 'my_support_log', { p_slug: CFG.slug }) } catch (e) { SUP = [] }   // owner's view of support access; absent until the platform SQL is run
+      try { SUP = await rpc(sb, 'my_support_log', { p_slug: CFG.slug }) } catch (e) { SUP = [] }
+      try { BILL = await rpc(sb, 'my_billing', { p_slug: CFG.slug }) } catch (e) { BILL = null }   // subscription notice   // owner's view of support access; absent until the platform SQL is run
       try {
         const since = new Date(Date.now() - 14 * 864e5).toISOString();
         V = (await pages(() => sb.from('visits').select('id,created_at').eq('business_id', biz.id).gte('created_at', since).order('id'))).map(x => x.created_at);
@@ -141,7 +142,8 @@ function hero() {
   const rep = n ? Math.round(M.filter(u => u.total >= 2).length / n * 100) : 0;
   const chip = (ic, val, lab) => `<div class="a-chip">${ic}<b>${val}</b><span>${lab}</span></div>`;
   return `<header class="a-hero${home ? '' : ' slim'}"><div class="a-in">
-    ${support ? `<div class="a-support"><b>Support mode</b> · you are managing this shop for its owner. Changes are logged. <a href="/platform/#shop=${esc(support)}">Back to platform</a></div>` : ''}
+    ${biz.suspended ? `<div class="a-paused"><b>This shop is paused.</b> Customers can't join or collect stamps and you can't make changes until the subscription is sorted. Please contact support.</div>` : ''}
+    ${support ? `<div class="a-support"><b>Support mode</b> · you are managing this shop for its owner. Changes are logged. <a href="/platform/#/shop/${esc(support)}">Back to platform</a></div>` : ''}
     <div class="a-brand"><div class="a-logo">${mark(biz)}</div><div class="a-bt"><b>${esc(biz.name)}</b><span>Owner dashboard</span></div>
     <button class="a-ib" aria-label="Refresh" onclick="refresh()">${AI.refresh}</button></div>
     ${home ? `<div class="a-chips">${chip(AI.trend, tot, 'Stamps')}${chip(AI.users, n, 'Members')}${chip(AI.gift, rw, 'Rewards')}${chip(AI.repeat, rep + '%', 'Repeat')}</div>` : ''}
@@ -230,7 +232,7 @@ function homeV() {
       + stat(d.filter(x => x.used_at).length, 'Daily coupons redeemed');
   }
   const kit = 'theme' in biz && !(biz.theme || {}).done && M.length < 5 ? `<div class="a-card"><div class="a-h"><h2>Make it yours</h2><span class="a-tag">2 minutes</span></div><p class="sub">Add your logo and pick your colour so the app looks like your shop.</p><button class="btn sm" onclick="go('m')">Set up branding</button></div>` : '';
-  return kit + `<div class="a-card"><div class="a-h"><h2>Sign-up QR</h2><span class="a-tag">At the counter</span></div>
+  return billNote() + kit + `<div class="a-card"><div class="a-h"><h2>Sign-up QR</h2><span class="a-tag">At the counter</span></div>
     <p class="sub">Print this for the counter or door. Scanning it lets a new customer join and get their first stamp — it cannot add any later stamps.</p>
     <label class="lb">Sign-up link</label><input readonly class="ro" value="${esc(joinUrl())}" onclick="this.select()">
     <div class="qr" id="qrb"></div>
@@ -761,6 +763,13 @@ async function pickLogo(btn) {
 document.addEventListener('input', e => { if (e.target && /^(cc|cn|ct|brr|brf|brh)$/.test(e.target.id)) brPv() });
 document.addEventListener('change', e => { if (e.target && (e.target.id == 'brr' || e.target.id == 'brf' || e.target.id == 'brh' || e.target.id == 'clfile')) setTimeout(brPv, 0) });
 
+// Subscription reminder for the owner: shown when renewal is within a week or overdue.
+function billNote() {
+  if (!BILL || !BILL.renews_on || BILL.suspended || support) return '';
+  const d = Math.ceil((new Date(BILL.renews_on + 'T00:00') - Date.now()) / 864e5);
+  if (d > 7) return '';
+  return `<div class="a-card" style="border-color:${d < 0 ? '#dc2626' : '#d97706'}"><h2>${d < 0 ? 'Subscription payment overdue' : 'Subscription renews soon'}</h2><p class="sub" style="margin:0">${d < 0 ? 'Your plan ran out on ' + esc(fbd(BILL.renews_on)) + '. Please pay now so your shop is not paused.' : 'Your plan renews on ' + esc(fbd(BILL.renews_on)) + ' (' + (d <= 0 ? 'today' : 'in ' + d + ' day' + (d == 1 ? '' : 's')) + '). Please pay on time to keep your rewards running.'}</p></div>`;
+}
 // ---------- Support access log (what the platform team did in this shop) ----------
 const SUPL = { support_open: 'Support opened your dashboard', settings_changed: 'Settings changed', view_customers: 'Customer list viewed', export: 'Data exported', delete_customer: 'A customer was deleted', reset_customer_password: 'A customer password was reset', import_customers: 'Customers imported', domain_added: 'Domain added', domain_removed: 'Domain removed', owner_changed: 'Owner changed', shop_created: 'Shop created', owner_reset_email: 'Password reset email sent' };
 function supV() {

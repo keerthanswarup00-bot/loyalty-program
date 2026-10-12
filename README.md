@@ -92,18 +92,31 @@ Instead of one Vercel project per client, one deployment can serve every shop; t
 4. In Vercel add the wildcard domain `*.yourplatform.com` to the project (needs the domain's nameservers on Vercel).
 5. Open `/platform/`, sign in, press **Create shop**. The shop opens at `<address>.yourplatform.com` (customers at `/app/`, owner at `/admin/`).
 
-### Platform page (`/platform/`): running many shops
+### Platform page (`/platform/`): running many shops and subscriptions
 
-- **All shops:** search, sort (needs attention / most active / newest / name), and flags for shops that are quiet (no stamps for 14 days), have no customers, have no owner or have an overdue renewal. Search any customer by phone or name across every shop.
-- **One shop:** numbers for the last 7 and 30 days, a customer list with search (WhatsApp link, reset a locked-out customer's password), CSV export of customers, every stamp and coupons (also your backup), private notes (plan, contact, renewal date), domains, owner change, and a password reset email to the owner.
-- **Work as the owner:** "Open dashboard as owner" opens `/admin/?as=<shop>`. You get the full owner dashboard for that shop (offers, brand, menu, customers, Insights) using your platform login. A banner shows you are in support mode.
-- **Accountability:** every support session, every change to shop settings (the field names), customer deletions, password resets, imports, exports, customer-list views and domain/owner changes are recorded. You see them in Activity log; the shop owner sees their shop's entries in More -> Support access. The log records what was done, not the customers' data.
-- **Needs** the latest `supabase/schema.sql` (re-run it; it is safe). It extends every owner check to platform admins and adds the audit and notes tables.
+A bottom nav splits the page into sections:
+
+- **Overview:** totals, and a "Needs attention" list (overdue, no owner, quiet, no customers) with one-tap Record payment.
+- **Shops:** search, sort, flags (Paused, No owner, Overdue Nd, Renews in Nd, Quiet). Tap a shop for its own tabs: **Overview** (numbers, private contact and notes), **Customers** (search, WhatsApp, reset password, CSV export of customers, visits and offers), **Billing** and **Access**.
+- **Billing:** every shop's plan, price, renewal date and last payment; overdue first.
+- **Customers:** find any customer by phone or name across all shops.
+- **Activity:** the audit log. **New shop** creates a shop.
+
+**Subscriptions**
+- **Pause / Reactivate** (shop -> Billing). Enforced in the database, not just on screen: a paused shop's customers cannot join, earn stamps, play or claim, and the owner cannot save changes. Customers see "Rewards are paused"; the owner sees a paused banner. Data is kept. You (platform admin) are exempt so you can still fix things.
+- **Record payment** logs amount and date and moves the renewal date forward (from the current renewal date if it is in the future, otherwise from the payment date). It reactivates a paused shop.
+- Owners see an overdue or renews-soon notice on their Home. Nothing pauses automatically: payments are recorded by hand, so auto-pausing could cut off someone who has paid. Use the Overdue list and press Pause.
+- **Delete shop** (shop -> Access -> Delete zone): the shop must be paused first and you must type its address. Removes the shop, its customers and their logins and brand files. Payment records and the activity log are kept. Export the CSVs first; it cannot be undone.
+
+**Other**
+- **Work as the owner:** "Open dashboard as owner" opens `/admin/?as=<shop>` with your platform login and a support banner.
+- **Accountability:** support sessions, settings changes (field names), deletions, password resets, imports, exports, pause/reactivate, payments and shop deletion are logged. The shop owner sees their entries in More -> Support access. Edits to offers, the menu and redemptions made in support mode are not logged individually.
+- **Needs** the latest `supabase/schema.sql` (re-run the whole file; it is safe).
 - **Protect the platform login:** it can reach every shop's customers. Use a long unique password and turn on two-step verification for that Supabase account.
 
 **Custom domains:** in `/platform/` add the domain to the shop, then add the same domain to the Vercel project and point the client's DNS at Vercel (CNAME `cname.vercel-dns.com`). Both steps are manual: the repo holds no Vercel token. A domain not added in `/platform/` shows "Shop not found".
 
-Limits to know: platform admins cannot see a shop's customers, and cannot open a shop's dashboard unless they are its owner (use **Change owner** for support). There is no suspend switch: write functions do not check a paused flag, so a flag would only look like protection. Existing single-shop deployments keep working unchanged (leave `slug` set). Customer logins are keyed by shop address, so the same phone number can join several shops separately.
+Limits to know: you cannot set an owner's password (use the reset email or **Change owner**). Existing single-shop deployments keep working unchanged (leave `slug` set). Customer logins are keyed by shop address, so the same phone number can join several shops separately.
 
 ## Libraries
 
