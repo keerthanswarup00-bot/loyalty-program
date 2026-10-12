@@ -15,6 +15,7 @@
 .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,72px);align-items:center}
 .hero-grid>*{min-width:0}
 .hero h1{margin-block:18px 22px}
+.hero-sub{font:600 clamp(1.05rem,1.7vw,1.3rem)/1.35 var(--display);letter-spacing:-.01em;color:var(--fg);margin:0 0 14px}
 .hero .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
 @media (max-width:860px){.hero-grid{grid-template-columns:1fr}}
 
@@ -115,7 +116,7 @@
 .stat{border:1px solid var(--line);border-radius:14px;padding:12px;font-size:.74rem;color:var(--mut);line-height:1.3}
 .stat b{display:block;font:800 1.6rem/1.1 var(--display);color:var(--fg);margin-bottom:2px;font-variant-numeric:tabular-nums}
 .rem{padding:4px 18px 14px}
-.rem h4{margin:6px 0 4px;font:700 1rem var(--display)}
+.rem h3{margin:6px 0 4px;font:700 1rem var(--display)}
 .rem-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
 .rem-row small{display:block;font:700 .6rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
 .rem-row b{font-weight:600;font-size:.94rem}
@@ -159,6 +160,7 @@
 .cform .btn{justify-self:start}.cform .btn:disabled{opacity:.6;cursor:default}
 .hp{position:absolute!important;left:-9999px;width:1px;height:1px;opacity:0}
 .form-msg{margin:0;min-height:1.5em;font-size:.95rem;color:var(--mut)}.form-msg.ok{color:var(--good)}
+.aside-card h2{font-size:1.12rem;line-height:1.25;font-weight:700;font-family:var(--display)}
 .aside-card{border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:12px;justify-items:start;background:var(--surface);margin-bottom:14px}
 .aside-card[hidden]{display:none}
 
