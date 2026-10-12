@@ -25,4 +25,7 @@ begin
     surprise := b.sur_offer;
   end if;
   return json_build_object('stamps', m.stamps, 'surprise', surprise, 'lost', lost);
-end $$;
+end $;
+
+-- Internal helper: never callable directly by API roles.
+revoke execute on function public._do_stamp(uuid) from public, anon, authenticated;
