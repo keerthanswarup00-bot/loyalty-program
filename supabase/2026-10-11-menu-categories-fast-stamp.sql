@@ -148,6 +148,9 @@ begin
   return r;
 end $$;
 
+revoke execute on function public.add_stamp(text, text) from public, anon, authenticated;
+grant execute on function public.add_stamp(text, text) to authenticated;
+
 revoke execute on function public.get_menu(text), public.save_menu_category(text, uuid, text),
   public.delete_menu_category(uuid), public.reorder_menu_categories(text, uuid[]),
   public.set_category_items(text, uuid, uuid[]),
