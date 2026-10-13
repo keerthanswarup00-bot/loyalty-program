@@ -237,7 +237,7 @@ Everything else (name, logo, colour, offers, cooldown, stamp count, card length)
 - Deployed `admin.js` parses clean; `.pv` preview CSS is served.
 - `get_business('cheesora-bliss')` returns `stamp_url` (empty) and a **60,999-character logo data URL** — the logo upload did persist; it was invisible only because `mark()` rejected `data:` URLs (fixed in `9389b78`).
 - Supabase project *Loyalty program* is `ACTIVE_HEALTHY`.
-- Owner account: `keerthanswarup00@gmail.com` (per `new-client.sql`).
+- Owner account: `(owner email: kept out of the repo)` (per `new-client.sql`).
 
 ---
 
@@ -338,7 +338,7 @@ I cannot execute SQL for you: the Supabase CLI has no run-SQL command and `supab
 | Publishable key | `assets/config.js` (public, safe to ship) |
 | Service-role key | **nowhere in this repo** — deliberately |
 | Vercel project / alias | `loyalty-program` / `royalty-prog.vercel.app` |
-| Owner login | `keerthanswarup00@gmail.com` |
+| Owner login | `(owner email: kept out of the repo)` |
 | Per-client slug | `cheesora-bliss` |
 
 ### If you are taking this over

@@ -86,17 +86,5 @@ create table if not exists public.leads (
 alter table public.leads enable row level security;
 revoke all on public.leads from anon, authenticated;
 
-create or replace function public.submit_lead(p_name text, p_shop text, p_contact text, p_message text) returns void
-language plpgsql security definer set search_path = public as $$
-begin
-  if char_length(trim(coalesce(p_name, ''))) < 2 then raise exception 'Please enter your name'; end if;
-  if char_length(trim(coalesce(p_contact, ''))) < 5 then raise exception 'Please enter a phone number or email'; end if;
-  if (select count(*) from leads where created_at > now() - interval '1 hour') >= 30 then
-    raise exception 'Too many messages right now. Please try again in a while.';
-  end if;
-  insert into leads (name, shop, contact, message)
-  values (left(trim(p_name), 80), left(trim(coalesce(p_shop, '')), 80), left(trim(p_contact), 120), left(trim(coalesce(p_message, '')), 1000));
-end $$;
-
-revoke execute on function public.submit_lead(text, text, text, text) from public, anon, authenticated;
-grant execute on function public.submit_lead(text, text, text, text) to anon, authenticated;
+-- submit_lead is defined in 2026-10-11-lead-rate-limit.sql (called only by the submit-lead Edge Function).
+-- It was removed from here so re-running this file can never re-grant an unthrottled version to anon.
