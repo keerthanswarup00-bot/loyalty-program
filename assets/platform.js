@@ -168,12 +168,13 @@ async function loadShopAudit() { try { shopAudit = await rpc(sb, 'platform_audit
 const audRow = (a, showShop) => `<div class="of"><div><b>${esc(AUD[a.action] || a.action)}</b>${showShop ? ` <span class="mut sm">· ${esc(a.slug || '')}</span>` : ''}<div class="mut sm">${esc(a.admin_email || '')}${a.detail && a.detail.fields ? ' · ' + esc(a.detail.fields.join(', ')) : a.detail && a.detail.host ? ' · ' + esc(a.detail.host) : a.detail && a.detail.kind ? ' · ' + esc(a.detail.kind) + ' (' + a.detail.rows + ')' : ''}</div></div><span class="mut sm">${esc(fdt(a.created_at))}</span></div>`;
 
 // ---------- views ----------
-const loginV = () => `<div class="card" style="margin-top:40px"><h2>Platform login</h2><p class="sub">Sign in with your platform admin account.</p>
+const MARK = '<svg class="pf-mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 4.2" stroke-linecap="round"/><text x="20" y="25" text-anchor="middle" font-size="13" font-weight="800" fill="currentColor" font-family="Figtree,system-ui,sans-serif">+1</text></svg>';
+const loginV = () => `<div class="pf-top" style="margin-top:24px"><span class="pf-brand">${MARK}Innondu</span></div><div class="card"><h2>Platform login</h2><p class="sub">Sign in with your platform admin account.</p>
   <label class="lb">Email</label><input id="em" type="email" autocomplete="email">
   <label class="lb">Password</label>${pwField('pw', 'current-password')}
   <button class="btn" data-go onclick="login(this)">Sign in</button></div>`;
 const deniedV = () => `<div class="card" style="margin-top:40px"><h2>No access</h2><p class="sub">This account is not a platform admin. In Supabase, run:<br><code>insert into public.platform_admins (user_id) select id from auth.users where email = 'you@example.com';</code></p><button class="btn alt" onclick="out()">Sign out</button></div>`;
-const topV = () => `<div class="pf-top"><button class="pf-brand" onclick="go('#')">All shops</button><span><button class="lnk" onclick="go('#audit')">Activity log</button> · <button class="lnk" onclick="out()">Sign out</button></span></div>${err ? `<div class="card"><p class="sub">${esc(err)}</p></div>` : ''}`;
+const topV = () => `<div class="pf-top"><button class="pf-brand" onclick="go('#')" aria-label="All shops">${MARK}Innondu<em>Platform</em></button><span><button class="lnk" onclick="go('#audit')">Activity log</button> · <button class="lnk" onclick="out()">Sign out</button></span></div>${err ? `<div class="card"><p class="sub">${esc(err)}</p></div>` : ''}`;
 
 function listV() {
   const q = fq.toLowerCase(), S = {
