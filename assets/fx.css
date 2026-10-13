@@ -1,0 +1,63 @@
+/* Customer page FX: hero animation, scroll effects, interactive bits.
+   Loaded only by app/index.html. Does NOT touch .st / .grid / .count / .prog (stamp card) rules. */
+html{scroll-behavior:smooth}
+body{overflow-x:clip}
+
+/* ---- scroll progress bar ---- */
+.fx-bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:30;background:#f5b942;box-shadow:0 0 8px #f5b942;transform-origin:left;transform:scaleX(0);pointer-events:none}
+
+/* ---- mini sticky header (appears once the hero scrolls away) ---- */
+.fx-mini{position:fixed;top:0;left:0;right:0;z-index:25;border:0;cursor:pointer;color:var(--on-brand,#fff);font:inherit;
+  padding:calc(8px + env(safe-area-inset-top,0px)) 0 8px;background:color-mix(in srgb,var(--brand) 93%,transparent);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 8px 24px -12px color-mix(in srgb,var(--brand) 70%,#000);
+  transform:translateY(-110%);transition:transform .4s cubic-bezier(.2,.8,.2,1)}
+.fx-mini.on{transform:none}
+.fx-mi-in{max-width:480px;margin:0 auto;padding:0 18px;display:flex;align-items:center;gap:10px;text-align:left}
+.fx-mi-in .c-logo{width:30px;height:30px;font-size:14px}
+.fx-mi-in b{flex:1;min-width:0;font:600 16px Fraunces,Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-pill{background:var(--on-brand,#fff);color:var(--brand-t,var(--brand));border-radius:99px;padding:3px 11px;font:600 13px Inter,system-ui,sans-serif;flex:none}
+
+/* ---- hero (.c-hero): decoration + brand row only. .c-count and .prog are never touched ---- */
+.c-hero.fxh{position:relative;isolation:isolate;overflow:hidden}
+.fx-orbs{position:absolute;inset:0;z-index:-1;pointer-events:none}
+.fx-orbs i{position:absolute;border-radius:50%;filter:blur(30px);opacity:.45;
+  translate:calc(var(--px,0)*var(--k)*1px) calc(var(--p,0)*var(--k)*2.2px + var(--py,0)*var(--k)*.6px);
+  animation:fxfloat var(--t,9s) ease-in-out infinite alternate}
+.fx-orbs i:nth-child(1){width:150px;height:150px;left:-40px;top:-40px;background:#fff;--k:26;--t:9s;opacity:.22}
+.fx-orbs i:nth-child(2){width:120px;height:120px;right:-30px;top:10px;background:#f5b942;--k:-34;--t:11s;opacity:.4}
+.fx-orbs i:nth-child(3){width:100px;height:100px;left:45%;bottom:-40px;background:#fff;--k:44;--t:13s;opacity:.18}
+.fx-orbs b{position:absolute;width:5px;height:5px;border-radius:50%;background:#fff;opacity:.5;
+  translate:calc(var(--px,0)*var(--k)*1px) calc(var(--p,0)*var(--k)*2px);animation:fxtw var(--t,4s) ease-in-out infinite alternate;animation-delay:var(--d,0s)}
+@keyframes fxfloat{to{transform:translate3d(14px,-18px,0) scale(1.12)}}
+@keyframes fxtw{from{transform:scale(.4);opacity:.1}to{transform:scale(1.4);opacity:.8}}
+
+.c-hero.fxh .c-brand{transform:translateY(calc(var(--p,0)*16px));opacity:calc(1 - var(--p,0)*.7)}
+.c-hero.fxh .c-logo{cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transform:perspective(500px) rotateX(calc(var(--py,0)*-16deg)) rotateY(calc(var(--px,0)*16deg));
+  animation:fxlogo .9s cubic-bezier(.2,1.3,.4,1) backwards}
+.c-hero.fxh .c-logo.wig{animation:fxwig .5s ease}
+.c-hero.fxh .c-bt>span{animation:fxup .7s .5s cubic-bezier(.2,.8,.2,1) backwards}
+.c-bt b .fx-w,.c-bt b .fx-w>span{font-size:inherit;opacity:1}
+.fx-w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.12em;margin-bottom:-.12em}
+.fx-w>span{display:inline-block;animation:fxw .75s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i)*90ms + 180ms)}
+@keyframes fxw{from{transform:translateY(110%)}}
+@keyframes fxlogo{from{opacity:0;transform:perspective(500px) scale(.3) rotate(-25deg)}}
+@keyframes fxup{from{opacity:0;transform:translateY(14px)}}
+@keyframes fxwig{0%,100%{rotate:0deg}25%{rotate:-14deg;scale:1.15}60%{rotate:12deg;scale:1.1}}
+/* re-renders (tab switches, refocus) must not replay the intro */
+.c-hero.fxh.still .c-logo,.c-hero.fxh.still .c-bt>span,.c-hero.fxh.still .fx-w>span{animation:none}
+
+/* ---- scroll reveal for cards below the fold (never the stamp card) ---- */
+.fx-r{position:relative;animation:none!important;opacity:0;transform:translateY(34px) scale(.97);
+  transition:opacity .6s ease,transform .7s cubic-bezier(.2,.8,.2,1)}
+.fx-r.in{opacity:1;transform:none}
+.fx-r .of{opacity:0;transform:translateX(-16px);transition:opacity .5s ease,transform .6s cubic-bezier(.2,.8,.2,1);transition-delay:calc(var(--i,0)*80ms + 160ms)}
+.fx-r.in .of{opacity:1;transform:none}
+.fx-r .of.u{opacity:0}
+.fx-r.in .of.u{opacity:.45}
+/* pointer spotlight */
+.fx-r::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s;
+  background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),color-mix(in srgb,var(--brand) 13%,transparent),transparent 70%)}
+.fx-r.hot::before{opacity:1}
+
+@media (prefers-reduced-motion:reduce){.fx-bar,.fx-mini{display:none}}
