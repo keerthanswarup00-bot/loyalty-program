@@ -3,9 +3,15 @@
 > Innondu (ಇನ್ನೊಂದು, Kannada for "one more") is a small rewards web app for neighbourhood shops. It gives shops digital stamp cards, a daily scratch card and offers that customers use in their phone browser. Nothing to install, and it works alongside the shop's existing billing system.
 
 ## Pages
-- [Home](https://www.innondu.com/): what Innondu does, live stamp demo, owner dashboard preview
+- [Home](https://www.innondu.com/): what Innondu does, live stamp demo, owner dashboard preview, FAQ
+- [For cafés](https://www.innondu.com/for-cafes/): how Innondu works in a café
 - [About](https://www.innondu.com/about/): why it was built and what it believes
 - [Contact](https://www.innondu.com/contact/): tell us about your shop; replies within a day
+
+## Guides
+- [Digital stamp card for cafés in India: how it works and what to look for](https://www.innondu.com/blog/digital-stamp-card-for-cafes-india/)
+- [How to replace paper punch cards with a digital stamp card](https://www.innondu.com/blog/replace-paper-punch-cards/)
+- [11 loyalty program ideas for small shops that bring people back](https://www.innondu.com/blog/loyalty-program-ideas-small-shops/)
 
 ## Key facts
 - Customers: join with a phone number, collect stamps by tapping an NFC tag or scanning a QR code, claim rewards and offers.

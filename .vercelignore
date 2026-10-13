@@ -4,6 +4,7 @@ archive/
 supabase/
 seo/
 innondu-stamp-menu-update/
+innondu-content-kit/
 tests/
 scripts/
 *.md

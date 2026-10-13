@@ -1,0 +1,42 @@
+/* Content pages (blog + for-cafes): scoped additions on top of site.css core tokens/header/footer.
+   Keep in sync with the inline <style> blocks on blog/*, for-cafes/index.html. */
+main .wrap{max-width:840px}
+main section{padding-block:clamp(20px,3vw,40px)}
+.page,.post{padding-block:clamp(16px,2.5vw,32px) clamp(48px,8vw,96px)}
+.page .hero,.post .hero{padding:clamp(32px,5vw,56px) 0 clamp(24px,3vw,36px)}
+.page h1,.post h1{font-size:clamp(2.05rem,4.8vw,3.5rem);line-height:1.06;letter-spacing:-.03em;margin:16px 0 18px}
+.post h2{margin-block:1.6em .5em}
+.post h3{margin-block:1.5em .35em}
+.post p,.post ul,.post ol{max-width:68ch;margin:0 0 1.05em}
+.post ul,.post ol{padding-left:1.35em}
+.post li{margin:.45em 0}
+.post a:not(.btn),.page a:not(.btn){color:var(--accent);text-decoration:none}
+.post a:not(.btn):hover,.page a:not(.btn):hover{text-decoration:underline;text-underline-offset:3px}
+.post p a:not(.btn),.post li a:not(.btn),.page p a:not(.btn),.page li a:not(.btn){text-decoration:underline;text-underline-offset:3px}
+.lede{font-size:clamp(1.08rem,1.9vw,1.24rem);color:var(--mut);margin:0;max-width:62ch}
+.eyebrow{margin-bottom:12px}
+.crumbs{font:500 .84rem var(--mono);color:var(--mut);display:flex;gap:8px;flex-wrap:wrap;padding-block:20px 12px}
+.crumbs a{color:var(--mut);text-decoration:none;white-space:nowrap}
+.crumbs a:hover{color:var(--fg)}
+.crumbs [aria-current="page"]{color:var(--fg)}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+.steps{counter-reset:s;list-style:none;padding:0;display:grid;gap:14px;max-width:70ch}
+.steps li{counter-increment:s;position:relative;padding:18px 20px 18px 62px;background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.steps li::before{content:counter(s);position:absolute;left:18px;top:18px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font:800 .95rem var(--display)}
+.steps li p{margin:4px 0 0;color:var(--mut);max-width:58ch}
+.faq{max-width:760px}
+.faq details{background:var(--surface);border:1px solid var(--line);border-radius:16px;margin:12px 0;padding:0 18px}
+.faq summary{cursor:pointer;padding:15px 0;font-weight:700}
+.faq summary::marker{color:var(--accent)}
+.faq details[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px;padding-bottom:12px}
+.faq details p{margin:0 0 16px;color:var(--mut);max-width:62ch}
+.byline{font:500 .84rem var(--mono);color:var(--mut);border-top:1px solid var(--line);padding-top:18px;margin-top:46px}
+.next{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-top:28px;display:grid;gap:2px}
+.next p{margin:0;color:var(--mut)}
+.next a{color:var(--accent);font-weight:600}
+.cards{list-style:none;padding:0;display:grid;gap:16px;margin-top:8px}
+.cards li{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px}
+.cards h2{margin:0 0 8px;font-size:1.28rem;line-height:1.32}
+.cards a{color:var(--fg);text-decoration:none}
+.cards a:hover{color:var(--accent)}
+.cards p{margin:0;color:var(--mut);max-width:66ch}

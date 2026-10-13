@@ -108,6 +108,84 @@
         "No POS integration needed"
       ],
       "publisher": { "@id": "https://www.innondu.com/#org" }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://www.innondu.com/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Do my customers need to install an app?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Innondu runs in the phone's browser. Customers open a link, join with their phone number and can add the card to their home screen with one tap. There is nothing to download from an app store."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Innondu work with my billing software?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Innondu does not connect to your billing or POS and does not replace it. It sits alongside how you already work. At the counter your staff only redeem a code; everything else happens on the customer's phone."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What does the NFC stamp cost?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Nothing. Every shop gets an NFC stamp and a QR poster free. A branded 3D stand in your colours, with NFC inside, is optional."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does a customer collect a stamp?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "They tap their phone on the NFC stamp at the counter, or scan the QR poster. They sign in once, and after that each visit is a single tap. You set a waiting time between stamps so one customer cannot collect several at once."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What if a customer's phone does not have NFC?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "They scan the QR code on the poster instead. It opens the same page and adds the same stamp."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do rewards and offers get redeemed?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Each reward and offer comes with its own 6-character code on the customer's card. The customer shows it, your staff type it into the Redeem tab and confirm. A code can be used only once."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use my own brand?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Customers see your shop's name, colour, logo and social links, and you can upload your own stamp image. Your brand, not ours."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What can I see as the owner?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A customer list with visits and stamps, who is due a birthday, and who has gone quiet. You can send a ready WhatsApp message in one tap, update your menu with photos, and change your offers any time."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Who can see my customers' details?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Only you, the shop owner, see your customers' list. Each customer sees only their own card and can delete their account whenever they like."
+          }
+        }
+      ]
     }
   ]
 }
@@ -335,6 +413,14 @@ footer a{text-decoration:none}footer a:hover{color:var(--fg)}
 .beliefs p{color:var(--mut)}
 @media (max-width:640px){.beliefs{grid-template-columns:1fr}}
 
+/* faq */
+.faq{display:grid;gap:12px;max-width:760px}
+.faq details{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:0 18px}
+.faq summary{cursor:pointer;padding:15px 0;font-weight:700;color:var(--fg)}
+.faq summary::marker{color:var(--accent)}
+.faq details[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px;padding-bottom:12px}
+.faq details p{margin:0 0 16px;color:var(--mut);max-width:62ch}
+
 /* contact */
 .contact-grid{display:grid;gap:26px;max-width:560px;margin-inline:auto}
 .contact-grid>*{min-width:0}
@@ -376,6 +462,7 @@ footer a{text-decoration:none}footer a:hover{color:var(--fg)}
     <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-menu"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <nav id="site-menu" aria-label="Main">
       <a href="/about/">About</a>
+      <a href="/blog/">Blog</a>
       <a href="/contact/">Contact</a>
       <a class="btn sm accent" href="/contact/">Get Innondu</a>
     </nav>
@@ -569,6 +656,53 @@ footer a{text-decoration:none}footer a:hover{color:var(--fg)}
   </div>
 </section>
 
+<section class="line" id="faq" aria-labelledby="faq-title">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">FAQ</div>
+      <h2 id="faq-title">Questions shop owners ask</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Do my customers need to install an app?</summary>
+        <p>No. Innondu runs in the phone&#x27;s browser. Customers open a link, join with their phone number and can add the card to their home screen with one tap. There is nothing to download from an app store.</p>
+      </details>
+      <details>
+        <summary>Does Innondu work with my billing software?</summary>
+        <p>Innondu does not connect to your billing or POS and does not replace it. It sits alongside how you already work. At the counter your staff only redeem a code; everything else happens on the customer&#x27;s phone.</p>
+      </details>
+      <details>
+        <summary>What does the NFC stamp cost?</summary>
+        <p>Nothing. Every shop gets an NFC stamp and a QR poster free. A branded 3D stand in your colours, with NFC inside, is optional.</p>
+      </details>
+      <details>
+        <summary>How does a customer collect a stamp?</summary>
+        <p>They tap their phone on the NFC stamp at the counter, or scan the QR poster. They sign in once, and after that each visit is a single tap. You set a waiting time between stamps so one customer cannot collect several at once.</p>
+      </details>
+      <details>
+        <summary>What if a customer&#x27;s phone does not have NFC?</summary>
+        <p>They scan the QR code on the poster instead. It opens the same page and adds the same stamp.</p>
+      </details>
+      <details>
+        <summary>How do rewards and offers get redeemed?</summary>
+        <p>Each reward and offer comes with its own 6-character code on the customer&#x27;s card. The customer shows it, your staff type it into the Redeem tab and confirm. A code can be used only once.</p>
+      </details>
+      <details>
+        <summary>Can I use my own brand?</summary>
+        <p>Yes. Customers see your shop&#x27;s name, colour, logo and social links, and you can upload your own stamp image. Your brand, not ours.</p>
+      </details>
+      <details>
+        <summary>What can I see as the owner?</summary>
+        <p>A customer list with visits and stamps, who is due a birthday, and who has gone quiet. You can send a ready WhatsApp message in one tap, update your menu with photos, and change your offers any time.</p>
+      </details>
+      <details>
+        <summary>Who can see my customers&#x27; details?</summary>
+        <p>Only you, the shop owner, see your customers&#x27; list. Each customer sees only their own card and can delete their account whenever they like.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
 <section class="line">
   <div class="wrap">
     <div class="cta-band reveal">
@@ -583,7 +717,7 @@ footer a{text-decoration:none}footer a:hover{color:var(--fg)}
 <footer>
   <div class="wrap">
     <div><b>Innondu</b> &middot; <span lang="kn">ಇನ್ನೊಂದು</span> means &ldquo;one more&rdquo;</div>
-    <nav aria-label="Footer"><a href="/">Home</a><a href="/about/">About</a><a href="/contact/">Contact</a><a href="/admin/">Owner login</a></nav>
+    <nav aria-label="Footer"><a href="/">Home</a><a href="/about/">About</a><a href="/for-cafes/">For cafés</a><a href="/blog/">Blog</a><a href="/contact/">Contact</a><a href="/admin/">Owner login</a></nav>
     <div class="credit">Created by <a href="https://aryanswaroop.com" target="_blank" rel="noopener">aryanswaroop.com</a></div>
   </div>
 </footer>
