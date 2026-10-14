@@ -297,13 +297,16 @@ function initDailyScr() {
 
 // ---------- First-visit intro ----------
 const introSeen = () => { try { return localStorage.getItem('lk-intro') == '1' } catch (e) { return true } };
-function introV() {
-  let s = '';
-  const st = (n, t, x) => s += `<li><i>${n}</i><div><b>${t}</b><span>${x}</span></div></li>`;
+// The "how it works" steps, shared by the first-visit intro and the connect landing page.
+function howSteps(st) {
   st(1, 'Join free', 'Enter your name and phone number. It takes 30 seconds.' + (biz.join_stamp ? ' Your first stamp is free.' : ''));
   st(2, 'Collect stamps', 'Each visit, tap your phone on the stamp tag at the counter. Collect ' + biz.need + ' stamps and get ' + esc(biz.reward) + '.');
   if (dailyPub) st(3, 'Scratch every day', 'Open your card once a day and scratch it for a surprise offer.');
   st(dailyPub ? 4 : 3, 'Show your code', 'Offers have a 6-letter code. Show it to our staff and they will apply it.');
+}
+function introV() {
+  let s = '';
+  howSteps((n, t, x) => s += `<li><i>${n}</i><div><b>${t}</b><span>${x}</span></div></li>`);
   return `<div class="iv" role="dialog" aria-modal="true" aria-labelledby="int-t"><div class="is">
     <h2 id="int-t">How ${esc(biz.name)} rewards work</h2>
     <ol class="steps">${s}</ol>
@@ -766,11 +769,40 @@ async function claim() {
   try { const r = await rpc(sb, 'claim_reward', { p_slug: CFG.slug }); reward = r.code; sur = null; await load(); render(); confetti(); buzz() } catch (e) { toast(nice(e)); await load(); render() }
 }
 
+// ---------- Connect page (signed out) ----------
+// The landing a customer sees before they join. Every value comes from the shop's own
+// settings (get_business), so nothing here is invented or shown when the shop has not set it.
+function connectV() {
+  const need = Math.max(2, +biz.need || 8);
+  let g = ''; for (let i = 0; i < need; i++) g += `<div class="st" aria-hidden="true">${i + 1}</div>`;
+  return `<div class="card">
+  <div class="eyebrow">Rewards club</div>
+  <h2 class="cx-lead">Collect ${need} stamps, get ${esc(biz.reward)}</h2>
+  <p class="sub">Join ${esc(biz.name)} and start collecting today. It's free${biz.join_stamp ? ', and your first stamp is on us' : ''}.</p>
+  <div class="grid" aria-hidden="true">${g}</div>
+</div>`;
+}
+function pubOffersV() {
+  const rows = [];
+  if (biz.welcome_offer) rows.push(`<li><i>${IC.chk}</i><span><b>Welcome gift</b><em>${esc(biz.welcome_offer)} when you join.</em></span></li>`);
+  if (biz.bday_offer) rows.push(`<li><i>${IC.chk}</i><span><b>Birthday treat</b><em>${esc(biz.bday_offer)} around your birthday.</em></span></li>`);
+  if (biz.ref_on && biz.ref_offer) rows.push(`<li><i>${IC.chk}</i><span><b>Refer a friend</b><em>You both get ${esc(biz.ref_offer)}.</em></span></li>`);
+  if (dailyPub) rows.push(`<li><i>${IC.chk}</i><span><b>Daily scratch</b><em>Open your card once a day for a surprise.</em></span></li>`);
+  if (!rows.length) return '';
+  return `<div class="card"><h2>What you can earn</h2><ul class="cx-list">${rows.join('')}</ul></div>`;
+}
+function howV() {
+  let s = '';
+  howSteps((n, t, x) => s += `<li><i>${n}</i><div><b>${t}</b><span>${x}</span></div></li>`);
+  return `<div class="card"><h2>How it works</h2><ol class="steps">${s}</ol></div>`;
+}
+const attrV = () => `<footer class="cx-attr">Powered by <a href="https://innondu.com" target="_blank" rel="noopener">Innondu</a></footer>`;
+
 function authV() {
   const nw = form == 'new';
   const isLoginTab = form == 'in' || view == 'signin' || view == 'forgot';
-  return head(biz) + `<div class="card"><div class="tabs"><button class="${nw && !isLoginTab ? 'on' : ''}" onclick="form='new';view='home';render()">New member</button><button class="${isLoginTab ? 'on' : ''}" onclick="form='in';view='signin';render()">Login</button></div>
-  ${view == 'forgot' ? forgotV() : (isLoginTab ? signinV() : joinV())}</div>` + socials(biz);
+  return head(biz) + connectV() + `<div class="card"><div class="tabs"><button class="${nw && !isLoginTab ? 'on' : ''}" onclick="form='new';view='home';render()">New member</button><button class="${isLoginTab ? 'on' : ''}" onclick="form='in';view='signin';render()">Login</button></div>
+  ${view == 'forgot' ? forgotV() : (isLoginTab ? signinV() : joinV())}</div>` + howV() + pubOffersV() + socials(biz) + attrV();
 }
 
 function joinV() {
