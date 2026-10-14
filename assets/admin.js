@@ -3,7 +3,7 @@
 // Message (WhatsApp queue) · Offers (visual editors) · Menu (items with photos) · More (brand, news, refer, tag, account).
 // Support mode: a platform admin opens /admin/?as=<shop> and works as that shop's owner (shares the /platform/ login). Everything they do is logged.
 const SUPPORT_AS = (new URLSearchParams(location.search).get('as') || '').toLowerCase();
-const sb = notReady() ? null : mkClient(SUPPORT_AS ? 'lk-platform' : 'lk-admin-' + (CFG.slug || 'unresolved'));
+const sb = notReady() ? null : mkClient(SUPPORT_AS ? 'lk-platform' : (CFG.slug === 'cheesora-bliss' ? 'lk-admin' : 'lk-admin-' + (CFG.slug || 'unresolved')));
 let support = null, SUP = [];
 let signed = false, recover = false, biz = null, M = [], V = [], MSG = [], MENU = null, tab = 'h', ov = null, openId = null, selMode = false, visCache = {};
 let q = '', rq = '', rc = '', rp = '', rd = null, rbusy = false;

@@ -1,5 +1,5 @@
 // Customer app: sign up / sign in, stamp card, offers.
-const sb = notReady() ? null : mkClient('lk-customer-' + (CFG.slug || 'unresolved'));
+const sb = notReady() ? null : mkClient(CFG.slug === 'cheesora-bliss' ? 'lk-customer' : 'lk-customer-' + (CFG.slug || 'unresolved'));
 let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, ip = null, pop = null, rt = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
 let usedSeen = null;
 let daily = null, dailyPub = false, introShow = false, scratching = false, dailyT = null;

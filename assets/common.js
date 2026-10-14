@@ -99,7 +99,7 @@ function socials(b) {
 //   2) a custom domain registered for the shop (looked up once with resolve_host(), remembered for the tab)
 //   3) ?shop=slug, on localhost only (for testing)
 async function resolveShop() {
-  if (/^\/app\/?$/.test(location.pathname)) return false;
+  if (/^\/app\/?$/.test(location.pathname) && /(^|\.)innondu\.com$/i.test(location.hostname)) return false;
   if (CFG.slug) return true;
   const h = location.hostname.toLowerCase(), base = String(CFG.baseDomain || '').toLowerCase().replace(/^\./, '');
   if (/^(localhost|127\.0\.0\.1)$/.test(h)) { const q = new URLSearchParams(location.search).get('shop'); if (q && /^[a-z0-9-]+$/.test(q)) { CFG.slug = q; return true } }
