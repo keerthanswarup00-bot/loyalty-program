@@ -1,5 +1,8 @@
 // Shared helpers for the customer app and the owner app.
 const CFG = window.LK;
+// Resolve path-based shop routes synchronously before either app creates its Supabase client.
+const _shopPath = location.pathname.match(/^\/app\/([a-z0-9-]+)(?:\/admin)?\/?$/i);
+if (_shopPath) CFG.slug = _shopPath[1].toLowerCase();
 const $ = s => document.querySelector(s);
 const v = i => ($('#' + i) || {}).value || '';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -96,6 +99,7 @@ function socials(b) {
 //   2) a custom domain registered for the shop (looked up once with resolve_host(), remembered for the tab)
 //   3) ?shop=slug, on localhost only (for testing)
 async function resolveShop() {
+  if (/^\/app\/?$/.test(location.pathname) && /(^|\.)innondu\.com$/i.test(location.hostname)) return false;
   if (CFG.slug) return true;
   const h = location.hostname.toLowerCase(), base = String(CFG.baseDomain || '').toLowerCase().replace(/^\./, '');
   if (/^(localhost|127\.0\.0\.1)$/.test(h)) { const q = new URLSearchParams(location.search).get('shop'); if (q && /^[a-z0-9-]+$/.test(q)) { CFG.slug = q; return true } }
@@ -109,7 +113,7 @@ async function resolveShop() {
   } catch (e) { }
   return false;
 }
-const noShopMsg = '<div class="card"><h2>Shop not found</h2><p class="sub">This web address is not linked to a shop. Check the link, or ask the shop for their rewards link.</p></div>';
+const noShopMsg = /^\/app\/?$/.test(location.pathname) ? '<div class="card"><h2>Find your shop</h2><p class="sub">Open the rewards link or scan the QR code provided by your shop to get started.</p><p class="sub"><a href="/">Back to Innondu</a></p></div>' : '<div class="card"><h2>Shop not found</h2><p class="sub">This web address is not linked to a shop. Check the link, or ask the shop for their rewards link.</p><p class="sub"><a href="/">Back to Innondu</a></p></div>';
 const notReady = () => /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !window.supabase;
 const setupMsg = '<div class="card"><h2>Almost there</h2><p class="sub">Add your Supabase URL and key in <b>assets/config.js</b>, then reload. See README.md.</p></div>';
 

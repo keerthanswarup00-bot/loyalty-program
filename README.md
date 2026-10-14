@@ -1,6 +1,6 @@
 # Loyalty Kit (Phase 2: shared backend)
 
-Website at `/` (plus `/about/` and `/contact/`), customer app at `/app/`, owner dashboard at `/admin/`. One free Supabase database serves every client. Plain HTML/CSS/JS, no build step.
+Website at `/` (plus `/about/` and `/contact/`), customer apps at `/app/<shop-slug>`, and owner dashboards at `/app/<shop-slug>/admin`. Bare `/app/` is a neutral entry page. One free Supabase database serves every client. Plain HTML/CSS/JS, no build step.
 
 ```
 index.html            Innondu landing page (public site root)
@@ -88,9 +88,9 @@ Instead of one Vercel project per client, one deployment can serve every shop; t
 
 1. Run `supabase/2026-10-12-platform.sql` (already in `schema.sql`).
 2. Make yourself platform admin, once: `insert into public.platform_admins (user_id) select id from auth.users where email = 'you@example.com';` (the account must exist: Authentication -> Users -> Add user).
-3. In `assets/config.js` set `slug: ''` and `baseDomain: 'yourplatform.com'`.
+3. In `assets/config.js` set `slug: ''`. For path-based routing on the main domain, leave `baseDomain: ''`.
 4. In Vercel add the wildcard domain `*.yourplatform.com` to the project (needs the domain's nameservers on Vercel).
-5. Open `/platform/`, sign in, press **Create shop**. The shop opens at `<address>.yourplatform.com` (customers at `/app/`, owner at `/admin/`).
+5. Open `/platform/`, sign in, press **Create shop**. The default shop URLs are `/app/<shop-slug>` for customers and `/app/<shop-slug>/admin` for the owner. If you intentionally configure a base domain or custom domain, the legacy host-based URLs can still be used.
 
 ### Platform page (`/platform/`): running many shops
 
