@@ -158,7 +158,8 @@ function scrReveal(id) {
   const x = ((card && card.offers) || []).find(o => o.id == id); if (!x) return;
   scrMem.add(id); try { localStorage.setItem('lk-scr-' + id, '1') } catch (e) { }
   sur = { t: 'Surprise unlocked', x: x.text };   // no .scratch flag, so the normal banner shows
-  render(); confetti(); buzz();
+  const from = anchorOf(document.querySelector('.scr-wrap'));
+  render(); burst(from || { x: .5, y: .42 }); buzz();
   toast('Saved to your offers');
 }
 function initScratch() {
@@ -188,29 +189,19 @@ function initScratch() {
 }
 
 
-// ---------- Confetti (canvas) ----------
-function confetti() {
-  if (!scrOn() || !document.body) return;
-  const cv = document.createElement('canvas');
-  const g = cv.getContext && cv.getContext('2d');
-  if (!g) return;
-  const w = cv.width = window.innerWidth || 360, h = cv.height = window.innerHeight || 640;
-  cv.setAttribute('aria-hidden', 'true');
-  Object.assign(cv.style, { position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: '40' });
-  document.body.appendChild(cv);
-  const brand = (getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#e8590c');
-  const cols = [brand, '#f5b301', '#e8590c', '#2b8a3e', '#1971c2', '#fff'];
-  const P = [];
-  for (let i = 0; i < 140; i++) P.push({ x: w / 2 + (Math.random() - .5) * 30, y: -14 - Math.random() * 40, vx: (Math.random() - .5) * 9, vy: Math.random() * 4 + 1.5, g: .35, r: Math.random() * Math.PI * 2, vr: (Math.random() - .5) * .35, w: 5 + Math.random() * 6, l: 8 + Math.random() * 8, c: cols[i % cols.length] });
-  const t0 = performance.now(), DUR = 3200;
-  const fr = t => {
-    const k = Math.max(0, 1 - (t - t0) / DUR);
-    g.clearRect(0, 0, w, h);
-    for (const p of P) { p.vy += p.g; p.vx *= .985; p.vr *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr; g.save(); g.globalAlpha = k; g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.c; g.fillRect(-p.w / 2, -p.l / 2, p.w, p.l); g.restore(); }
-    if (t - t0 < DUR) requestAnimationFrame(fr); else cv.remove();
-  };
-  requestAnimationFrame(fr);
+// ---------- Confetti ----------
+// Bursts from the thing that earned it (an element, a saved rect, or a selector), never from the top of the screen.
+// Uses the shared burst() (transform/opacity only, one overlay). Falls back to just above the middle of the screen.
+function anchorOf(t) {
+  try {
+    const r = typeof t == 'string' ? (document.querySelector(t) || {}).getBoundingClientRect : t && t.getBoundingClientRect ? t.getBoundingClientRect.bind(t) : null;
+    const b = r ? r() : (t && t.width != null ? t : null);
+    if (!b || (!b.width && !b.height)) return null;
+    const vw = window.innerWidth || 360, vh = window.innerHeight || 640;
+    return { x: Math.min(.95, Math.max(.05, (b.left + b.width / 2) / vw)), y: Math.min(.95, Math.max(.05, (b.top + b.height / 2) / vh)) };
+  } catch (e) { return null }
 }
+function confetti(t, big) { burst(anchorOf(t) || { x: .5, y: .42 }, big) }
 
 // ---------- Daily scratch card ----------
 const fmtCd = ms => { const m = Math.max(0, Math.ceil(ms / 60000)); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm' };
@@ -236,7 +227,7 @@ async function dailyPlay() {
   } catch (e) { scratching = false; toast(nice(e)); render() }
 }
 async function dailyFinish() {
-  if (daily && daily.win) confetti();
+  if (daily && daily.win) confetti('#daily-scr', true);
   await load();
   render();
 }
@@ -655,7 +646,7 @@ async function reg(btn) {
     } else {
       render();
       if (pend) await scan();
-      else { confetti(); buzz() }
+      else { confetti('.c-hero'); buzz() }
     }
   } catch (e) {
     const msg = String((e && e.message) || e);
@@ -763,7 +754,7 @@ async function delMe() {
 }
 
 async function claim() {
-  try { const r = await rpc(sb, 'claim_reward', { p_slug: CFG.slug }); reward = r.code; sur = null; await load(); render(); confetti(); buzz() } catch (e) { toast(nice(e)); await load(); render() }
+  try { const from = anchorOf('.rw .btn, .btn[onclick="claim()"]'); const r = await rpc(sb, 'claim_reward', { p_slug: CFG.slug }); reward = r.code; sur = null; await load(); render(); confetti(document.querySelector('.rw .code') || from, true); buzz() } catch (e) { toast(nice(e)); await load(); render() }
 }
 
 function authV() {
@@ -845,7 +836,7 @@ function render() {
     initScratch();
     initDailyScr();
   }
-  if (pop && !pop.fired) { pop.fired = true; confetti() }
+  if (pop && !pop.fired) { pop.fired = true; confetti('.mdl') }
   if (y) window.scrollTo(0, y);
 }
 
