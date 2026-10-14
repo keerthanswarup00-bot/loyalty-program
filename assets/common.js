@@ -1,5 +1,33 @@
 // Shared helpers for the customer app and the owner app.
 const CFG = window.LK;
+
+// ---- Where each shop lives ----
+// Many shops can share one address: /app/<slug>/ is a shop's customer app and /app/<slug>/admin/ its owner dashboard
+// (vercel.json rewrites both to the same two pages, so a new shop needs no deployment). The shop named in config.js keeps
+// its short links /app/ and /admin/, so printed QR codes, NFC tags and installed home-screen cards keep working.
+// A shop on its own address (subdomain or custom domain) also uses /app/ and /admin/.
+const CFG_SLUG = CFG.slug || '';
+const PATH_SHOP = (() => { const m = location.pathname.match(/^\/app\/([a-z0-9][a-z0-9-]*)(?:\/(admin))?\/?$/i); return m ? { slug: m[1].toLowerCase(), admin: !!m[2] } : null })();
+if (PATH_SHOP) CFG.slug = PATH_SHOP.slug;
+let HOSTED = false;   // set by resolveShop() when the web address alone identifies the shop
+const shopPath = (slug, admin) => (slug === CFG_SLUG || (HOSTED && slug === CFG.slug)) ? (admin ? '/admin/' : '/app/') : '/app/' + slug + '/' + (admin ? 'admin/' : '');
+const appUrl = slug => location.origin + shopPath(slug || CFG.slug, false);
+const adminUrl = slug => location.origin + shopPath(slug || CFG.slug, true);
+// Browser storage names get the shop's name when shops share an address, so one phone can hold a login for each of them.
+// The config.js shop keeps the plain names (nobody is signed out when this ships).
+const SCOPED = !!PATH_SHOP && PATH_SHOP.slug !== CFG_SLUG;
+const skey = k => SCOPED ? k + '-' + CFG.slug : k;
+
+// Shop addresses made from a name: "Café Bean & Brew" -> "cafe-bean-and-brew". Must satisfy the database rule in platform_create_business.
+const RESERVED_SLUGS = ['www', 'app', 'admin', 'api', 'platform', 'mail', 'static', 'assets', 'about', 'contact', 'docs', 'support', 'status'];
+const slugify = name => String(name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+// The first free address: the slug itself, then -2, -3 ... when it is reserved or already used (taken = function(slug) -> boolean).
+function uniqueSlug(base, taken) {
+  if (base.length < 3) return '';
+  let s = base, n = 1;
+  while (RESERVED_SLUGS.includes(s) || taken(s)) { n++; s = base.slice(0, 40 - String(n).length - 1).replace(/-+$/, '') + '-' + n }
+  return s;
+}
 const $ = s => document.querySelector(s);
 const v = i => ($('#' + i) || {}).value || '';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -90,6 +118,7 @@ function socials(b) {
   return L.length ? `<div class="soc">${L.map(x => `<a href="${esc(x[1])}" target="_blank" rel="noopener" aria-label="${x[0]}">${IC[x[2]]}</a>`).join('')}</div>` : '';
 }
 // ---- Which shop is this page for? ----
+// A /app/<slug>/ address always wins (see above). Otherwise:
 // Single-shop deployment: config.js sets `slug` and nothing changes.
 // Multi-shop deployment: leave `slug` empty. The shop comes from the address:
 //   1) subdomain of config.js `baseDomain`   (cheesora.example.com -> "cheesora", needs no database lookup)
@@ -99,13 +128,13 @@ async function resolveShop() {
   if (CFG.slug) return true;
   const h = location.hostname.toLowerCase(), base = String(CFG.baseDomain || '').toLowerCase().replace(/^\./, '');
   if (/^(localhost|127\.0\.0\.1)$/.test(h)) { const q = new URLSearchParams(location.search).get('shop'); if (q && /^[a-z0-9-]+$/.test(q)) { CFG.slug = q; return true } }
-  if (base && h.endsWith('.' + base)) { const s = h.slice(0, -base.length - 1); if (/^[a-z0-9-]+$/.test(s) && !['www', 'app', 'admin', 'platform'].includes(s)) { CFG.slug = s; return true } }
+  if (base && h.endsWith('.' + base)) { const s = h.slice(0, -base.length - 1); if (/^[a-z0-9-]+$/.test(s) && !['www', 'app', 'admin', 'platform'].includes(s)) { CFG.slug = s; HOSTED = true; return true } }
   const key = 'lk-host-' + h;
-  try { const c = sessionStorage.getItem(key); if (c) { CFG.slug = c; return true } } catch (e) { }
+  try { const c = sessionStorage.getItem(key); if (c) { CFG.slug = c; HOSTED = true; return true } } catch (e) { }
   try {
     const r = await fetch(CFG.supabaseUrl + '/rest/v1/rpc/resolve_host', { method: 'POST', headers: { apikey: CFG.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_host: h }) });
     const s = r.ok ? await r.json() : null;
-    if (typeof s == 'string' && /^[a-z0-9-]+$/.test(s)) { CFG.slug = s; try { sessionStorage.setItem(key, s) } catch (e) { } return true }
+    if (typeof s == 'string' && /^[a-z0-9-]+$/.test(s)) { CFG.slug = s; HOSTED = true; try { sessionStorage.setItem(key, s) } catch (e) { } return true }
   } catch (e) { }
   return false;
 }

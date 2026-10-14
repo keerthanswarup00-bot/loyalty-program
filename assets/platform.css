@@ -33,3 +33,6 @@ main.wide{max-width:760px}
 .pf-res{margin-top:10px;display:grid;gap:6px}.pf-res button{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--tx);font:inherit;cursor:pointer}.pf-res small{color:var(--mut);width:100%}.pf-res span{color:var(--mut);font-size:13px}
 .pf-cu{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line)}.pf-cu:first-of-type{border-top:0}
 .pf-act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.pf-act .btn.sm{padding:7px 11px;font-size:12.5px}
+.pf-copy{display:flex;gap:8px;align-items:center}.pf-copy input{flex:1;min-width:0}.pf-copy .btn.sm{flex:none}
+.pf-slug{display:flex;align-items:center;border:1px solid var(--line);border-radius:var(--r-in,12px);background:var(--bg)}.pf-slug span{padding-left:14px;color:var(--mut);font-size:13.5px;white-space:nowrap}
+.pf-slug input{border:0;background:transparent;box-shadow:none;padding-left:2px;min-width:0}.pf-slug:focus-within{border-color:var(--brand)}

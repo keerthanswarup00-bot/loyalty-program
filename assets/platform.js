@@ -12,8 +12,8 @@ const dAgo = t => t ? Math.floor((Date.now() - new Date(t)) / 864e5) : null;
 const ago = t => { const d = dAgo(t); return d === null ? 'never' : d <= 0 ? 'today' : d == 1 ? 'yesterday' : d + ' days ago' };
 const baseDom = () => String(CFG.baseDomain || '').replace(/^\./, '');
 const shopHost = r => (r.domains && r.domains[0]) || (baseDom() ? r.slug + '.' + baseDom() : null);
-// Link for a shop. A single-shop deployment (config slug set) only serves its own shop on this address.
-const shopUrl = (r, path) => { const h = shopHost(r); if (h) return 'https://' + h + path; return CFG.slug == r.slug ? location.origin + path : null };
+// Link for a shop: its own domain or subdomain when it has one, otherwise /app/<slug>/ (customers) or /app/<slug>/admin/ (owner) on this address.
+const shopUrl = (r, admin) => { const h = shopHost(r); return h ? 'https://' + h + (admin ? '/admin/' : '/app/') : location.origin + shopPath(r.slug, admin) };
 const missingSql = e => /function|schema cache|does not exist|relation/i.test(String(e && e.message || e)) ? 'Run the latest supabase/schema.sql in Supabase first.' : null;
 const bad = e => toast(missingSql(e) || nice(e));
 const R = slug => rows.find(r => r.slug == slug);
@@ -65,21 +65,38 @@ const openShop = (slug, tab) => { if (tab) ptab = tab; sel = null; go('#shop=' +
 const setTab = t => { ptab = t; if (t == 'customers' && !cust) loadCust(true); if (t == 'access' && !shopAudit) loadShopAudit(); render() };
 
 // ---------- shop creation, domains, owner ----------
+let creating = false;
+const randomPw = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'; return Array.from(crypto.getRandomValues(new Uint8Array(24)), b => c[b % c.length]).join('') };
+// The address follows the shop name until you type your own.
+function nsAuto() { const a = $('#ns'); if (a && !a.dataset.t) a.value = uniqueSlug(slugify(v('nn')), x => !!R(x)) }
+// Shop name + owner email -> the shop, its owner login and the links to send. The owner sets their own password from an emailed
+// link (or you type one under More options). A failed attempt can simply be repeated: an owner account that already exists is reused.
 async function createShop(btn) {
-  const slug = v('ns').trim().toLowerCase(), name = v('nn').trim(), email = v('ne').trim().toLowerCase(), pw = v('np'), color = v('nc') || '#8a4b2a';
-  if (!slug || !name || !email) return toast('Fill in the shop address, name and owner email');
+  if (creating) return;
+  const name = v('nn').trim(), email = v('ne').trim().toLowerCase(), pw = v('np'), color = v('nc') || '#8a4b2a';
+  const slug = (v('ns').trim() || uniqueSlug(slugify(name), x => !!R(x))).toLowerCase();
+  if (!name || !email) return toast('Enter the shop name and the owner email');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast('That owner email does not look right');
+  if (!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(slug)) return toast('Give the shop an address: 3 to 40 letters, numbers or hyphens');
+  if (RESERVED_SLUGS.includes(slug)) return toast('"' + slug + '" is reserved. Pick another address.');
+  if (R(slug)) return toast('The address "' + slug + '" is already used by ' + R(slug).name);
   if (pw && pw.length < 6) return toast('The owner password must be at least 6 characters');
-  btn.disabled = true;
+  creating = true; btn.disabled = true;
   try {
-    if (pw) {   // a separate client that does not save its session, so this admin stays signed in
-      const tmp = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'lk-tmp' } });
-      const { error } = await tmp.auth.signUp({ email, password: pw });
-      if (error && !/already (been )?registered/i.test(error.message)) throw error;
-    }
+    // A separate client that does not save its session, so this admin stays signed in.
+    const tmp = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'lk-tmp' } });
+    const { error } = await tmp.auth.signUp({ email, password: pw || randomPw() });
+    const existing = !!error && /already (been )?registered/i.test(error.message);
+    if (error && !existing) throw error;
     await rpc(sb, 'platform_create_business', { p_slug: slug, p_name: name, p_owner_email: email, p_tagline: '', p_color: color });
-    created = { slug, name, email, pw }; await reload(); toast('Shop created'); go('#shop=' + slug);
+    let mail = null;
+    if (!pw && !existing) { const r = await sb.auth.resetPasswordForEmail(email, { redirectTo: adminUrl(slug) }); mail = r.error ? nice(r.error) : true }
+    let join = null;   // the sign-up link the QR code opens
+    try { const { data } = await sb.from('businesses').select('join_token').eq('slug', slug).maybeSingle(); if (data && data.join_token) join = appUrl(slug) + '#join=' + data.join_token } catch (e) { }
+    created = { slug, name, email, pw: existing ? '' : pw, existing, mail, join };
+    await reload(); toast('Shop created'); go('#shop=' + slug);
   } catch (e) { bad(e) }
-  btn.disabled = false;
+  creating = false; btn.disabled = false;
 }
 async function addDomain() {
   const host = (v('dmn') || '').trim().toLowerCase(); if (!host) return toast('Type the domain first');
@@ -96,7 +113,7 @@ async function setOwner() {
 async function ownerReset() {
   const r = R(sel); if (!r || !r.owner_email) return;
   if (!confirm('Email a password reset link to ' + r.owner_email + '?')) return;
-  const { error } = await sb.auth.resetPasswordForEmail(r.owner_email, { redirectTo: location.origin + '/admin/' });
+  const { error } = await sb.auth.resetPasswordForEmail(r.owner_email, { redirectTo: adminUrl(r.slug) });
   if (error) return toast(nice(error));
   try { await rpc(sb, 'platform_log', { p_slug: sel, p_action: 'owner_reset_email' }); shopAudit = null } catch (e) { }
   toast('Reset link sent to ' + r.owner_email);
@@ -194,12 +211,14 @@ function listV() {
 const drawList = () => { const el = $('#pfl'); if (!el) return; const keep = fq; render(); const i = $('#fq'); if (i) { i.focus(); i.setSelectionRange(keep.length, keep.length) } };
 
 function newV() {
-  return topV() + `<div class="card"><button class="lnk" onclick="go('#')">← All shops</button><h2 style="margin-top:8px">New shop</h2><p class="sub">Creates the shop and its owner login. No separate database or deployment.</p>
-    <label class="lb">Shop address <span>(letters, numbers, hyphens)</span></label><input id="ns" autocapitalize="off" placeholder="cheesora-bliss">
-    <label class="lb">Shop name</label><input id="nn" placeholder="Cheesora Bliss">
-    <label class="lb">Owner email</label><input id="ne" type="email" autocomplete="off">
-    <label class="lb">Owner password <span>(leave blank if they already have an account here)</span></label>${pwField('np', 'new-password')}
-    <label class="lb">Brand colour</label><input id="nc" type="color" value="#8a4b2a">
+  return topV() + `<div class="card"><button class="lnk" onclick="go('#')">← All shops</button><h2 style="margin-top:8px">New shop</h2><p class="sub">Type the shop name and the owner's email. The address, the owner login and the sign-up QR are set up for you.</p>
+    <label class="lb">Shop name</label><input id="nn" placeholder="Cheesora Bliss" autocomplete="off" oninput="nsAuto()">
+    <label class="lb">Owner email <span>(they get an email to choose their own password)</span></label><input id="ne" type="email" autocomplete="off" autocapitalize="off">
+    <label class="lb">Shop address</label><div class="pf-slug"><span>${esc(location.host)}/app/</span><input id="ns" autocapitalize="off" autocomplete="off" placeholder="made from the name" oninput="this.dataset.t=1"></div>
+    <p class="hint">Made from the name. Change it only if you want something else, and pick carefully: printed QR codes and NFC tags contain it.</p>
+    <details class="a-det2"><summary>More options</summary>
+      <label class="lb">Brand colour</label><input id="nc" type="color" value="#8a4b2a">
+      <label class="lb">Owner password <span>(leave blank to email them a setup link instead)</span></label>${pwField('np', 'new-password')}</details>
     <button class="btn" data-go onclick="createShop(this)">Create shop</button></div>`;
 }
 function auditV() {
@@ -209,9 +228,8 @@ function auditV() {
 
 function shopV() {
   const r = R(sel); if (!r) return topV();
-  const cu = shopUrl(r, '/app/'), ad = '/admin/?as=' + encodeURIComponent(r.slug);
-  const doneBox = created && created.slug == r.slug ? `<div class="card"><h2>${esc(r.name)} is ready</h2><p class="sub">Send the owner these details (this box disappears when you leave the page).</p>
-    <p style="margin:6px 0"><b>Dashboard:</b> ${esc((shopUrl(r, '/admin/')) || '(add a domain first)')}<br><b>Email:</b> ${esc(created.email)}<br><b>Password:</b> ${created.pw ? esc(created.pw) : '(their existing password)'}</p><button class="btn sm alt" onclick="created=null;render()">Dismiss</button></div>` : '';
+  const cu = shopUrl(r, false), ad = '/admin/?as=' + encodeURIComponent(r.slug);
+  const doneBox = created && created.slug == r.slug ? doneV(r) : '';
   const tabs = [['overview', 'Overview'], ['customers', 'Customers'], ['access', 'Access and notes']].map(t => `<button class="${ptab == t[0] ? 'on' : ''}" onclick="setTab('${t[0]}')">${t[1]}</button>`).join('');
   return topV() + doneBox + `<div class="card"><button class="lnk" onclick="go('#')">← All shops</button>
     <div class="pf-head"><i class="pf-dot big" style="background:${esc(HEX6.test(r.color) ? r.color : '#8a4b2a')}"></i><div><h2 style="margin:0">${esc(r.name)}</h2><div class="mut sm">${esc(r.slug)}${shopHost(r) ? ' · ' + esc(shopHost(r)) : ''}</div></div></div>
@@ -219,6 +237,19 @@ function shopV() {
     <div class="row"><a class="btn sm" href="${ad}" target="_blank" rel="noopener">Open dashboard as owner</a><a class="btn sm alt" href="${ad}&tab=ins" target="_blank" rel="noopener">Insights</a>${cu ? `<a class="btn sm alt" href="${esc(cu)}" target="_blank" rel="noopener">Customer app</a>` : ''}</div>
     <p class="hint">Opening the dashboard lets you change anything the owner can (offers, brand, menu, customers). It is logged and the owner sees it in their dashboard.</p></div>
     <div class="tabs">${tabs}</div>` + (ptab == 'customers' ? custV(r) : ptab == 'access' ? accessV(r) : overviewV(r));
+}
+const joinQr = u => { if (typeof qrcode == 'undefined') return '<p class="mut sm">QR library could not load.</p>'; const z = qrcode(0, 'M'); z.addData(u); z.make(); return z.createSvgTag({ cellSize: 6, margin: 2, scalable: true }) };
+const copyRow = u => `<div class="pf-copy"><input readonly class="ro" value="${esc(u)}" onclick="this.select()"><button class="btn sm alt" onclick="copyText(${esc(JSON.stringify(u))})">Copy</button></div>`;
+function doneV(r) {
+  const c = created, adm = shopUrl(r, true);
+  const who = c.existing ? `<b>${esc(c.email)}</b> already has an account here, so they sign in with their existing password.`
+    : c.pw ? `Sign in with <b>${esc(c.email)}</b> and the password <b>${esc(c.pw)}</b>.`
+    : c.mail === true ? `A setup email went to <b>${esc(c.email)}</b>. They choose their own password from it.`
+    : `The setup email could not be sent${c.mail ? ' (' + esc(c.mail) + ')' : ''}. Use "Email password reset link" on the Access and notes tab, or set a password yourself.`;
+  return `<div class="card"><h2>${esc(r.name)} is ready</h2><p class="sub">Send the owner these. This box disappears when you leave the page.</p>
+    <label class="lb">Owner dashboard</label>${copyRow(adm)}<p class="hint">${who}</p>
+    ${c.join ? `<label class="lb">Customer sign-up link <span>(the QR opens this; owners can print it from their dashboard)</span></label>${copyRow(c.join)}<div class="qr">${joinQr(c.join)}</div>` : ''}
+    <button class="btn sm alt" onclick="created=null;render()">Dismiss</button></div>`;
 }
 function overviewV(r) {
   const st = (b, l) => `<div class="a-st"><b>${b}</b><span>${l}</span></div>`;

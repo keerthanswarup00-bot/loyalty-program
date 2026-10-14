@@ -92,6 +92,20 @@ Instead of one Vercel project per client, one deployment can serve every shop; t
 4. In Vercel add the wildcard domain `*.yourplatform.com` to the project (needs the domain's nameservers on Vercel).
 5. Open `/platform/`, sign in, press **Create shop**. The shop opens at `<address>.yourplatform.com` (customers at `/app/`, owner at `/admin/`).
 
+### Path-based shops (no subdomain needed)
+
+Every shop also opens at `/app/<slug>/` (customers) and `/app/<slug>/admin/` (owner), e.g. `innondu.com/app/cheesora-bliss`. `vercel.json` rewrites these to the same pages; the slug in the URL picks the shop. The shop named in `config.js` (`slug`) keeps its plain `/app/` and `/admin/` addresses, so printed tags, installed home-screen apps and logins keep working. Other shops keep their login and saved data separately by shop (storage keys are suffixed with the slug).
+
+- **Supabase -> Authentication -> URL Configuration:** add `https://www.innondu.com/app/**` to Redirect URLs, otherwise setup and password-reset emails land on the Site URL.
+- Turn "Confirm email" off (required by this app) and remember Supabase's built-in email sender is rate-limited.
+- Local testing of `/app/<slug>` needs `vercel dev`; a plain static server does not apply rewrites (`?shop=<slug>` still works on localhost).
+- Path-based shops share one browser origin, so isolation is weaker than with subdomains.
+- `node scripts/check-routing.js` (npm run `check:routing`) tests the slug and path helpers.
+
+### Adding a shop from `/platform/`
+
+**New shop**: type the shop name and the owner's email, press **Create shop**. The address follows the name (editable), the owner account is created, and the owner gets an email to set their own password (or you set one under More options). You then see the owner link, the customer join link and its QR code to share. No SQL needed.
+
 ### Platform page (`/platform/`): running many shops
 
 - **All shops:** search, sort (needs attention / most active / newest / name), and flags for shops that are quiet (no stamps for 14 days), have no customers, have no owner or have an overdue renewal. Search any customer by phone or name across every shop.

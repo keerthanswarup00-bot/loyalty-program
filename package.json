@@ -7,6 +7,7 @@
     "test:smoke:headed": "playwright test tests/smoke.spec.js --headed",
     "test:smoke:debug": "playwright test tests/smoke.spec.js --debug",
     "check:js": "node scripts/check-js-syntax.js",
+    "check:routing": "node scripts/check-routing.js",
     "prepare": "node scripts/install-hooks.js"
   },
   "devDependencies": {
