@@ -1,5 +1,5 @@
 // Customer app: sign up / sign in, stamp card, offers.
-const sb = notReady() ? null : mkClient('lk-customer');
+const sb = notReady() ? null : mkClient('lk-customer-' + (CFG.slug || 'unresolved'));
 let biz = null, card = null, form = 'new', view = 'home', pend = null, sur = null, reward = null, ip = null, pop = null, rt = null, intro = true, joinTok = null, refTok = '', fx = true, wasCard = null;
 let usedSeen = null;
 let daily = null, dailyPub = false, introShow = false, scratching = false, dailyT = null;
@@ -736,7 +736,7 @@ function icon(size) {
 function pwa() {
   try {
     const add = (tag, attrs) => { const e = document.createElement(tag); Object.keys(attrs).forEach(k => e.setAttribute(k, attrs[k])); document.head.appendChild(e) };
-    const man = { name: biz.name + ' Rewards', short_name: biz.name.slice(0, 12), start_url: location.origin + '/app/', scope: location.origin + '/app/', display: 'standalone', background_color: '#f6f2ec', theme_color: biz.color || '#8a4b2a',
+    const man = { name: biz.name + ' Rewards', short_name: biz.name.slice(0, 12), start_url: location.origin + '/app/' + encodeURIComponent(CFG.slug), scope: location.origin + '/app/' + encodeURIComponent(CFG.slug) + '/', display: 'standalone', background_color: '#f6f2ec', theme_color: biz.color || '#8a4b2a',
       icons: [{ src: icon(192), sizes: '192x192', type: 'image/png', purpose: 'any maskable' }, { src: icon(512), sizes: '512x512', type: 'image/png', purpose: 'any maskable' }] };
     add('link', { rel: 'manifest', href: URL.createObjectURL(new Blob([JSON.stringify(man)], { type: 'application/manifest+json' })) });
     add('link', { rel: 'apple-touch-icon', href: icon(180) });

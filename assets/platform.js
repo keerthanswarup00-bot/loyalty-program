@@ -13,7 +13,13 @@ const ago = t => { const d = dAgo(t); return d === null ? 'never' : d <= 0 ? 'to
 const baseDom = () => String(CFG.baseDomain || '').replace(/^\./, '');
 const shopHost = r => (r.domains && r.domains[0]) || (baseDom() ? r.slug + '.' + baseDom() : null);
 // Link for a shop. A single-shop deployment (config slug set) only serves its own shop on this address.
-const shopUrl = (r, path) => { const h = shopHost(r); if (h) return 'https://' + h + path; return CFG.slug == r.slug ? location.origin + path : null };
+const shopUrl = (r, path) => {
+  const h = shopHost(r);
+  if (h) return 'https://' + h + path;
+  if (path == '/app/') return location.origin + '/app/' + encodeURIComponent(r.slug);
+  if (path == '/admin/') return location.origin + '/app/' + encodeURIComponent(r.slug) + '/admin';
+  return null;
+};
 const missingSql = e => /function|schema cache|does not exist|relation/i.test(String(e && e.message || e)) ? 'Run the latest supabase/schema.sql in Supabase first.' : null;
 const bad = e => toast(missingSql(e) || nice(e));
 const R = slug => rows.find(r => r.slug == slug);
@@ -96,7 +102,7 @@ async function setOwner() {
 async function ownerReset() {
   const r = R(sel); if (!r || !r.owner_email) return;
   if (!confirm('Email a password reset link to ' + r.owner_email + '?')) return;
-  const { error } = await sb.auth.resetPasswordForEmail(r.owner_email, { redirectTo: location.origin + '/admin/' });
+  const { error } = await sb.auth.resetPasswordForEmail(r.owner_email, { redirectTo: shopUrl(r, '/admin/') || (location.origin + '/app/' + encodeURIComponent(r.slug) + '/admin') });
   if (error) return toast(nice(error));
   try { await rpc(sb, 'platform_log', { p_slug: sel, p_action: 'owner_reset_email' }); shopAudit = null } catch (e) { }
   toast('Reset link sent to ' + r.owner_email);
@@ -209,7 +215,7 @@ function auditV() {
 
 function shopV() {
   const r = R(sel); if (!r) return topV();
-  const cu = shopUrl(r, '/app/'), ad = '/admin/?as=' + encodeURIComponent(r.slug);
+  const cu = shopUrl(r, '/app/'), ad = (shopUrl(r, '/admin/') || (location.origin + '/app/' + encodeURIComponent(r.slug) + '/admin')) + '?as=' + encodeURIComponent(r.slug);
   const doneBox = created && created.slug == r.slug ? `<div class="card"><h2>${esc(r.name)} is ready</h2><p class="sub">Send the owner these details (this box disappears when you leave the page).</p>
     <p style="margin:6px 0"><b>Dashboard:</b> ${esc((shopUrl(r, '/admin/')) || '(add a domain first)')}<br><b>Email:</b> ${esc(created.email)}<br><b>Password:</b> ${created.pw ? esc(created.pw) : '(their existing password)'}</p><button class="btn sm alt" onclick="created=null;render()">Dismiss</button></div>` : '';
   const tabs = [['overview', 'Overview'], ['customers', 'Customers'], ['access', 'Access and notes']].map(t => `<button class="${ptab == t[0] ? 'on' : ''}" onclick="setTab('${t[0]}')">${t[1]}</button>`).join('');

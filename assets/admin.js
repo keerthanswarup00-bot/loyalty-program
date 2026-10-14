@@ -3,7 +3,7 @@
 // Message (WhatsApp queue) · Offers (visual editors) · Menu (items with photos) · More (brand, news, refer, tag, account).
 // Support mode: a platform admin opens /admin/?as=<shop> and works as that shop's owner (shares the /platform/ login). Everything they do is logged.
 const SUPPORT_AS = (new URLSearchParams(location.search).get('as') || '').toLowerCase();
-const sb = notReady() ? null : mkClient(SUPPORT_AS ? 'lk-platform' : 'lk-admin');
+const sb = notReady() ? null : mkClient(SUPPORT_AS ? 'lk-platform' : 'lk-admin-' + (CFG.slug || 'unresolved'));
 let support = null, SUP = [];
 let signed = false, recover = false, biz = null, M = [], V = [], MSG = [], MENU = null, tab = 'h', ov = null, openId = null, selMode = false, visCache = {};
 let q = '', rq = '', rc = '', rp = '', rd = null, rbusy = false;
@@ -12,8 +12,9 @@ let sel = new Set(), bsel = new Set(), sortBy = 'joined', bseg = 'all', bmsg = '
 let impRows = null;
 const first = u => (u.name || '').split(' ')[0];
 
-const scanUrl = () => location.origin + '/app/#scan=' + biz.scan_token;
-const joinUrl = () => location.origin + '/app/#join=' + biz.join_token;
+const customerUrl = () => location.origin + '/app/' + encodeURIComponent(CFG.slug);
+const scanUrl = () => customerUrl() + '#scan=' + biz.scan_token;
+const joinUrl = () => customerUrl() + '#join=' + biz.join_token;
 const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).length;
 // When this customer's current card runs out (null = no deadline: no stamps yet, full card, or no limit).
 const cardEnd = u => { if (!biz.card_months || !u.card_started_at || !(u.stamps > 0) || u.stamps >= biz.need) return null; const d = new Date(u.card_started_at); d.setMonth(d.getMonth() + biz.card_months); return d };
@@ -111,7 +112,7 @@ async function out() {
 async function forgot() {
   const email = v('em').trim();
   if (!email) return toast('Enter your email above first');
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/admin/' });
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/app/' + encodeURIComponent(CFG.slug) + '/admin' });
   if (error) return toast(nice(error));
   toast('If that email has an account, a reset link is on its way');
 }
@@ -163,7 +164,7 @@ function chartV() {
       : '<p class="sub" style="margin:8px 0 0">No stamps yet. They will show up here as customers tap the tag.</p>') + '</div>';
 }
 function reminders() {
-  const L = [], t = new Date(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), link = location.origin + '/app/';
+  const L = [], t = new Date(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), link = customerUrl();
   M.forEach(u => {
     if (u.bday && biz.bday_offer) {
       const [, mo, d] = u.bday.split('-').map(Number);
@@ -400,7 +401,7 @@ const BT = () => [
 function bText(u) {
   let t = bmsg.trim().replace(/\{name\}/gi, first(u) || 'there');
   if (/^https:\/\/\S+$/.test(bimg)) t += '\n' + bimg;
-  if (blink) t += '\n' + location.origin + '/app/';
+  if (blink) t += '\n' + customerUrl();
   if (bstop) t += '\n\nReply STOP if you do not want these messages.';
   return t;
 }
@@ -810,7 +811,7 @@ function moreV() {
     <details class="a-det2"><summary>Rewrite each NFC tag</summary><ol class="sub" style="margin-top:8px"><li>Install a free NFC app such as NFC Tools.</li><li>Tap Write, then Add a record and choose URL / URI.</li><li>Paste the stamp link copied above.</li><li>Hold the phone on the tag and tap Write.</li><li>Lock the tag so it cannot be overwritten.</li><li>Test the tag on one iPhone and one Android phone.</li></ol></details>
     <p class="hint">Keep any old printed QR in place until the new one replaces it: download the new QR above and print it at the counter.</p></div>
 ${supV()}
-  <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="/app/">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
+  <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="/app/${encodeURIComponent(CFG.slug)}">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
 }
 async function regen(col) {
   if (!confirm(col == 'join_token' ? 'The old sign-up QR will stop working and you will need to print the new one. Continue?' : 'Old NFC tags and any printed stamp QR will stop adding stamps. Continue?')) return;
