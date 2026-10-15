@@ -31,7 +31,7 @@ addEventListener('pointerup', () => {
 // ---------- Modal (cooldown countdown + invalid code) ----------
 // Lives in #modal (outside #app) so render() and the visibilitychange reload never destroy it.
 const fmtCdStop = s => { const x = Math.max(0, Math.ceil(s)); const m = Math.floor(x / 60), h = Math.floor(m / 60); const mm = m % 60, ss = x % 60; return h ? h + ':' + String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0') : String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0') };
-const lkSeen = () => { try { return localStorage.getItem('lk-seen') == '1' } catch (e) { return false } };
+const lkSeen = () => { try { return localStorage.getItem(sk('lk-seen')) == '1' } catch (e) { return false } };
 function mdlOpen(html) {
   clearInterval(mdlItv); mdlItv = null;
   const r = $('#modal'); if (!r) return;
@@ -287,7 +287,7 @@ function initDailyScr() {
 }
 
 // ---------- First-visit intro ----------
-const introSeen = () => { try { return localStorage.getItem('lk-intro') == '1' } catch (e) { return true } };
+const introSeen = () => { try { return localStorage.getItem(sk('lk-intro')) == '1' } catch (e) { return true } };
 function introV() {
   let s = '';
   const st = (n, t, x) => s += `<li><i>${n}</i><div><b>${t}</b><span>${x}</span></div></li>`;
@@ -302,7 +302,7 @@ function introV() {
     <a href="#" onclick="introClose('login');return false">Already a member? Sign in</a></div></div></div>`;
 }
 function introClose(where) {
-  try { localStorage.setItem('lk-intro', '1') } catch (e) { }
+  try { localStorage.setItem(sk('lk-intro'), '1') } catch (e) { }
   introShow = false;
   form = where == 'login' ? 'in' : 'new';
   view = where == 'login' ? 'signin' : 'home';
@@ -628,7 +628,7 @@ async function reg(btn) {
       const w = card.offers.find(o => o.type == 'Welcome');
       if (w && !sur) sur = { t: 'Welcome gift', x: w.text };
     }
-    try { localStorage.setItem('lk-seen', '1') } catch (e) { }
+    try { localStorage.setItem(sk('lk-seen'), '1') } catch (e) { }
     view = 'home'; form = 'new';
     let a = card && card.member.stamps > 0 ? Math.min(card.member.stamps, +biz.need) - 1 : -1;
     if (pend && biz.join_stamp) {
@@ -668,8 +668,8 @@ async function login(btn) {
     const { error } = await sb.auth.signInWithPassword({ email: mail(p), password: w });
     if (error) throw error;
     if (!(await ensureCard())) { await sb.auth.signOut(); throw new Error('No card found for this number. Please join first.') }
-    try { localStorage.setItem('lk-phone', p) } catch (e) { }   // remember the number for next time, never the password
-    try { localStorage.setItem('lk-seen', '1') } catch (e) { }
+    try { localStorage.setItem(sk('lk-phone'), p) } catch (e) { }   // remember the number for next time, never the password
+    try { localStorage.setItem(sk('lk-seen'), '1') } catch (e) { }
     a2hsHiOn();
     view = 'home'; form = 'in';
     render();
@@ -710,11 +710,11 @@ async function savePw(btn) {
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); ip = e; if (card && view == 'home') render() });
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform == 'MacIntel' && navigator.maxTouchPoints > 1);
-const a2hsOff = () => { try { return localStorage.getItem('lk-a2hs') == '1' } catch (e) { return false } };
+const a2hsOff = () => { try { return localStorage.getItem(sk('lk-a2hs')) == '1' } catch (e) { return false } };
 // After the first successful login the card is shown prominently at the top of Home, until they act on it.
-const a2hsHi = () => { try { return localStorage.getItem('lk-a2hs-hi') == '1' } catch (e) { return false } };
-const a2hsHiOn = () => { try { if (!a2hsOff() && !standalone()) localStorage.setItem('lk-a2hs-hi', '1') } catch (e) { } };
-const a2hsHiOff = () => { try { localStorage.removeItem('lk-a2hs-hi') } catch (e) { } };
+const a2hsHi = () => { try { return localStorage.getItem(sk('lk-a2hs-hi')) == '1' } catch (e) { return false } };
+const a2hsHiOn = () => { try { if (!a2hsOff() && !standalone()) localStorage.setItem(sk('lk-a2hs-hi'), '1') } catch (e) { } };
+const a2hsHiOff = () => { try { localStorage.removeItem(sk('lk-a2hs-hi')) } catch (e) { } };
 function a2hsV() {
   if (standalone() || a2hsOff() || !(ip || isIos())) return '';
   const hi = a2hsHi(), lead = hi ? '<p class="sub" style="color:var(--tx);font-weight:600">Add this to your home screen so you stay logged in.</p>' : '';
@@ -723,7 +723,7 @@ function a2hsV() {
   <div class="row" style="margin-top:12px">${ip ? '<button class="btn sm" onclick="install()">Add to home screen</button>' : ''}<button class="btn sm alt" onclick="hideA2hs()">Not now</button></div></div>`;
 }
 async function install() { try { ip.prompt(); await ip.userChoice } catch (e) { } ip = null; a2hsHiOff(); render() }
-function hideA2hs() { try { localStorage.setItem('lk-a2hs', '1') } catch (e) { } a2hsHiOff(); render() }
+function hideA2hs() { try { localStorage.setItem(sk('lk-a2hs'), '1') } catch (e) { } a2hsHiOff(); render() }
 
 // Home-screen icon and name for this business, generated from its colour and first letter.
 function icon(size) {
@@ -736,7 +736,7 @@ function icon(size) {
 function pwa() {
   try {
     const add = (tag, attrs) => { const e = document.createElement(tag); Object.keys(attrs).forEach(k => e.setAttribute(k, attrs[k])); document.head.appendChild(e) };
-    const man = { name: biz.name + ' Rewards', short_name: biz.name.slice(0, 12), start_url: location.origin + '/app/', scope: location.origin + '/app/', display: 'standalone', background_color: '#f6f2ec', theme_color: biz.color || '#8a4b2a',
+    const man = { name: biz.name + ' Rewards', short_name: biz.name.slice(0, 12), start_url: location.origin + appBase(), scope: location.origin + appBase(), display: 'standalone', background_color: '#f6f2ec', theme_color: biz.color || '#8a4b2a',
       icons: [{ src: icon(192), sizes: '192x192', type: 'image/png', purpose: 'any maskable' }, { src: icon(512), sizes: '512x512', type: 'image/png', purpose: 'any maskable' }] };
     add('link', { rel: 'manifest', href: URL.createObjectURL(new Blob([JSON.stringify(man)], { type: 'application/manifest+json' })) });
     add('link', { rel: 'apple-touch-icon', href: icon(180) });
@@ -750,7 +750,7 @@ async function delMe() {
   unlive();
   usedSeen = null;
   if (!confirm('Delete your account, card and offers permanently?')) return;
-  try { await rpc(sb, 'delete_me'); await sb.auth.signOut(); try { localStorage.removeItem('lk-phone') } catch (x) { } card = null; sur = reward = null; form = 'new'; view = 'home'; pg = 'home'; render(); toast('Your account was deleted') } catch (e) { toast(nice(e)) }
+  try { await rpc(sb, 'delete_me'); await sb.auth.signOut(); try { localStorage.removeItem(sk('lk-phone')) } catch (x) { } card = null; sur = reward = null; form = 'new'; view = 'home'; pg = 'home'; render(); toast('Your account was deleted') } catch (e) { toast(nice(e)) }
 }
 
 async function claim() {
@@ -777,7 +777,7 @@ function joinV() {
   <p class="note" style="text-align:center;margin:14px 0 0"><a href="#" onclick="introShow=true;render();return false">How it works</a></p>`;
 }
 
-const savedPhone = () => { try { return localStorage.getItem('lk-phone') || '' } catch (e) { return '' } };
+const savedPhone = () => { try { return localStorage.getItem(sk('lk-phone')) || '' } catch (e) { return '' } };
 function signinV() {
   return `<h2>Welcome back</h2><p class="sub">Login to view your rewards.</p>
   <label class="lb">Phone number</label><input id="p" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10-digit mobile number" value="${esc(savedPhone())}">
@@ -796,7 +796,7 @@ function forgotV() {
 const onDay = x => new Date(+new Date(x.valid_from) + 12 * 36e5).toLocaleDateString(undefined, { timeZone: biz.tz || 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' });
 const when = x => x.valid_from ? 'Valid only on <b>' + onDay(x) + '</b>' : x.expires_at ? (daysTo(x.expires_at) <= 3 ? '<span class="expiry">Expires in ' + daysTo(x.expires_at) + (daysTo(x.expires_at) == 1 ? ' day' : ' days') + '</span>' : 'Valid until ' + fd(x.expires_at)) : 'No expiry';
 
-const newsKey = () => 'lk-news-' + (biz.news_at || '');
+const newsKey = () => sk('lk-news-') + (biz.news_at || '');
 function newsSeen() { try { return localStorage.getItem(newsKey()) == '1' } catch (e) { return false } }
 function newsV() {
   if (!biz.news_text || newsSeen()) return '';
@@ -848,7 +848,7 @@ async function waPref() {
 async function reload() { try { await load(); render(); toast('Up to date') } catch (e) { toast(nice(e)) } }
 addEventListener('hashchange', () => {
   const s = location.hash.match(/scan=([\w-]+)/), j = location.hash.match(/join=([\w-]+)/);
-  if (j) { joinTok = j[1]; try { sessionStorage.setItem('lk-join', j[1]) } catch (e) { } render() }
+  if (j) { joinTok = j[1]; try { sessionStorage.setItem(sk('lk-join'), j[1]) } catch (e) { } render() }
   if (s) { pend = s[1]; if (card) scan(); else { if (!joinTok) joinTok = pend; render() } }
 });
 // Coming back to the page (e.g. after staff taps the tag, or a day later) shows fresh stamps and offers.
@@ -883,7 +883,7 @@ function skelV() {
   try {
     const m = location.hash.match(/scan=([\w-]+)/); if (m) pend = m[1];
     const jm = location.hash.match(/join=([\w-]+)/);
-    try { if (jm) sessionStorage.setItem('lk-join', jm[1]); joinTok = jm ? jm[1] : sessionStorage.getItem('lk-join') } catch (e) { joinTok = jm ? jm[1] : null }
+    try { if (jm) sessionStorage.setItem(sk('lk-join'), jm[1]); joinTok = jm ? jm[1] : sessionStorage.getItem(sk('lk-join')) } catch (e) { joinTok = jm ? jm[1] : null }
     const cached = readBiz();
     if (cached) { biz = cached; brand(biz) }
     $('#app').innerHTML = skelV();

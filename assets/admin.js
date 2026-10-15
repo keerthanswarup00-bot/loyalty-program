@@ -12,8 +12,8 @@ let sel = new Set(), bsel = new Set(), sortBy = 'joined', bseg = 'all', bmsg = '
 let impRows = null;
 const first = u => (u.name || '').split(' ')[0];
 
-const scanUrl = () => location.origin + '/app/#scan=' + biz.scan_token;
-const joinUrl = () => location.origin + '/app/#join=' + biz.join_token;
+const scanUrl = () => pubOrigin() + appBase() + '#scan=' + biz.scan_token;
+const joinUrl = () => pubOrigin() + appBase() + '#join=' + biz.join_token;
 const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).length;
 // When this customer's current card runs out (null = no deadline: no stamps yet, full card, or no limit).
 const cardEnd = u => { if (!biz.card_months || !u.card_started_at || !(u.stamps > 0) || u.stamps >= biz.need) return null; const d = new Date(u.card_started_at); d.setMonth(d.getMonth() + biz.card_months); return d };
@@ -65,11 +65,13 @@ async function pages(make) {
 async function enter() {
   signed = true;
   if (/^[a-z0-9-]+$/.test(SUPPORT_AS)) {
-    try { await rpc(sb, 'platform_support_open', { p_slug: SUPPORT_AS }); CFG.slug = SUPPORT_AS; support = SUPPORT_AS }
+    try { await rpc(sb, 'platform_support_open', { p_slug: SUPPORT_AS }); CFG.slug = SUPPORT_AS; linkSlug = SUPPORT_AS; support = SUPPORT_AS }
     catch (e) { toast('Support mode needs a platform admin account') }
   }
   await load(); render();
-  if (support && new URLSearchParams(location.search).get('tab') == 'ins') openIns();
+  const qt = new URLSearchParams(location.search).get('tab');
+  if (support && qt == 'ins') openIns();
+  else if (support && qt == 'set') go('m');   // a freshly created shop: straight to branding and settings
 }
 async function load() {
   try {
@@ -111,7 +113,7 @@ async function out() {
 async function forgot() {
   const email = v('em').trim();
   if (!email) return toast('Enter your email above first');
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/admin/' });
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + adminBase() });
   if (error) return toast(nice(error));
   toast('If that email has an account, a reset link is on its way');
 }
@@ -163,7 +165,7 @@ function chartV() {
       : '<p class="sub" style="margin:8px 0 0">No stamps yet. They will show up here as customers tap the tag.</p>') + '</div>';
 }
 function reminders() {
-  const L = [], t = new Date(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), link = location.origin + '/app/';
+  const L = [], t = new Date(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), link = pubOrigin() + appBase();
   M.forEach(u => {
     if (u.bday && biz.bday_offer) {
       const [, mo, d] = u.bday.split('-').map(Number);
@@ -211,7 +213,7 @@ async function winback(id, btn) {
     if (!r.ok) { if (w) w.close(); btn.disabled = false; return toast(WBERR[r.error] || 'Could not create the message') }
     const msg = `Hi ${first(u)}, we miss you at ${biz.name}! Here's a little something for your next visit: ${r.offer}.`
       + (r.expires_at ? ` Valid until ${fd(r.expires_at)}.` : '')
-      + ` Show this code at the counter: ${r.code}. You can also see it on your card: ${location.origin}/app/`;
+      + ` Show this code at the counter: ${r.code}. You can also see it on your card: ${pubOrigin()}${appBase()}`;
     if (w) w.location.href = waLink(r.phone, msg);
     else { try { await navigator.clipboard.writeText(msg) } catch (e) { } toast('Pop-up blocked. Message copied: paste it into WhatsApp.') }
     await load(); render();
@@ -267,7 +269,7 @@ async function fetchVis(id) {
 }
 function detail(u) {
   const f = (l, x) => `<div><span>${l}</span><b>${x}</b></div>`;
-  const msg = `Hi ${first(u)}, thanks for being part of ${biz.name} rewards! ${location.origin}/app/`;
+  const msg = `Hi ${first(u)}, thanks for being part of ${biz.name} rewards! ${pubOrigin()}${appBase()}`;
   const ce = cardEnd(u);
   const of = (u.offers || []).slice().sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   const st = x => x.used_at ? 'Used ' + fd(x.used_at) : isExp(x) ? 'Expired ' + fd(x.expires_at) : x.valid_from && new Date(x.valid_from) > Date.now() ? 'Valid on ' + fd(x.valid_from) : x.expires_at ? 'Until ' + fd(x.expires_at) : 'No expiry';
@@ -400,7 +402,7 @@ const BT = () => [
 function bText(u) {
   let t = bmsg.trim().replace(/\{name\}/gi, first(u) || 'there');
   if (/^https:\/\/\S+$/.test(bimg)) t += '\n' + bimg;
-  if (blink) t += '\n' + location.origin + '/app/';
+  if (blink) t += '\n' + pubOrigin() + appBase();
   if (bstop) t += '\n\nReply STOP if you do not want these messages.';
   return t;
 }
@@ -810,7 +812,7 @@ function moreV() {
     <details class="a-det2"><summary>Rewrite each NFC tag</summary><ol class="sub" style="margin-top:8px"><li>Install a free NFC app such as NFC Tools.</li><li>Tap Write, then Add a record and choose URL / URI.</li><li>Paste the stamp link copied above.</li><li>Hold the phone on the tag and tap Write.</li><li>Lock the tag so it cannot be overwritten.</li><li>Test the tag on one iPhone and one Android phone.</li></ol></details>
     <p class="hint">Keep any old printed QR in place until the new one replaces it: download the new QR above and print it at the counter.</p></div>
 ${supV()}
-  <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="/app/">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
+  <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="${appBase()}">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
 }
 async function regen(col) {
   if (!confirm(col == 'join_token' ? 'The old sign-up QR will stop working and you will need to print the new one. Continue?' : 'Old NFC tags and any printed stamp QR will stop adding stamps. Continue?')) return;

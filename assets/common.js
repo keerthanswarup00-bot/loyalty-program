@@ -1,5 +1,22 @@
 // Shared helpers for the customer app and the owner app.
 const CFG = window.LK;
+// ---- Path routing: many shops on one address ----
+// /app/<slug>/ is a shop's customer app and /app/<slug>/admin/ its owner dashboard (vercel.json rewrites both to the shared pages).
+// The slug is read synchronously here so the login storage below is already per shop. The old /app/ and /admin/ addresses are
+// untouched: they still use config.js `slug`, or the host name (see resolveShop).
+const ROUTE_SLUG = (() => {
+  const m = location.pathname.match(/^\/app\/([a-z0-9][a-z0-9-]*)(?:\/admin)?\/?$/i), s = m && m[1].toLowerCase();
+  if (!s || ['assets', 'admin', 'platform', 'index'].includes(s)) return null;
+  CFG.slug = s; return s;
+})();
+// Slug used to build links. Support mode (/admin/?as=<shop>) sets it too, so links point at the shop being worked on.
+let linkSlug = ROUTE_SLUG;
+const appBase = () => linkSlug ? '/app/' + linkSlug + '/' : '/app/';
+const adminBase = () => linkSlug ? '/app/' + linkSlug + '/admin/' : '/admin/';
+// Printed or sent links (QR, NFC, WhatsApp) use the public domain from config.js when the shop is path-routed.
+const pubOrigin = () => (linkSlug && CFG.publicOrigin) || location.origin;
+// Browser storage is per shop on a path-routed address, because every shop then shares one origin. Unchanged elsewhere.
+const sk = k => ROUTE_SLUG ? k + ':' + ROUTE_SLUG : k;
 const $ = s => document.querySelector(s);
 const v = i => ($('#' + i) || {}).value || '';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -17,7 +34,7 @@ const IC = {
 
 // Separate storage keys so an owner and a customer can be signed in on the same browser.
 // persistSession/autoRefreshToken are stated explicitly so the login survives reloads; detectSessionInUrl stays at its default (admin password recovery needs the hash).
-const mkClient = key => window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { storageKey: key, persistSession: true, autoRefreshToken: true } });
+const mkClient = key => window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { storageKey: sk(key), persistSession: true, autoRefreshToken: true } });
 async function rpc(c, fn, args) { const { data, error } = await c.rpc(fn, args); if (error) throw error; return data }
 
 const toast = m => { $('#t').innerHTML = '<div class="toast">' + esc(m) + '</div>'; setTimeout(() => $('#t').innerHTML = '', 3200) };

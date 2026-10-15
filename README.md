@@ -92,6 +92,18 @@ Instead of one Vercel project per client, one deployment can serve every shop; t
 4. In Vercel add the wildcard domain `*.yourplatform.com` to the project (needs the domain's nameservers on Vercel).
 5. Open `/platform/`, sign in, press **Create shop**. The shop opens at `<address>.yourplatform.com` (customers at `/app/`, owner at `/admin/`).
 
+### Shop addresses: `/app/<shop>/` (no wildcard domain needed)
+
+Every shop also lives at one shared address: customers at `https://www.innondu.com/app/<shop>/`, the owner at `https://www.innondu.com/app/<shop>/admin/`. `vercel.json` rewrites both to the shared pages and the page reads the shop from the path. The old `/app/` and `/admin/` addresses keep working (they use the `slug` in `config.js`), so printed QR codes and NFC tags are unaffected.
+
+- Sign-ins and small saved settings are kept per shop on these addresses, so two shops on one domain never share a login. Owners and customers who use `/app/<shop>/` sign in once, separately from `/app/`.
+- QR codes, NFC tags and WhatsApp links use `publicOrigin` from `config.js` (set to `https://www.innondu.com`).
+- Reserved names that can never be shops: `www app admin api platform mail static assets about contact docs support status index`.
+- Supabase -> Authentication -> URL Configuration -> add `https://www.innondu.com/app/**` to **Redirect URLs** so the owner password reset email can return to `/app/<shop>/admin/`.
+- Local testing: `node scripts/dev-server.js` (applies the same rewrites; `python -m http.server` cannot). Offline routing tests: `npx playwright test tests/path-routing.spec.js`.
+
+**Adding a shop:** `/platform/` -> **+ New shop** -> type the shop name and the owner's email -> **Create shop**. The address is made from the name, the owner password is generated, the login is tested before it is shown, and a "Copy message for the owner" button gives you the links and login to send.
+
 ### Platform page (`/platform/`): running many shops
 
 - **All shops:** search, sort (needs attention / most active / newest / name), and flags for shops that are quiet (no stamps for 14 days), have no customers, have no owner or have an overdue renewal. Search any customer by phone or name across every shop.
