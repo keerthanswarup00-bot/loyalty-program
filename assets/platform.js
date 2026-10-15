@@ -125,7 +125,7 @@ async function setOwner() {
 async function ownerReset() {
   const r = R(sel); if (!r || !r.owner_email) return;
   if (!confirm('Email a password reset link to ' + r.owner_email + '?')) return;
-  const { error } = await sb.auth.resetPasswordForEmail(r.owner_email, { redirectTo: location.origin + '/admin/' });
+  const { error } = await sb.auth.resetPasswordForEmail(r.owner_email, { redirectTo: shopUrl(r, '/admin/') || location.origin + '/admin/' });
   if (error) return toast(nice(error));
   try { await rpc(sb, 'platform_log', { p_slug: sel, p_action: 'owner_reset_email' }); shopAudit = null } catch (e) { }
   toast('Reset link sent to ' + r.owner_email);
@@ -243,8 +243,8 @@ function shopV() {
   const cu = shopUrl(r, '/app/'), ad = '/admin/?as=' + encodeURIComponent(r.slug);
   const cl = shopUrl(r, '/app/'), dl = shopUrl(r, '/admin/');
   const pwNote = !created ? '' : created.pwState == 'ok' ? '' : created.pwState == 'confirm' ? '<p class="hint" style="color:#e0a030">This account must confirm its email before it can sign in. Ask the owner to click the link Supabase emailed, or switch off Confirm email in Supabase → Authentication → Providers → Email.</p>' : created.pwState == 'other' ? '<p class="hint" style="color:#e0a030">This email already had an account, so the password above is NOT theirs. They sign in with the password they already have (use "Email password reset link" under Access and notes if they forgot it).</p>' : '';
-  const pwShown = !created ? '' : created.pwState == 'ok' ? esc(created.pw) : created.pwState == 'existing' ? '(their existing password)' : '(their existing password; the one you typed was not applied)';
-  const msg = !created ? '' : `Your ${r.name} rewards are ready.\nCustomer link: ${cl}\nOwner dashboard: ${dl}\nEmail: ${created.email}\nPassword: ${created.pwState == 'ok' ? created.pw : 'your existing password'}`;
+  const pwShown = !created ? '' : (created.pwState == 'ok' || created.pwState == 'confirm') ? esc(created.pw) : created.pwState == 'existing' ? '(their existing password)' : '(their existing password; the one you typed was not applied)';
+  const msg = !created ? '' : `Your ${r.name} rewards are ready.\nCustomer link: ${cl}\nOwner dashboard: ${dl}\nEmail: ${created.email}\nPassword: ${created.pwState == 'ok' || created.pwState == 'confirm' ? created.pw : 'your existing password'}`;
   const doneBox = created && created.slug == r.slug ? `<div class="card"><h2>${esc(r.name)} is ready</h2><p class="sub">Send the owner these details (this box disappears when you leave the page).</p>
     <p style="margin:6px 0;word-break:break-all"><b>Customer link:</b> ${esc(cl)}<br><b>Dashboard:</b> ${esc(dl)}<br><b>Email:</b> ${esc(created.email)}<br><b>Password:</b> ${pwShown}</p>${pwNote}
     <div class="row"><a class="btn sm" href="${esc(setupUrl(r.slug))}" target="_blank" rel="noopener">Set up the shop now</a><button class="btn sm alt" data-t="${esc(msg)}" onclick="copyText(this.dataset.t,'Copied. Paste it into WhatsApp.')">Copy message for the owner</button><button class="btn sm alt" onclick="created=null;render()">Dismiss</button></div></div>` : '';
