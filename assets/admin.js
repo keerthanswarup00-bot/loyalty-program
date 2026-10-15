@@ -69,7 +69,12 @@ async function enter() {
   signed = true;
   if (/^[a-z0-9-]+$/.test(SUPPORT_AS)) {
     try { await rpc(sb, 'platform_support_open', { p_slug: SUPPORT_AS }); CFG.slug = SUPPORT_AS; linkSlug = SUPPORT_AS; support = SUPPORT_AS }
-    catch (e) { toast('Support mode needs a platform admin account') }
+    catch (e) {
+      // Never fall back to the deployment's own shop: a platform admin could end up editing the wrong shop.
+      const m = String((e && e.message) || e), missing = /function|schema cache|does not exist/i.test(m);
+      $('#app').innerHTML = `<div class="card"><h2>Could not open ${esc(SUPPORT_AS)}</h2><p class="sub">${missing ? 'The database is missing the latest platform update. In Supabase, open SQL Editor and run the whole of <b>supabase/schema.sql</b> (it is safe to run again), then reload this page.' : /not allowed/i.test(m) ? 'This account is not a platform admin. Sign in to /platform/ with your platform admin account first.' : /not found/i.test(m) ? 'There is no shop with that address.' : esc(nice(e))}</p><p class="hint">Details: ${esc(m)}</p><a class="btn alt" href="/platform/">Back to the platform page</a></div>`;
+      return;
+    }
   }
   await load(); render();
   const qt = new URLSearchParams(location.search).get('tab');
