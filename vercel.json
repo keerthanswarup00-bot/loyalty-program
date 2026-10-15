@@ -38,5 +38,23 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/app/:slug/admin",
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/app/:slug/admin/",
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/app/:slug",
+      "destination": "/app/index.html"
+    },
+    {
+      "source": "/app/:slug/",
+      "destination": "/app/index.html"
+    }
   ]
 }

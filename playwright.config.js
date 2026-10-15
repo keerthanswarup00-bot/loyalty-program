@@ -19,7 +19,7 @@ export default defineConfig({
     ...devices['Desktop Chrome']
   },
   webServer: process.env.SMOKE_BASE_URL ? undefined : {
-    command: 'python3 -m http.server 4173',
+    command: 'node scripts/dev-server.js 4173',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 15_000

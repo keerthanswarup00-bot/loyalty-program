@@ -4,6 +4,7 @@
 window.LK = {
   supabaseUrl: 'https://qgechlsujyzgivwnvdwf.supabase.co',
   supabaseKey: 'sb_publishable_oEWnni9aBtWuwqF_aS6duQ_gF0B55r3',
+  publicOrigin: 'https://www.innondu.com',   // domain printed on QR codes, NFC tags and WhatsApp links for /app/<shop> addresses ('' = the current address)
   slug: 'cheesora-bliss',                    // must match the business slug in the database. Leave '' for a multi-shop deployment (see README -> Many shops, one deployment)
   baseDomain: '',                       // multi-shop only: shops open at <slug>.<baseDomain>; custom domains are added in /platform/
   emailDomain: 'members.example.com',   // internal login address for phone sign-ins; never receives mail
