@@ -96,3 +96,10 @@ test('platform: Create shop opens the new shop dashboard on its settings tab', a
   await expect(page.getByText('Zed Shop is ready')).toBeVisible();
   await expect(page.getByText('/app/zed-shop/admin/')).toBeVisible();
 });
+
+test('owner dashboard: QR and NFC links use /app/<shop>/ on the public domain', async ({ page }) => {
+  await mock(page);
+  await page.goto('/admin/');
+  const r = await page.evaluate(() => { biz = { slug: 'cheesora-bliss', scan_token: 'S1', join_token: 'J1' }; syncLinks(); return [scanUrl(), joinUrl()] });
+  expect(r).toEqual(['https://www.innondu.com/app/cheesora-bliss/#scan=S1', 'https://www.innondu.com/app/cheesora-bliss/#join=J1']);
+});
