@@ -103,3 +103,13 @@ test('owner dashboard: QR and NFC links use /app/<shop>/ on the public domain', 
   const r = await page.evaluate(() => { biz = { slug: 'cheesora-bliss', scan_token: 'S1', join_token: 'J1' }; syncLinks(); return [scanUrl(), joinUrl()] });
   expect(r).toEqual(['https://www.innondu.com/app/cheesora-bliss/#scan=S1', 'https://www.innondu.com/app/cheesora-bliss/#join=J1']);
 });
+
+test('support mode never falls back to the default shop when it cannot open the shop', async ({ page }) => {
+  await mock(page);
+  await page.goto('/admin/?as=swaroop');
+  await page.evaluate(async () => { window.rpc = async () => { throw new Error('Could not find the function public.platform_support_open in the schema cache') }; await enter(); });
+  await expect(page.getByText('Could not open swaroop')).toBeVisible();
+  await expect(page.getByText('supabase/schema.sql').first()).toBeVisible();
+  expect(await page.evaluate(() => CFG.slug)).toBe('cheesora-bliss');   // config default untouched, but nothing was loaded for it
+  await expect(page.locator('#app')).not.toContainText('Cheesora Bliss');
+});

@@ -36,7 +36,7 @@ const chips = r => flags(r).map(x => `<span class="pf-chip l${x[1]}">${esc(x[0])
 async function reload() { rows = await rpc(sb, 'platform_overview') }
 async function enter() {
   signed = true; denied = false; err = '';
-  try { await reload() }
+  try { await reload(); if (rows.length && rows[0].need === undefined) err = 'Your Supabase database is behind this page. Open SQL Editor and run the whole of supabase/schema.sql (safe to run again), then reload. Until then some numbers, notes and Open dashboard as owner will not work.' }
   catch (e) { rows = []; if (/not allowed/i.test(String(e && e.message || e))) denied = true; else err = missingSql(e) || nice(e) }
   route();
 }
@@ -260,7 +260,7 @@ function overviewV(r) {
   const st = (b, l) => `<div class="a-st"><b>${b}</b><span>${l}</span></div>`;
   const rate = r.coupons_30d ? Math.round(r.redeemed_30d / r.coupons_30d * 100) + '%' : '—';
   return `<div class="card"><div class="a-sts">${st(num(r.members), 'Customers')}${st('+' + num(r.new_members_7d), 'New, 7 days')}${st(num(r.stamps_7d), 'Stamps, 7 days')}${st(num(r.stamps_30d), 'Stamps, 30 days')}${st(num(r.coupons_30d), 'Coupons issued, 30d')}${st(num(r.redeemed_30d) + ' (' + rate + ')', 'Redeemed, 30d')}</div>
-    <p class="sub" style="margin-top:14px">Owner <b>${esc(r.owner_email || 'none')}</b> · last stamp ${esc(ago(r.last_stamp))} · created ${esc(fd(r.created_at))}<br>Card: ${r.need} stamps for "${esc(r.reward)}" · time zone ${esc(r.tz)}</p></div>
+    <p class="sub" style="margin-top:14px">Owner <b>${esc(r.owner_email || 'none')}</b> · last stamp ${esc(ago(r.last_stamp))} · created ${esc(fd(r.created_at))}<br>${r.need === undefined ? '' : `Card: ${r.need} stamps for "${esc(r.reward)}" · time zone ${esc(r.tz)}`}</p></div>
     <div class="card"><h2 style="font-size:17px">Your notes <span class="mut sm">(private, never shown to the shop)</span></h2>
       <label class="lb">Plan</label><input id="mpl" value="${esc(r.plan)}" placeholder="e.g. Monthly 999">
       <label class="lb">Contact</label><input id="mct" value="${esc(r.contact)}" placeholder="Name, phone, best time to call">
