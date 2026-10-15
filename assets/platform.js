@@ -69,6 +69,8 @@ const RESERVED = ['www', 'app', 'admin', 'api', 'platform', 'mail', 'static', 'a
 const slugify = t => String(t || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 36).replace(/-+$/, '');
 const genPw = () => { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', a = new Uint32Array(12); crypto.getRandomValues(a); return Array.from(a, x => c[x % c.length]).join('') };
 let slugTouched = false;
+// The owner dashboard for a new shop, opened as the platform admin (logged in Activity), straight on the branding and settings tab.
+const setupUrl = slug => '/admin/?as=' + encodeURIComponent(slug) + '&tab=set';
 // Typing the shop name fills in the address (until the address is edited by hand) and shows the link it will get.
 function nameInput() { if (!slugTouched) { const e = $('#ns'); if (e) e.value = slugify(v('nn')) } slugShow() }
 function slugShow() {
@@ -85,6 +87,8 @@ async function createShop(btn) {
   if (RESERVED.includes(slug)) return toast('That address is reserved. Pick another.');
   if (pw && pw.length < 6) return toast('The owner password must be at least 6 characters');
   btn.disabled = true;
+  // Open the new tab now, inside the click, so the browser allows it; it is pointed at the dashboard once the shop exists.
+  let win = null; try { win = window.open('about:blank', '_blank') } catch (e) { }
   try {
     let pwState = 'existing';   // ok = the password shown works, confirm = owner must confirm their email first, other = the account already existed
     if (pw) {   // a separate client that does not save its session, so this admin stays signed in
@@ -102,7 +106,8 @@ async function createShop(btn) {
       catch (e) { if (auto && /already taken/i.test(String(e && e.message || e)) && i < 6) slug = base.slice(0, 36) + '-' + (i + 1); else throw e }
     }
     created = { slug, name, email, pw, pwState }; await reload(); toast('Shop created'); go('#shop=' + slug);
-  } catch (e) { bad(e) }
+    if (win) win.location.href = setupUrl(slug);
+  } catch (e) { if (win) win.close(); bad(e) }
   btn.disabled = false;
 }
 async function addDomain() {
@@ -242,7 +247,7 @@ function shopV() {
   const msg = !created ? '' : `Your ${r.name} rewards are ready.\nCustomer link: ${cl}\nOwner dashboard: ${dl}\nEmail: ${created.email}\nPassword: ${created.pwState == 'ok' ? created.pw : 'your existing password'}`;
   const doneBox = created && created.slug == r.slug ? `<div class="card"><h2>${esc(r.name)} is ready</h2><p class="sub">Send the owner these details (this box disappears when you leave the page).</p>
     <p style="margin:6px 0;word-break:break-all"><b>Customer link:</b> ${esc(cl)}<br><b>Dashboard:</b> ${esc(dl)}<br><b>Email:</b> ${esc(created.email)}<br><b>Password:</b> ${pwShown}</p>${pwNote}
-    <div class="row"><button class="btn sm" data-t="${esc(msg)}" onclick="copyText(this.dataset.t,'Copied. Paste it into WhatsApp.')">Copy message for the owner</button><button class="btn sm alt" onclick="created=null;render()">Dismiss</button></div></div>` : '';
+    <div class="row"><a class="btn sm" href="${esc(setupUrl(r.slug))}" target="_blank" rel="noopener">Set up the shop now</a><button class="btn sm alt" data-t="${esc(msg)}" onclick="copyText(this.dataset.t,'Copied. Paste it into WhatsApp.')">Copy message for the owner</button><button class="btn sm alt" onclick="created=null;render()">Dismiss</button></div></div>` : '';
   const tabs = [['overview', 'Overview'], ['customers', 'Customers'], ['access', 'Access and notes']].map(t => `<button class="${ptab == t[0] ? 'on' : ''}" onclick="setTab('${t[0]}')">${t[1]}</button>`).join('');
   return topV() + doneBox + `<div class="card"><button class="lnk" onclick="go('#')">← All shops</button>
     <div class="pf-head"><i class="pf-dot big" style="background:${esc(HEX6.test(r.color) ? r.color : '#8a4b2a')}"></i><div><h2 style="margin:0">${esc(r.name)}</h2><div class="mut sm">${esc(r.slug)}${shopHost(r) ? ' · ' + esc(shopHost(r)) : ''}</div></div></div>

@@ -79,3 +79,20 @@ test('platform: New shop form fills address from the name', async ({ page }) => 
   await page.fill('#nn', 'Something Else');
   await expect(page.locator('#ns')).toHaveValue('my-own');
 });
+
+test('platform: Create shop opens the new shop dashboard on its settings tab', async ({ page, context }) => {
+  await mock(page);
+  await page.goto('/platform/');
+  await page.evaluate(() => {
+    signed = true; view = 'new'; render();
+    window.rpc = async (c, fn, a) => fn == 'platform_overview' ? [{ id: '1', slug: a && a.p_slug || 'zed-shop', name: 'Zed Shop', color: '#8a4b2a', owner_email: 'o@x.com', members: 0, stamps_7d: 0, stamps_30d: 0, domains: [], plan: '', contact: '', notes: '' }] : fn == 'platform_create_business' ? { id: '1', slug: a.p_slug } : null;
+    window.reload = async () => { rows = [{ id: '1', slug: 'zed-shop', name: 'Zed Shop', color: '#8a4b2a', owner_email: 'o@x.com', members: 0, new_members_7d: 0, stamps_7d: 0, stamps_30d: 0, coupons_30d: 0, redeemed_30d: 0, domains: [], plan: '', contact: '', notes: '', need: 8, reward: 'x', tz: 'Asia/Kolkata' }] };
+  });
+  await page.fill('#nn', 'Zed Shop'); await page.fill('#ne', 'o@x.com'); await page.fill('#np', '');
+  const popup = context.waitForEvent('page');
+  await page.click('text=Create shop');
+  const p = await popup;
+  await p.waitForURL(/\/admin\/\?as=zed-shop&tab=set/);
+  await expect(page.getByText('Zed Shop is ready')).toBeVisible();
+  await expect(page.getByText('/app/zed-shop/admin/')).toBeVisible();
+});

@@ -69,7 +69,9 @@ async function enter() {
     catch (e) { toast('Support mode needs a platform admin account') }
   }
   await load(); render();
-  if (support && new URLSearchParams(location.search).get('tab') == 'ins') openIns();
+  const qt = new URLSearchParams(location.search).get('tab');
+  if (support && qt == 'ins') openIns();
+  else if (support && qt == 'set') go('m');   // a freshly created shop: straight to branding and settings
 }
 async function load() {
   try {
