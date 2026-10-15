@@ -104,6 +104,16 @@ Every shop also lives at one shared address: customers at `https://www.innondu.c
 
 **Adding a shop:** `/platform/` -> **+ New shop** -> type the shop name and the owner's email -> **Create shop**. The address is made from the name, the owner password is generated, the login is tested before it is shown, and a "Copy message for the owner" button gives you the links and login to send.
 
+### Connect page: `/app/<shop>/connect` (on or off per shop)
+
+A public "link in bio" page for each shop: join rewards, menu, WhatsApp, Google review, Instagram/Facebook/website, where to find the shop (with open/closed status, hours and a directions link) and current offers. It is **off by default**; when off, the link says "This page isn't available".
+
+- **One-time setup:** run `supabase/2026-10-15-connect.sql` in Supabase (also inside `schema.sql`). Until then the dashboard shows a one-line note and the page stays unavailable.
+- **Switch it on:** the owner opens their dashboard -> More -> **Connect page**, picks On, writes a headline and (optionally) a Google review link, and presses **Save settings**. A platform admin can also switch it from `/platform/` -> the shop -> Overview -> **Connect page**.
+- **Locations and offers** are edited in More -> Connect page -> **Locations** / **Offers on the page**. These offers are public notices, separate from the coupons customers collect in the app. Offers with a last day hide themselves after it.
+- **Where the content comes from:** name, logo and colours from Brand; Instagram, Facebook, WhatsApp and Website from Links; the menu from the Menu tab.
+- Customers only ever read through `get_connect()`, which returns nothing while the page is off. Offline tests: `npx playwright test tests/connect-page.spec.js`.
+
 ### Platform page (`/platform/`): running many shops
 
 - **All shops:** search, sort (needs attention / most active / newest / name), and flags for shops that are quiet (no stamps for 14 days), have no customers, have no owner or have an overdue renewal. Search any customer by phone or name across every shop.

@@ -654,7 +654,7 @@ async function svBrand(btn) {
   const t = i => v(i).trim(), ok = x => !x || /^https:\/\//.test(x);
   // One line per prize/message: trimmed, empty lines dropped, each capped at 80 characters.
   const lines = i => v(i).split('\n').map(s => s.trim().slice(0, 80)).filter(Boolean).join('\n');
-  if (!['ci', 'cf', 'cw', 'cs'].map(t).every(ok)) return toast('Links must start with https://');
+  if (!['ci', 'cf', 'cw', 'cs', 'crv'].map(t).every(ok)) return toast('Links must start with https://');
   const dg = dgGet(), prizes = dg.prizes.map(p => ({ text: String(p.text).trim().slice(0, 80), chance: Math.round(Math.max(0, Math.min(100, +p.chance || 0)) * 10) / 10 }));
   if (prizes.some(p => !p.text)) return toast('Give every prize a name, or remove the empty row.');
   if (prizes.reduce((a, p) => a + p.chance, 0) > 100.0001) return toast('Prize chances add up to more than 100%.');
@@ -663,12 +663,14 @@ async function svBrand(btn) {
   const f = $('#clfile').files[0];
   if (f) { try { logoUrl = await readImg(f, 'logo') } catch (e) { return imgErr(e) } }
   const nw = t('nw').slice(0, 280);
+  const connP = cnOk() ? { connect_on: v('cnon') == '1', connect_title: t('cnt').slice(0, 80), connect_sub: t('cns').slice(0, 240), review_url: t('crv') } : {};   // only if supabase/2026-10-15-connect.sql has been run
   if (!HEX6.test(v('cc') || biz.color)) return toast('Pick the brand colour with the colour box');
   const themeP = 'theme' in biz ? { theme: Object.assign({}, brLook(), { done: true }) } : {};   // only if the 2026-10-12-branding.sql update has been run
   await save({
     ...themeP,
     name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl, color: v('cc') || biz.color,
     ig: t('ci'), fb: t('cf'), wa: t('cw'), web: t('cs'),
+    ...connP,
     news_text: nw, news_at: nw ? (nw == (biz.news_text || '') && biz.news_at ? biz.news_at : new Date().toISOString()) : null,
     ref_on: v('rfon') == '1', ref_offer: t('rfo') || '20% off your next bill', ref_cap: Math.max(1, Math.min(100, Math.round(+v('rfc')) || 5)),
     daily_on: v('dailon') == '1',
@@ -783,6 +785,7 @@ function supV() {
 function moreV() {
   return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${brandKit()}${dbHint()}</div>
   <div class="a-card"><h2>Links</h2>${fld('ci', 'Instagram', biz.ig, '', 'https://…')}${fld('cf', 'Facebook', biz.fb, '', 'https://…')}${fld('cw', 'WhatsApp', biz.wa, '', 'https://wa.me/…')}${fld('cs', 'Website', biz.web, '', 'https://…')}</div>
+  ${connectCard()}
   <div class="a-card"><h2>What's new</h2><p class="sub">A short note shown at the top of every customer's card (an event, new menu item, holiday hours). Leave blank to hide it.</p><textarea id="nw" rows="3" maxlength="280">${esc(biz.news_text || '')}</textarea><p class="hint">Up to 280 characters. Customers who already closed the old note see the new one.</p></div>
   <div class="a-card"><h2>Refer a friend</h2><p class="sub">Each customer gets a personal code. A friend who enters it when joining gets this offer, and the customer gets it too after the friend's next stamp.</p>
     <label class="lb">Referrals</label><select id="rfon"><option value="1"${biz.ref_on ? ' selected' : ''}>On</option><option value="0"${biz.ref_on ? '' : ' selected'}>Off</option></select>
@@ -823,6 +826,88 @@ function moreV() {
 ${supV()}
   <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="${appBase()}">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
 }
+// ---------- Connect page: on/off switch, texts, locations and offers ----------
+// The public page lives at /app/<shop>/connect (see connect/index.html). It only shows while the switch is On.
+const cnOk = () => 'connect_on' in biz;
+const cnUrl = () => pubOrigin() + appBase() + 'connect';
+let CN = null, cnEd = null;   // CN: null | 'loading' | 'err' | { locs: [], promos: [] }
+const cnErr = e => /function|schema cache|does not exist|relation/i.test(String((e && e.message) || e)) ? 'Run supabase/2026-10-15-connect.sql in the Supabase SQL editor first.' : nice(e);
+function connectCard() {
+  if (!cnOk()) return `<div class="a-card"><h2>Connect page</h2><p class="sub" style="margin:0">A public page with your links, menu, locations and offers. It needs one database update: run <b>supabase/2026-10-15-connect.sql</b> in the Supabase SQL editor, then reload.</p></div>`;
+  return `<div class="a-card"><div class="a-h"><h2>Connect page</h2><span class="a-tag">${biz.connect_on ? 'Live' : 'Off'}</span></div>
+    <p class="sub">One link for your Instagram bio, WhatsApp status or a table card: join rewards, menu, WhatsApp, Google review, where to find you and your current offers.</p>
+    <label class="lb">Connect page</label><select id="cnon"><option value="1"${biz.connect_on ? ' selected' : ''}>On: anyone with the link can see it</option><option value="0"${biz.connect_on ? '' : ' selected'}>Off: the link shows "not available"</option></select>
+    <label class="lb">Link to share</label><input readonly class="ro" value="${esc(cnUrl())}" onclick="this.select()">
+    <div class="row" style="margin-top:10px"><button type="button" class="btn sm alt" onclick="copyText('${esc(cnUrl())}','Link copied')">Copy link</button><a class="btn sm alt" href="${esc(appBase())}connect" target="_blank" rel="noopener">Open page</a></div>
+    ${fld('cnt', 'Headline', biz.connect_title, 'maxlength=80', biz.name)}${fld('cns', 'Short line under it', biz.connect_sub, 'maxlength=240', biz.tagline || 'e.g. Fresh desserts, made daily')}
+    ${fld('crv', 'Google review link', biz.review_url, '', 'https://g.page/…')}
+    <div class="row" style="margin-top:14px"><button type="button" class="btn sm alt" onclick="cnOpen('cnloc')">Locations</button><button type="button" class="btn sm alt" onclick="cnOpen('cnpro')">Offers on the page</button></div>
+    <p class="hint">The switch, headline and review link are saved with the Save settings button below. Instagram, Facebook, WhatsApp and Website come from Links above. The menu comes from your Menu tab.</p></div>`;
+}
+async function loadCn(quiet) {
+  if (!quiet) { CN = 'loading'; render() }
+  try {
+    const [a, b] = await Promise.all([
+      sb.from('shop_locations').select('*').eq('business_id', biz.id).order('sort').order('created_at'),
+      sb.from('shop_promos').select('*').eq('business_id', biz.id).order('created_at', { ascending: false })]);
+    if (a.error) throw a.error; if (b.error) throw b.error;
+    CN = { locs: a.data, promos: b.data };
+  } catch (e) { CN = 'err'; toast(cnErr(e)) }
+  render();
+}
+function cnOpen(k) { cnEd = null; go('m', k); loadCn() }
+const cnBack = () => `<button class="a-back" onclick="go('m')">${AI.back}<span>Back to settings</span></button>`;
+const cnChk = (i, l, on) => `<label class="chk"><input type="checkbox" id="${i}"${on ? ' checked' : ''}> ${l}</label>`;
+function connEditV() {
+  if (CN == 'loading' || CN == null) return cnBack() + '<div class="a-card sk" aria-busy="true"><i></i><i style="width:60%"></i><i></i></div>';
+  if (CN == 'err') return cnBack() + `<div class="a-card"><p class="sub" style="margin:0">Could not load this. Run <b>supabase/2026-10-15-connect.sql</b> in the Supabase SQL editor, then reload.</p></div>`;
+  return ov == 'cnloc' ? cnLocV() : cnProV();
+}
+function cnLocV() {
+  const e = cnEd && cnEd.kind == 'loc' ? CN.locs.find(x => x.id == cnEd.id) : null, L = CN.locs;
+  const st = (id, cur) => `<select${id ? ` onchange="cnLocStatus('${id}',this.value)"` : ' id="lst"'} style="width:auto">${[['open', 'Open'], ['closed', 'Closed'], ['temporarily_closed', 'Temporarily closed']].map(o => `<option value="${o[0]}"${cur == o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select>`;
+  return cnBack() + `<h2 class="a-title">Locations</h2><p class="sub" style="margin-bottom:14px">Where customers can find you: a shop, a stall, a branch. Switch a place to Closed on days it is not out.</p>
+  ${L.length ? `<div class="a-card flush">${L.map(l => `<div class="ct-row" style="padding:12px 16px;gap:10px;flex-wrap:wrap;align-items:center"><span class="ct-n" style="flex:1;min-width:160px"><b>${esc(l.name)}${l.active ? '' : ' (hidden)'}</b><small>${esc(l.address || '—')}</small></span>${st(l.id, l.status)}<button class="btn sm alt" onclick="cnEdit('loc','${l.id}')">Edit</button><button class="btn sm alt" onclick="cnDel('loc','${l.id}')">Delete</button></div>`).join('')}</div>` : '<div class="a-card"><p class="sub" style="margin:0">No locations yet. Add your first one below.</p></div>'}
+  <div class="a-card"><h2>${e ? 'Edit location' : 'Add a location'}</h2>${fld('lname', 'Name', e ? e.name : '', 'maxlength=80', 'e.g. Hoskote stall')}${fld('laddr', 'Address', e ? e.address : '', 'maxlength=240')}${fld('lmap', 'Google Maps link', e ? e.maps_url : '', '', 'https://maps.app.goo.gl/…')}${fld('lhr', 'Hours or note', e ? e.hours_note : '', 'maxlength=120', 'e.g. 5 pm to 10 pm, closed Mondays')}
+    <label class="lb">Today</label>${st('', e ? e.status : 'open')}
+    ${cnChk('lfe', 'Show this one first', e && e.featured)}${cnChk('lac', 'Show on the connect page', e ? e.active : true)}
+    <div class="row" style="margin-top:14px"><button class="btn" data-go onclick="cnSaveLoc(this)">${e ? 'Save changes' : 'Add location'}</button>${e ? '<button class="btn alt" onclick="cnEd=null;render()">Cancel</button>' : ''}</div></div>`;
+}
+function cnProV() {
+  const e = cnEd && cnEd.kind == 'promo' ? CN.promos.find(x => x.id == cnEd.id) : null, L = CN.promos;
+  return cnBack() + `<h2 class="a-title">Offers on the page</h2><p class="sub" style="margin-bottom:14px">Things worth telling people about: a festive special, a weekend deal. These are public notices, separate from the coupons customers collect in the app. Ended offers hide themselves.</p>
+  ${L.length ? `<div class="a-card flush">${L.map(p => `<div class="ct-row" style="padding:12px 16px;gap:10px;flex-wrap:wrap;align-items:center"><span class="ct-n" style="flex:1;min-width:160px"><b>${esc(p.title)}${p.active ? '' : ' (hidden)'}</b><small>${p.ends_on ? 'Until ' + esc(fbd(p.ends_on)) : 'No end date'}</small></span><button class="btn sm alt" onclick="cnEdit('promo','${p.id}')">Edit</button><button class="btn sm alt" onclick="cnDel('promo','${p.id}')">Delete</button></div>`).join('')}</div>` : '<div class="a-card"><p class="sub" style="margin:0">No offers yet. Add one below.</p></div>'}
+  <div class="a-card"><h2>${e ? 'Edit offer' : 'Add an offer'}</h2>${fld('ptitle', 'Title', e ? e.title : '', 'maxlength=80', 'e.g. Diwali gift boxes')}
+    <label class="lb">Details</label><textarea id="pbody" rows="3" maxlength="300">${esc(e ? e.body : '')}</textarea>
+    <label class="lb">Kind</label><select id="pkind"><option value="offer"${e && e.kind == 'offer' || !e ? ' selected' : ''}>Offer</option><option value="festive"${e && e.kind == 'festive' ? ' selected' : ''}>Festive special</option></select>
+    ${fld('pend', 'Last day (optional)', e && e.ends_on ? e.ends_on : '', 'type=date')}
+    ${cnChk('pac', 'Show on the connect page', e ? e.active : true)}
+    <div class="row" style="margin-top:14px"><button class="btn" data-go onclick="cnSavePro(this)">${e ? 'Save changes' : 'Add offer'}</button>${e ? '<button class="btn alt" onclick="cnEd=null;render()">Cancel</button>' : ''}</div></div>`;
+}
+function cnEdit(kind, id) { cnEd = { kind, id }; render(); window.scrollTo(0, document.body.scrollHeight) }
+async function cnSaveLoc(btn) {
+  const t = i => v(i).trim(); if (!t('lname')) return toast('Give the location a name');
+  if (t('lmap') && !/^https:\/\//.test(t('lmap'))) return toast('The map link must start with https://');
+  btn.disabled = true;
+  try { await rpc(sb, 'save_location', { p_slug: CFG.slug, p_id: cnEd && cnEd.kind == 'loc' ? cnEd.id : null, p_name: t('lname'), p_address: t('laddr'), p_maps_url: t('lmap'), p_status: v('lst') || 'open', p_hours: t('lhr'), p_featured: $('#lfe').checked, p_active: $('#lac').checked }); cnEd = null; await loadCn(true); toast('Saved') }
+  catch (e) { toast(cnErr(e)) }
+  btn.disabled = false;
+}
+async function cnSavePro(btn) {
+  const t = i => v(i).trim(); if (!t('ptitle')) return toast('Give the offer a title');
+  btn.disabled = true;
+  try { await rpc(sb, 'save_promo', { p_slug: CFG.slug, p_id: cnEd && cnEd.kind == 'promo' ? cnEd.id : null, p_title: t('ptitle'), p_body: t('pbody'), p_kind: v('pkind') || 'offer', p_ends: t('pend') || null, p_active: $('#pac').checked }); cnEd = null; await loadCn(true); toast('Saved') }
+  catch (e) { toast(cnErr(e)) }
+  btn.disabled = false;
+}
+async function cnLocStatus(id, st) {
+  try { await rpc(sb, 'set_location_status', { p_id: id, p_status: st }); const l = CN.locs.find(x => x.id == id); if (l) l.status = st; toast('Updated') } catch (e) { toast(cnErr(e)); render() }
+}
+async function cnDel(kind, id) {
+  if (!confirm(kind == 'loc' ? 'Delete this location?' : 'Delete this offer?')) return;
+  try { await rpc(sb, kind == 'loc' ? 'delete_location' : 'delete_promo', { p_id: id }); if (cnEd && cnEd.id == id) cnEd = null; await loadCn(true) } catch (e) { toast(cnErr(e)) }
+}
+
 async function regen(col) {
   if (!confirm(col == 'join_token' ? 'The old sign-up QR will stop working and you will need to print the new one. Continue?' : 'Old NFC tags and any printed stamp QR will stop adding stamps. Continue?')) return;
   const tok = [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -1139,6 +1224,7 @@ function view() {
   if (tab == 'b') { if (!binit) { bpick(); binit = true } return msgV() }
   if (tab == 'o') return offersV();
   if (tab == 'p') return menuV();
+  if (ov == 'cnloc' || ov == 'cnpro') return connEditV();
   return moreV();
 }
 function render() {

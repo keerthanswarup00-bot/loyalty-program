@@ -41,6 +41,14 @@
   ],
   "rewrites": [
     {
+      "source": "/app/:slug/connect",
+      "destination": "/connect/index.html"
+    },
+    {
+      "source": "/app/:slug/connect/",
+      "destination": "/connect/index.html"
+    },
+    {
       "source": "/app/:slug/admin",
       "destination": "/admin/index.html"
     },

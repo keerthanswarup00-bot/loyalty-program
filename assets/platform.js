@@ -33,7 +33,11 @@ const score = r => flags(r).reduce((a, x) => a + x[1], 0);
 const chips = r => flags(r).map(x => `<span class="pf-chip l${x[1]}">${esc(x[0])}</span>`).join('');
 
 // ---------- data ----------
-async function reload() { rows = await rpc(sb, 'platform_overview') }
+async function reload() {
+  rows = await rpc(sb, 'platform_overview');
+  // Connect page switch per shop. Ignored until supabase/2026-10-15-connect.sql has been run.
+  try { const { data, error } = await sb.from('businesses').select('slug,connect_on'); if (!error && data) { const m = {}; data.forEach(x => m[x.slug] = x.connect_on); rows.forEach(r => { if (r.slug in m) r.connect_on = m[r.slug] }) } } catch (e) { }
+}
 async function enter() {
   signed = true; denied = false; err = '';
   try { await reload(); if (rows.length && rows[0].need === undefined) err = 'Your Supabase database is behind this page. Open SQL Editor and run the whole of supabase/schema.sql (safe to run again), then reload. Until then some numbers, notes and Open dashboard as owner will not work.' }
@@ -256,11 +260,19 @@ function shopV() {
     <p class="hint">Opening the dashboard lets you change anything the owner can (offers, brand, menu, customers). It is logged and the owner sees it in their dashboard.</p></div>
     <div class="tabs">${tabs}</div>` + (ptab == 'customers' ? custV(r) : ptab == 'access' ? accessV(r) : overviewV(r));
 }
+const connectUrl = r => { const b = shopUrl(r, '/app/'); return (/\/app\/$/.test(b) ? b + r.slug + '/' : b) + 'connect' };
+async function toggleConnect(slug) {
+  const r = R(slug); if (!r) return;
+  try { const { error } = await sb.from('businesses').update({ connect_on: !r.connect_on }).eq('slug', slug); if (error) throw error; await reload(); shopAudit = null; render(); toast('Connect page ' + (R(slug).connect_on ? 'switched on' : 'switched off')) } catch (e) { bad(e) }
+}
 function overviewV(r) {
   const st = (b, l) => `<div class="a-st"><b>${b}</b><span>${l}</span></div>`;
   const rate = r.coupons_30d ? Math.round(r.redeemed_30d / r.coupons_30d * 100) + '%' : '—';
   return `<div class="card"><div class="a-sts">${st(num(r.members), 'Customers')}${st('+' + num(r.new_members_7d), 'New, 7 days')}${st(num(r.stamps_7d), 'Stamps, 7 days')}${st(num(r.stamps_30d), 'Stamps, 30 days')}${st(num(r.coupons_30d), 'Coupons issued, 30d')}${st(num(r.redeemed_30d) + ' (' + rate + ')', 'Redeemed, 30d')}</div>
     <p class="sub" style="margin-top:14px">Owner <b>${esc(r.owner_email || 'none')}</b> · last stamp ${esc(ago(r.last_stamp))} · created ${esc(fd(r.created_at))}<br>${r.need === undefined ? '' : `Card: ${r.need} stamps for "${esc(r.reward)}" · time zone ${esc(r.tz)}`}</p></div>
+    ${r.connect_on === undefined ? '' : `<div class="card"><div class="a-h"><h2 style="font-size:17px">Connect page</h2><span class="pf-chip l${r.connect_on ? 0 : 1}">${r.connect_on ? 'Live' : 'Off'}</span></div>
+      <p class="sub">${esc(connectUrl(r))}</p><div class="row"><button class="btn sm${r.connect_on ? ' alt' : ''}" onclick="toggleConnect('${esc(r.slug)}')">${r.connect_on ? 'Switch off' : 'Switch on'}</button>${r.connect_on ? `<a class="btn sm alt" href="${esc(connectUrl(r))}" target="_blank" rel="noopener">Open page</a>` : ''}</div>
+      <p class="hint">The owner can also switch this in their dashboard under More. Their headline, locations and offers are edited there.</p></div>`}
     <div class="card"><h2 style="font-size:17px">Your notes <span class="mut sm">(private, never shown to the shop)</span></h2>
       <label class="lb">Plan</label><input id="mpl" value="${esc(r.plan)}" placeholder="e.g. Monthly 999">
       <label class="lb">Contact</label><input id="mct" value="${esc(r.contact)}" placeholder="Name, phone, best time to call">

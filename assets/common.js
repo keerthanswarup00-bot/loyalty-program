@@ -1,11 +1,11 @@
 // Shared helpers for the customer app and the owner app.
 const CFG = window.LK;
 // ---- Path routing: many shops on one address ----
-// /app/<slug>/ is a shop's customer app and /app/<slug>/admin/ its owner dashboard (vercel.json rewrites both to the shared pages).
+// /app/<slug>/ is a shop's customer app, /app/<slug>/admin/ its owner dashboard and /app/<slug>/connect its public link page (vercel.json rewrites both to the shared pages).
 // The slug is read synchronously here so the login storage below is already per shop. The old /app/ and /admin/ addresses are
 // untouched: they still use config.js `slug`, or the host name (see resolveShop).
 const ROUTE_SLUG = (() => {
-  const m = location.pathname.match(/^\/app\/([a-z0-9][a-z0-9-]*)(?:\/admin)?\/?$/i), s = m && m[1].toLowerCase();
+  const m = location.pathname.match(/^\/app\/([a-z0-9][a-z0-9-]*)(?:\/(?:admin|connect))?\/?$/i), s = m && m[1].toLowerCase();
   if (!s || ['assets', 'admin', 'platform', 'index'].includes(s)) return null;
   CFG.slug = s; return s;
 })();
