@@ -12,6 +12,9 @@ let sel = new Set(), bsel = new Set(), sortBy = 'joined', bseg = 'all', bmsg = '
 let impRows = null;
 const first = u => (u.name || '').split(' ')[0];
 
+// On a path-addressed deployment (config.js publicOrigin) every link, QR code and NFC tag points at /app/<shop>/ on the public domain.
+// Tags already written with the old /app/#scan=... address keep working: the stamp code is unchanged.
+const syncLinks = () => { if (biz && biz.slug && CFG.publicOrigin) linkSlug = biz.slug };
 const scanUrl = () => pubOrigin() + appBase() + '#scan=' + biz.scan_token;
 const joinUrl = () => pubOrigin() + appBase() + '#join=' + biz.join_token;
 const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).length;
@@ -78,6 +81,7 @@ async function load() {
     const { data, error } = await sb.from('businesses').select('*').eq('slug', CFG.slug).maybeSingle();
     if (error) throw error;
     biz = data;
+    syncLinks();
     if (biz) {
       brand(biz); document.title = 'Owner dashboard · ' + biz.name;
       M = await pages(() => sb.from('members').select('*,offers(id,type,text,code,valid_from,used_at,expires_at,created_at)').eq('business_id', biz.id).order('joined', { ascending: false }).order('id'));
