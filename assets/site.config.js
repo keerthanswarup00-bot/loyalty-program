@@ -29,14 +29,18 @@ window.SITE = {
   },
 
   pricing: {
-    pilot: 'TODO_PRICING_PILOT',                // free pilot period: how long, what it includes
-    price: 'TODO_PRICING_PRICE',                // price after the pilot. Do not guess.
-    included: 'TODO_PRICING_INCLUDED',          // what the price includes
-    notIncluded: 'TODO_PRICING_NOT_INCLUDED'    // what it does not include
+    software: 'TODO_PRICING_SOFTWARE',            // Is the app itself free to use?
+    subscription: 'TODO_PRICING_SUBSCRIPTION',    // Monthly / yearly subscription, or none?
+    perRedemption: 'TODO_PRICING_PER_REDEMPTION', // Any fee when a reward is redeemed?
+    hardware: 'TODO_PRICING_HARDWARE',            // What the NFC stamp and the poster cost
+    pilot: 'TODO_PRICING_PILOT',                  // Free pilot: how long, what it includes
+    afterPilot: 'TODO_PRICING_AFTER_PILOT',       // What happens when the pilot ends
+    included: 'TODO_PRICING_INCLUDED',            // What the price includes
+    notIncluded: 'TODO_PRICING_NOT_INCLUDED'      // What it does not
   },
 
-  // Real shops only, with written consent. Empty until you have them — a section renders
-  // nothing while this is empty. Shape: { name, area, quote, metric, photo, consent }
+  // Real shops only, with written consent. While empty (or without any consent:true entry) the
+  // proof section shows the free-pilot block instead. Shape: { name, area, quote, metric, photo, consent }
   proof: [],
 
   legal: {

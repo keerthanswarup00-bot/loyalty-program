@@ -34,6 +34,80 @@
 })();
 
 (function () {
+  // Pricing and proof sections, rendered from window.SITE. A value still marked TODO_ shows as a
+  // visible placeholder, never as a claim. The proof grid is never empty or invented: without a
+  // consented shop it becomes the "run a free pilot" block instead.
+  var cfg = window.SITE || {};
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function isTodo(v) { return typeof v === 'string' && /TODO_/.test(v); }
+  function val(v, where) {
+    return isTodo(v)
+      ? '<span class="tbd"><span class="tbd-tag">Placeholder</span> set <code>pricing.' + esc(where) + '</code> in assets/site.config.js</span>'
+      : esc(v);
+  }
+  var wa = window.INNONDU && window.INNONDU.WHATSAPP;
+  var waHref = wa && wa.length >= 10
+    ? 'https://wa.me/' + wa + '?text=' + encodeURIComponent(window.INNONDU.WHATSAPP_MESSAGE || '')
+    : '/contact/';
+
+  // Pricing: one row per question an owner asks.
+  var pBody = document.getElementById('pricing-body');
+  if (pBody) {
+    var price = cfg.pricing || {};
+    var rows = [
+      ['The app itself', 'software', price.software],
+      ['Subscription', 'subscription', price.subscription],
+      ['Each reward redeemed', 'perRedemption', price.perRedemption],
+      ['NFC stamp and poster', 'hardware', price.hardware],
+      ['The free pilot', 'pilot', price.pilot],
+      ['After the pilot', 'afterPilot', price.afterPilot],
+      ['Included', 'included', price.included],
+      ['Not included', 'notIncluded', price.notIncluded]
+    ].filter(function (r) { return r[2] !== undefined && r[2] !== null && r[2] !== ''; });
+    var draft = rows.some(function (r) { return isTodo(r[2]); });
+    pBody.innerHTML =
+      (draft ? '<p class="tbd-note" role="status"><b>Draft.</b> Rows marked Placeholder are still to be decided in assets/site.config.js. Do not treat this as final.</p>' : '') +
+      '<dl class="price-list">' + rows.map(function (r) {
+        return '<div class="price-row"><dt>' + esc(r[0]) + '</dt><dd>' + val(r[2], r[1]) + '</dd></div>';
+      }).join('') + '</dl>';
+  }
+
+  // Proof: consented shops only.
+  var sBody = document.getElementById('proof-body');
+  if (sBody) {
+    var shops = (cfg.proof || []).filter(function (s) { return s && s.consent === true; });
+    if (shops.length) {
+      sBody.innerHTML =
+        '<div class="sec-head"><div class="eyebrow">From real shops</div><h2>Shops using Innondu.</h2></div>' +
+        '<div class="proof-grid">' + shops.map(function (s) {
+          return '<figure class="proof-card">' +
+            (s.photo ? '<img src="' + esc(s.photo) + '" alt="" loading="lazy" decoding="async" width="480" height="320">' : '') +
+            '<blockquote>&ldquo;' + esc(s.quote) + '&rdquo;</blockquote>' +
+            '<figcaption><b>' + esc(s.name) + '</b>' +
+            (s.area ? '<span>' + esc(s.area) + '</span>' : '') +
+            (s.metric ? '<span class="metric">' + esc(s.metric) + '</span>' : '') +
+            '</figcaption></figure>';
+        }).join('') + '</div>';
+    } else {
+      var pilot = cfg.pricing || {};
+      sBody.innerHTML =
+        '<div class="sec-head"><div class="eyebrow">Free pilot</div><h2>Run a free pilot with your shop.</h2>' +
+        '<p class="lead">No shops are listed here yet &mdash; we are running pilots first. Try Innondu with your regulars for a fixed period, see who comes back, then decide.</p></div>' +
+        '<dl class="price-list">' +
+        '<div class="price-row"><dt>The pilot</dt><dd>' + val(pilot.pilot, 'pilot') + '</dd></div>' +
+        '<div class="price-row"><dt>After the pilot</dt><dd>' + val(pilot.afterPilot, 'afterPilot') + '</dd></div>' +
+        '</dl>' +
+        '<div class="pilot-cta"><a class="btn accent" href="' + esc(waHref) + '" target="_blank" rel="noopener">WhatsApp us</a>' +
+        '<a class="linkbtn" href="/contact/">Or set up my shop</a></div>';
+    }
+  }
+})();
+
+(function () {
   // Fade sections in as they scroll into view. Without IntersectionObserver or with reduced motion, everything just shows.
   var els = [].slice.call(document.querySelectorAll('.reveal'));
   var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -29,11 +29,16 @@ holds everything the Home, About and Contact pages say or link to. It is the onl
 - `whatsapp.number` / `whatsapp.message` — every "WhatsApp us" button becomes
   `https://wa.me/<number>?text=<message>`. Digits only, country code first (`919876543210`).
   Until a real number is set the buttons fall back to `/contact/`.
-- `pricing.*` — free pilot period, price after the pilot, what is and is not included. Left as
-  placeholders until you decide. Do not guess.
-- `proof` — real shops only: `{ name, area, quote, metric, photo, consent }`. Empty by default
-  and a page renders nothing while it is empty. Never add a shop without consent, or a metric
-  you cannot stand behind.
+- `pricing.*` — one entry per question the owner asks: `software` (is the app itself free),
+  `subscription`, `perRedemption`, `hardware` (NFC stamp and poster), `pilot` and `afterPilot`
+  (what the free pilot includes and what follows), plus `included` and `notIncluded`. Left as
+  placeholders until you decide. Do not guess. Any value still set to `TODO_...` renders on the
+  home page as a labelled "Placeholder" mark plus a draft note, so it cannot ship unnoticed.
+- `proof` — real shops only: `{ name, area, quote, metric, photo, consent }`. Only entries with
+  `consent: true` are shown. Empty by default, and while it is empty the proof section renders the
+  "run a free pilot" block instead (pilot terms from `pricing.*` and a WhatsApp/contact CTA) — a
+  page never shows an empty or invented grid. Never add a shop without consent, or a metric you
+  cannot stand behind.
 - `siteUrl`, `siteName`, `defaultOgImage` — canonical URL, site name, link-preview image
   (1200x630). Crawlers do not run JavaScript, so once the image exists copy the `og:image` tag
   into each page's `<head>` as well.
