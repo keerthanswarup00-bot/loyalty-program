@@ -1364,3 +1364,43 @@ grant execute on function public.my_support_log(text) to authenticated;
 grant execute on function public.platform_save_meta(text, text, text, text, date) to authenticated;
 grant execute on function public.platform_find_member(text) to authenticated;
 grant execute on function public.platform_overview() to authenticated;
+
+
+-- ---------- Platform-admin shop deletion ----------
+-- Deletes one shop and its dependent data after an exact-slug confirmation.
+-- The owner's auth.users row is deliberately retained.
+create or replace function public.platform_delete_business(p_slug text, p_confirm_slug text) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  b public.businesses;
+begin
+  if not public._is_platform_admin() then
+    raise exception 'Not allowed';
+  end if;
+  if p_slug is null or p_confirm_slug is null or btrim(p_slug) <> btrim(p_confirm_slug) then
+    raise exception 'Confirmation slug does not match';
+  end if;
+
+  select * into b from public.businesses where slug = btrim(p_slug) for update;
+  if not found then
+    raise exception 'Shop not found';
+  end if;
+
+  -- Record the deletion before removing the shop. business_id becomes NULL via ON DELETE SET NULL,
+  -- while the slug/action remain available in the platform audit history.
+  insert into public.platform_audit (business_id, slug, admin_id, admin_email, action, detail)
+  values (
+    b.id,
+    b.slug,
+    auth.uid(),
+    (select u.email from auth.users u where u.id = auth.uid()),
+    'shop_deleted',
+    jsonb_build_object('shop_name', b.name, 'owner_id_retained', b.owner_id is not null)
+  );
+
+  delete from public.businesses where id = b.id;
+end;
+$$;
+
+revoke execute on function public.platform_delete_business(text, text) from public, anon;
+grant execute on function public.platform_delete_business(text, text) to authenticated;
