@@ -18,7 +18,7 @@ const missingSql = e => /function|schema cache|does not exist|relation/i.test(St
 const bad = e => toast(missingSql(e) || nice(e));
 const R = slug => rows.find(r => r.slug == slug);
 const num = n => (+n || 0).toLocaleString();
-const AUD = { support_open: 'Opened the dashboard as owner', settings_changed: 'Changed settings', view_customers: 'Viewed the customer list', export: 'Exported data', delete_customer: 'Deleted a customer', reset_customer_password: 'Reset a customer password', import_customers: 'Imported customers', domain_added: 'Added a domain', domain_removed: 'Removed a domain', owner_changed: 'Changed the owner', shop_created: 'Created the shop', owner_reset_email: 'Sent the owner a password reset email', note: 'Note' };
+const AUD = { support_open: 'Opened the dashboard as owner', settings_changed: 'Changed settings', view_customers: 'Viewed the customer list', export: 'Exported data', delete_customer: 'Deleted a customer', reset_customer_password: 'Reset a customer password', import_customers: 'Imported customers', domain_added: 'Added a domain', domain_removed: 'Removed a domain', owner_changed: 'Changed the owner', shop_created: 'Created the shop', owner_reset_email: 'Sent the owner a password reset email', shop_deleted: 'Deleted shop', note: 'Note' };
 
 // What needs your attention for this shop. level: 2 = problem, 1 = heads-up.
 function flags(r) {
@@ -121,6 +121,20 @@ async function rmDomain(host) {
 async function setOwner() {
   const email = (prompt('New owner email for "' + sel + '" (they must already have an account):') || '').trim(); if (!email) return;
   try { await rpc(sb, 'platform_set_owner', { p_slug: sel, p_owner_email: email }); await reload(); shopAudit = null; render(); toast('Owner changed') } catch (e) { bad(e) }
+}
+async function deleteShop() {
+  const r = R(sel); if (!r) return;
+  if (!confirm('Permanently delete shop "' + r.name + '" (' + r.slug + ')? Customer and shop data will be removed. The owner login will remain.')) return;
+  const typed = prompt('Type the exact shop slug to confirm deletion: ' + r.slug);
+  if (typed === null || typed.trim() !== r.slug) return toast('Shop slug did not match. Nothing was deleted.');
+  try {
+    await rpc(sb, 'platform_delete_business', { p_slug: r.slug, p_confirm_slug: typed.trim() });
+    rows = rows.filter(x => x.slug !== r.slug);
+    if (created && created.slug === r.slug) created = null;
+    sel = null; cust = null; shopAudit = null;
+    toast('Shop deleted');
+    go('#');
+  } catch (e) { bad(e) }
 }
 async function ownerReset() {
   const r = R(sel); if (!r || !r.owner_email) return;
@@ -240,8 +254,10 @@ function auditV() {
 
 function shopV() {
   const r = R(sel); if (!r) return topV();
-  const cu = shopUrl(r, '/app/'), ad = '/admin/?as=' + encodeURIComponent(r.slug);
-  const cl = shopUrl(r, '/app/'), dl = shopUrl(r, '/admin/');
+  const origin = String(CFG.publicOrigin || location.origin).replace(/\/$/, '');
+  const cl = origin + '/app/' + encodeURIComponent(r.slug) + '/';
+  const dl = origin + '/app/' + encodeURIComponent(r.slug) + '/admin/';
+  const ad = dl;
   const pwNote = !created ? '' : created.pwState == 'ok' ? '' : created.pwState == 'confirm' ? '<p class="hint" style="color:#e0a030">This account must confirm its email before it can sign in. Ask the owner to click the link Supabase emailed, or switch off Confirm email in Supabase → Authentication → Providers → Email.</p>' : created.pwState == 'other' ? '<p class="hint" style="color:#e0a030">This email already had an account, so the password above is NOT theirs. They sign in with the password they already have (use "Email password reset link" under Access and notes if they forgot it).</p>' : '';
   const pwShown = !created ? '' : (created.pwState == 'ok' || created.pwState == 'confirm') ? esc(created.pw) : created.pwState == 'existing' ? '(their existing password)' : '(their existing password; the one you typed was not applied)';
   const msg = !created ? '' : `Your ${r.name} rewards are ready.\nCustomer link: ${cl}\nOwner dashboard: ${dl}\nEmail: ${created.email}\nPassword: ${created.pwState == 'ok' || created.pwState == 'confirm' ? created.pw : 'your existing password'}`;
@@ -281,14 +297,18 @@ function custV(r) {
       <div class="row"><button class="btn sm alt" onclick="exportShop('members',this)">Customers</button><button class="btn sm alt" onclick="exportShop('visits',this)">Every stamp</button><button class="btn sm alt" onclick="exportShop('offers',this)">Coupons</button></div></div>`;
 }
 function accessV(r) {
-  const dom = (r.domains || []).map(d => `<span class="chip">${esc(d)} <button class="lnk" aria-label="Remove ${esc(d)}" onclick="rmDomain('${esc(d)}')">×</button></span>`).join('');
-  return `<div class="card"><h2 style="font-size:17px">Owner</h2><p class="sub">${esc(r.owner_email || 'No owner set')}</p>
+  const origin = String(CFG.publicOrigin || location.origin).replace(/\/$/, '');
+  const customerUrl = origin + '/app/' + encodeURIComponent(r.slug) + '/';
+  const adminUrl = origin + '/app/' + encodeURIComponent(r.slug) + '/admin/';
+  return `<div class="card"><h2 style="font-size:17px">Shop links</h2><p class="sub">These links are generated automatically for this shop.</p>
+      <div class="row"><button class="btn sm alt" data-copy="${esc(customerUrl)}" onclick="copyText(this.dataset.copy,'Shop page link copied')">Copy shop page</button><button class="btn sm alt" data-copy="${esc(adminUrl)}" onclick="copyText(this.dataset.copy,'Admin page link copied')">Copy admin page</button></div>
+      <p class="hint" style="word-break:break-all">Shop: ${esc(customerUrl)}<br>Admin: ${esc(adminUrl)}</p></div>
+    <div class="card"><h2 style="font-size:17px">Owner</h2><p class="sub">${esc(r.owner_email || 'No owner set')}</p>
       <div class="row"><button class="btn sm alt" onclick="setOwner()">Change owner</button>${r.owner_email ? '<button class="btn sm alt" onclick="ownerReset()">Email password reset link</button>' : ''}</div>
       <p class="hint">The reset link goes to the owner's own email. You never see or set their password.</p></div>
-    <div class="card"><h2 style="font-size:17px">Domains</h2><div class="chips" style="margin:0 0 8px">${dom || '<span class="hint">None. ' + (shopHost(r) ? 'Opens at ' + esc(shopHost(r)) + '.' : 'Only reachable through the deployment address.') + '</span>'}</div>
-      <div class="row"><input id="dmn" placeholder="rewards.theirshop.com" autocapitalize="off"><button class="btn sm alt" onclick="addDomain()">Add domain</button></div>
-      <p class="hint">Also add the domain in Vercel and point its DNS there (see README).</p></div>
-    <div class="card"><h2 style="font-size:17px">Activity on this shop</h2>${shopAudit ? shopAudit.map(a => audRow(a, false)).join('') || '<p class="a-empty">No platform activity yet.</p>' : '<p class="a-empty">Loading…</p>'}</div>`;
+    <div class="card"><h2 style="font-size:17px">Activity on this shop</h2>${shopAudit ? shopAudit.map(a => audRow(a, false)).join('') || '<p class="a-empty">No platform activity yet.</p>' : '<p class="a-empty">Loading…</p>'}</div>
+    <div class="card" style="border:1px solid #7f343b"><h2 style="font-size:17px;color:#ff858c">Danger zone</h2><p class="sub">Permanently delete this shop and its customers, stamps, offers, messages, and shop settings. This cannot be undone. The owner's Supabase login will not be deleted.</p>
+      <button class="btn sm" style="background:#7f252d;color:#fff" onclick="deleteShop()">Delete shop</button></div>`;
 }
 
 function render() {
