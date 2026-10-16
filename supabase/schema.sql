@@ -61,6 +61,21 @@ alter table public.businesses add column if not exists winback_offer text not nu
 alter table public.businesses add column if not exists winback_valid_days int not null default 7 check (winback_valid_days between 0 and 90);
 -- Look of the customer app: {"radius":"soft","font":"serif","hero":"gradient","done":true}. Validated by _theme_ok() below.
 alter table public.businesses add column if not exists theme jsonb not null default '{}'::jsonb;
+-- Connect page: the public one-pager per shop. phone/address/maps/review plus optional extras.
+alter table public.businesses add column if not exists phone text not null default '';
+alter table public.businesses add column if not exists wa_phone text not null default '';
+alter table public.businesses add column if not exists address text not null default '';
+alter table public.businesses add column if not exists maps_url text not null default '';
+alter table public.businesses add column if not exists lat double precision;
+alter table public.businesses add column if not exists lng double precision;
+alter table public.businesses add column if not exists review_url text not null default '';
+alter table public.businesses add column if not exists yt text not null default '';
+-- Custom links shown in the social row: [{"label":"Book a table","url":"https://..."}].
+alter table public.businesses add column if not exists links jsonb not null default '[]'::jsonb;
+-- Photo gallery: a short list of image URLs uploaded to the public "brand" bucket.
+alter table public.businesses add column if not exists gallery jsonb not null default '[]'::jsonb;
+-- Shop type: cafe | bakery | salon | boutique | repair | generic. Sets page labels and defaults (assets/verticals.js).
+alter table public.businesses add column if not exists vertical text not null default 'cafe';
 
 
 create table if not exists public.members (
@@ -248,7 +263,8 @@ grant update (name, tagline, color, logo_url, stamp_url, ig, fb, wa, web, need, 
               join_token, news_text, news_at, ref_on, ref_offer, ref_cap,
               daily_on, daily_offers, daily_win_pct, daily_week_cap, daily_notes,
               daily_prizes, daily_days, daily_valid_days,
-              lapsed_days, winback_offer, winback_valid_days, theme)
+              lapsed_days, winback_offer, winback_valid_days, theme,
+              phone, wa_phone, address, maps_url, lat, lng, review_url, yt, links, gallery, vertical)
   on public.businesses to authenticated;
 
 -- ---------- Functions ----------
@@ -261,9 +277,14 @@ drop function if exists public._give(uuid, uuid, text, text, int);
 create or replace function public.get_business(p_slug text) returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
+    'slug', slug,
     'name', name, 'tagline', tagline, 'color', color, 'logo_url', logo_url,
     'stamp_url', stamp_url,
-    'ig', ig, 'fb', fb, 'wa', wa, 'web', web, 'need', need, 'reward', reward,
+    'ig', ig, 'fb', fb, 'yt', yt, 'wa', wa, 'web', web,
+    'phone', phone, 'wa_phone', wa_phone, 'address', address, 'maps_url', maps_url,
+    'lat', lat, 'lng', lng, 'review_url', review_url,
+    'links', links, 'gallery', gallery, 'vertical', vertical,
+    'need', need, 'reward', reward,
     'cooldown_min', cooldown_min, 'sur_stamps', sur_stamps, 'sur_offer', sur_offer,
     'welcome_offer', welcome_offer, 'bday_offer', bday_offer, 'exp_days', exp_days,
     'join_stamp', join_stamp, 'card_months', card_months, 'tz', tz,
@@ -959,9 +980,21 @@ begin
    where i.id = p_id and b.id = i.business_id and (b.owner_id = auth.uid() or (select public._is_platform_admin()));
 end $$;
 
+-- Owner: put the items in this order (first id = first row for customers).
+create or replace function public.reorder_menu_items(p_slug text, p_ids uuid[]) returns void
+language plpgsql security definer set search_path = public as $$
+declare b businesses;
+begin
+  select * into b from businesses where slug = p_slug and (owner_id = auth.uid() or (select public._is_platform_admin()));
+  if not found then raise exception 'Not allowed'; end if;
+  update menu_items i set sort = x.ord
+    from unnest(coalesce(p_ids, '{}'::uuid[])) with ordinality as x(id, ord)
+   where i.id = x.id and i.business_id = b.id;
+end $$;
+
 revoke execute on function public.get_menu(text), public.save_menu_item(text, uuid, text, text, text, text, boolean, uuid),
   public.save_menu_category(text, uuid, text), public.delete_menu_category(uuid), public.reorder_menu_categories(text, uuid[]),
-  public.set_category_items(text, uuid, uuid[]), public.delete_menu_item(uuid) from public, anon, authenticated;
+  public.set_category_items(text, uuid, uuid[]), public.delete_menu_item(uuid), public.reorder_menu_items(text, uuid[]) from public, anon, authenticated;
 grant execute on function public.get_menu(text) to anon, authenticated;
 grant execute on function public.save_menu_item(text, uuid, text, text, text, text, boolean, uuid) to authenticated;
 grant execute on function public.save_menu_category(text, uuid, text) to authenticated;
@@ -969,6 +1002,7 @@ grant execute on function public.delete_menu_category(uuid) to authenticated;
 grant execute on function public.reorder_menu_categories(text, uuid[]) to authenticated;
 grant execute on function public.set_category_items(text, uuid, uuid[]) to authenticated;
 grant execute on function public.delete_menu_item(uuid) to authenticated;
+grant execute on function public.reorder_menu_items(text, uuid[]) to authenticated;
 
 -- ---------- Website enquiries (Contact page) ----------
 -- Read them in Table Editor -> leads. Nobody can read or write the table from the browser.

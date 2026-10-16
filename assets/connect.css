@@ -1,20 +1,54 @@
 /* Connect page (public, one per shop). Loaded after style.css and uses the shop's brand variables. */
-main.cn{max-width:480px;padding:22px 16px 40px}
-.cn-hero{text-align:center;padding:10px 0 20px}
-.cn-hero .logo{width:84px;height:84px;border-radius:26px;font-size:38px;margin:0 auto 16px}
-.cn-hero h1{font-size:32px}
-.cn-hero p{max-width:34ch;margin:10px auto 0;color:var(--mut)}
-.cn-acts{display:grid;gap:10px;margin-bottom:6px}
-.cn-act{display:flex;align-items:center;gap:14px;padding:15px 16px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-card,22px);color:var(--tx);text-decoration:none;transition:transform .15s,border-color .15s}
+main.cn{max-width:520px;margin:0 auto;padding:16px 16px 48px}
+.cn-hero{position:relative;text-align:center;padding:30px 20px 24px;border-radius:var(--r-card,22px);background:linear-gradient(158deg,var(--brand),var(--brand-2,var(--brand)));color:var(--on-brand,#fff);box-shadow:0 14px 34px -22px color-mix(in srgb,var(--brand) 65%,transparent)}
+.cn-hero .logo{width:88px;height:88px;border-radius:26px;font-size:40px;margin:0 auto 16px;background:color-mix(in srgb,var(--on-brand,#fff) 16%,transparent);color:inherit;overflow:hidden}
+.cn-hero .logo img{width:100%;height:100%;object-fit:cover}
+.cn-hero h1{font-size:30px;margin:0;color:inherit}
+.cn-hero p{max-width:34ch;margin:10px auto 0;opacity:.92;color:inherit;font-size:15px}
+.cn-quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin:14px 0}
+.cn-quick-a{display:flex;flex-direction:column;align-items:center;gap:7px;padding:14px 8px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-in,14px);color:var(--tx);text-decoration:none;font-size:13.5px;font-weight:500;text-align:center;transition:transform .15s,border-color .15s}
+.cn-quick-a:hover,.cn-quick-a:focus-visible{transform:translateY(-1px);border-color:var(--brand);outline:0}
+.cn-qi{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand-t-l,var(--brand))}
+.cn-qi svg{width:21px;height:21px}
+.cn-acts{display:grid;gap:10px;margin:6px 0 0}
+.cn-act{display:flex;align-items:center;gap:14px;padding:15px 16px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-card,22px);color:var(--tx);text-decoration:none;text-align:left;font:inherit;width:100%;cursor:pointer;transition:transform .15s,border-color .15s}
 .cn-act:hover,.cn-act:focus-visible{transform:translateY(-1px);border-color:var(--brand);outline:0}
 .cn-act.pri{background:var(--brand);border-color:var(--brand);color:var(--on-brand,#fff)}
-.cn-ai{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand-t,var(--brand));flex:none}
+.cn-ai{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand-t-l,var(--brand));flex:none}
 .cn-act.pri .cn-ai{background:color-mix(in srgb,var(--on-brand,#fff) 18%,transparent);color:var(--on-brand,#fff)}
 .cn-ai svg{width:22px;height:22px}
-.cn-at{flex:1;min-width:0}.cn-at b{display:block;font-size:15.5px}
-.cn-ar svg{width:18px;height:18px;opacity:.6;display:block}
+.cn-at{flex:1;min-width:0}.cn-at b{display:block;font-size:15.5px;font-weight:600}
+.cn-at small{display:block;color:var(--mut);font-size:12.5px;margin-top:2px}
+.cn-act.pri .cn-at small{color:inherit;opacity:.85}
+.cn-ar svg{width:18px;height:18px;opacity:.55;display:block}
+.cn-note{color:var(--mut);font-size:12.5px;margin:10px 4px 0;text-align:center}
+.cn-sec{margin-top:26px}
+.cn-sec h2{font-size:19px;margin:0 0 12px}
+.cn-grp{margin-bottom:18px}
+.cn-grp h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 0 8px;font-weight:600}
+.cn-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cn-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-in,14px)}
+.cn-item .mn-tx{flex:1;min-width:0}
+.cn-item .mn-tx b{font-size:15px;font-weight:600;display:block}
+.cn-item .mn-tx small{display:block;color:var(--mut);font-size:12.5px;margin-top:2px;line-height:1.35}
+.cn-item .mn-ph{width:52px;height:52px;flex:none;border-radius:12px;overflow:hidden;background:color-mix(in srgb,var(--brand) 8%,transparent)}
+.cn-item .mn-ph img{width:100%;height:100%;object-fit:cover}
+.cn-item .mn-pr{font-weight:600;color:var(--tx);white-space:nowrap}
+.cn-item .mn-ask{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand-t-l,var(--brand))}
+.cn-item .mn-ask svg{width:20px;height:20px}
+.cn-gal{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cn-gal img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--r-in,14px);background:var(--card)}
+.cn-soc{display:flex;flex-wrap:wrap;gap:8px}
+.cn-soc a{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:99px;color:var(--tx);text-decoration:none;font-size:14px;font-weight:500}
+.cn-soc a:hover,.cn-soc a:focus-visible{border-color:var(--brand);outline:0}
+.cn-soc a svg{width:18px;height:18px;color:var(--brand-t-l,var(--brand))}
+.cn-share{display:grid;gap:10px}
+.cn-qr{margin-top:12px}
+.cn-qr-box{display:grid;place-items:center;gap:12px;padding:18px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-card,22px);text-align:center}
+.cn-qr-box svg{width:min(240px,70vw);height:auto;border-radius:10px}
 .cn-empty{text-align:center;margin-top:40px}
 .cn-empty h2{margin-bottom:8px}
-.cn-foot{text-align:center;color:var(--mut);font-size:12.5px;margin-top:36px}
+.cn-foot{text-align:center;color:var(--mut);font-size:12.5px;margin-top:34px}
 .cn-foot a{color:var(--mut)}
-@media (prefers-reduced-motion:reduce){.cn-act{transition:none}}
+.cn.sk .card i{margin-inline:auto}
+@media (prefers-reduced-motion:reduce){.cn-act,.cn-quick-a{transition:none}}

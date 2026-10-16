@@ -60,6 +60,9 @@ window.SITE = {
     compat: 'TODO_FAQ_COMPAT',
     install: 'TODO_FAQ_INSTALL',
     exit: 'TODO_FAQ_EXIT',
+    connect: 'TODO_FAQ_CONNECT',              // What is the Connect page, and how is it different from the stamp card?
+    connectEdit: 'TODO_FAQ_CONNECT_EDIT',      // Who edits the Connect page, and how?
+    connectNfc: 'TODO_FAQ_CONNECT_NFC'         // Does the NFC keychain cost extra, and is it included?
   },
 
   legal: {

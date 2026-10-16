@@ -3,21 +3,177 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f6f2ec">
-<title>Connect</title>
-<link rel="preconnect" href="https://qgechlsujyzgivwnvdwf.supabase.co" crossorigin>
+<meta name="theme-color" content="#0e1116">
+<title>Connect page for your shop. Innondu</title>
+<meta name="description" content="One fast page for your shop: directions, call and WhatsApp, your menu with prices, and a button to join your loyalty card. You edit it yourself.">
+<meta property="og:title" content="Connect page for your shop. Innondu">
+<meta property="og:description" content="One fast page for your shop: directions, call and WhatsApp, your menu with prices, and a button to join your loyalty card.">
+<link rel="canonical" href="https://www.innondu.com/connect/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/style.css?v=20261013">
-<link rel="stylesheet" href="/assets/connect.css?v=1">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Kannada:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=2">
+<link rel="stylesheet" href="/assets/home.css?v=2">
+<style>
+.cn-page-mock{display:grid;grid-template-columns:1fr;gap:22px}
+@media(min-width:820px){.cn-page-mock{grid-template-columns:1fr 320px}}
+.cn-mock{border:1px solid var(--line);border-radius:26px;background:var(--surface);padding:16px;max-width:340px}
+.cn-mock .m-head{text-align:center;padding:16px 12px;border-radius:20px;background:linear-gradient(158deg,#8a4b2a,#5b3320);color:#fff}
+.cn-mock .m-logo{width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,.16);margin:0 auto 10px;display:grid;place-items:center;font-weight:800;font-size:24px}
+.cn-mock .m-head b{display:block;font-size:19px}
+.cn-mock .m-head small{opacity:.9}
+.cn-mock .m-quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.cn-mock .m-quick i{display:grid;place-items:center;gap:4px;font-style:normal;font-size:10.5px;padding:10px 4px;border:1px solid var(--line);border-radius:12px;color:var(--mut)}
+.cn-mock .m-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;margin:8px 0;font-size:12.5px}
+.cn-mock .m-row.pri{background:#8a4b2a;border-color:#8a4b2a;color:#fff}
+.cn-mock .m-row span:last-child{margin-left:auto;opacity:.6}
+.cn-mock .m-item{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--line);border-radius:12px;margin:6px 0;font-size:12px}
+.cn-mock .m-item em{margin-left:auto;font-style:normal;color:var(--mut)}
+.cn-mock .m-foot{text-align:center;color:var(--mut);font-size:10.5px;margin-top:12px}
+</style>
 </head>
 <body>
-<main id="app" class="cn"><div class="card sk" aria-busy="true" aria-label="Loading"><i></i><i style="width:55%;margin-inline:auto"></i><i></i><i style="width:80%"></i></div></main>
-<div id="t" role="status" aria-live="polite"></div>
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous"></script>
-<script defer src="/assets/config.js"></script>
-<script defer src="/assets/common.js?v=20261015"></script>
-<script defer src="/assets/connect.js?v=1"></script>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="/"><svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><circle class="ring" cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 4.2" stroke-linecap="round"/><text x="20" y="25" text-anchor="middle" font-size="13" font-weight="800" fill="currentColor" font-family="Inter,system-ui,sans-serif">+1</text></svg>Innondu</a>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-menu"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <nav id="site-menu" aria-label="Main">
+      <a href="/about/">About</a>
+      <a href="/connect/" aria-current="page">Connect</a>
+      <a href="/faq/">FAQ</a>
+      <a href="/contact/">Contact</a>
+      <label class="lang-pick"><span class="sr-only" data-i18n="lang.label">Language</span>
+        <select id="lang-pick" aria-label="Language">
+          <option value="en">English</option>
+          <option value="hi">हिन्दी</option>
+          <option value="kn">ಕನ್ನಡ</option>
+        </select>
+      </label>
+      <a class="btn sm accent" href="/contact/">Get Innondu</a>
+    </nav>
+  </div>
+</header>
+<main id="top">
+
+<section class="hero sm">
+  <div class="wrap narrow">
+    <div class="eyebrow rise" style="--d:0s">Your shop&rsquo;s Connect page</div>
+    <h1 class="rise" style="--d:.08s">One link for everything your customers need.</h1>
+    <p class="lead rise" style="--d:.16s">Directions, call and WhatsApp, your menu with prices, and a button to join your loyalty card &mdash; on one fast page that opens straight in a browser. No app to install.</p>
+    <div class="cta rise" style="--d:.24s">
+      <a class="btn accent" href="/contact/">Set up my shop</a>
+      <a class="linkbtn" href="#demo">See a live example</a>
+    </div>
+  </div>
+</section>
+
+<section class="line">
+  <div class="wrap">
+    <div class="cn-page-mock">
+      <div class="reveal">
+        <div class="sec-head">
+          <div class="eyebrow">What&rsquo;s on the page</div>
+          <h2>Everything a customer looks for, in one place.</h2>
+        </div>
+        <ul class="tick-list">
+          <li><b>At the top</b> Your name, logo, tagline and colour.</li>
+          <li><b>Get in touch</b> Directions, call and WhatsApp buttons.</li>
+          <li><b>Join the card</b> One tap into your loyalty card.</li>
+          <li><b>Review</b> A link to your Google reviews, with an honest note.</li>
+          <li><b>Your list</b> Menu, services or products with prices and photos.</li>
+          <li><b>Share</b> Send the link, or print the QR code for the counter.</li>
+        </ul>
+        <p class="lead" style="margin-top:16px">The words change with your shop: cafes and bakeries show a menu, salons show services, stores show a collection.</p>
+      </div>
+      <div class="reveal" id="demo">
+        <div class="cn-mock" aria-label="Illustration of a shop Connect page" role="img">
+          <div class="m-head"><div class="m-logo">C</div><b>Cheesora Bliss</b><small>Sample page shown here</small></div>
+          <div class="m-quick">
+            <i>&#128205;<br>Directions</i>
+            <i>&#128222;<br>Call</i>
+            <i>&#128172;<br>WhatsApp</i>
+          </div>
+          <div class="m-row pri">Join the loyalty card<span>&rarr;</span></div>
+          <div class="m-row">Leave a review<span>&rarr;</span></div>
+          <div class="m-item">Filter coffee<em>&#8377;80</em></div>
+          <div class="m-item">Chocolate brownie<em>&#8377;90</em></div>
+          <div class="m-foot">Powered by Innondu</div>
+        </div>
+        <p class="cap" style="margin-top:12px">A sample layout &mdash; real shops use their own name, colour and list.</p>
+        <p><a class="linkbtn" href="/connect/cheesora-bliss/">Open a real example page</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="line">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">You edit it yourself</div>
+      <h2>Change it from your phone, in a minute.</h2>
+      <p class="lead">You sign in with the same account as your owner dashboard, on your own page. Edit your details, add or hide items, drop in photos, then tap &ldquo;View my page&rdquo;. The link stays the same, so anything you have already printed keeps working.</p>
+    </div>
+    <ol class="steps reveal">
+      <li><b>Edit</b><p>Your details, your list, your photos &mdash; from a phone or a laptop.</p></li>
+      <li><b>Preview</b><p>A live preview sits next to the form on a bigger screen.</p></li>
+      <li><b>Share</b><p>Copy the link, send it on WhatsApp, or download the QR code.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="line">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Printed and physical</div>
+      <h2>One link that also lives on a counter.</h2>
+      <p class="lead">The page&rsquo;s address is the thing to print or write. The QR code opens it with a scan; an NFC keychain opens it with a tap. Both point at the same page, so you only set it up once.</p>
+    </div>
+    <ol class="steps reveal">
+      <li><b>QR</b><p>Download it from your editor and put it on the counter, the table or the receipt.</p></li>
+      <li><b>NFC keychain</b><p>Write the same link to a tag with a free app &mdash; a tap opens the page.</p></li>
+      <li><b>The loyalty card</b><p>Customers tap the stamp tag from the card button on your page.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="line">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Who it is for</div>
+      <h2>Built around cafes, and useful for any shop.</h2>
+      <p class="lead">The Connect page is configured per shop type &mdash; a cafe gets a menu, a salon gets a price list, a repair shop gets its services. We launch it fully for cafes first; other types use the same page with their own labels and sample content, and we add more as they are asked for.</p>
+    </div>
+    <p class="cap reveal" style="margin-top:8px"><a class="linkbtn" href="/connect/cheesora-bliss/">See the live example</a> &mdash; a real cafe page you can open right now.</p>
+  </div>
+</section>
+
+<section class="line">
+  <div class="wrap">
+    <div class="cta-band reveal">
+      <h2>Put your shop in one link.</h2>
+      <p style="opacity:.75;max-width:52ch">If you already use Innondu for stamp cards, your Connect page sits alongside it on the same account. If you are starting fresh, it is one of the things we set up with you.</p>
+      <div class="band-cta">
+        <a class="btn" href="/contact/">Set up my shop</a>
+        <a class="linkbtn band-link" href="/faq/">Read the FAQ</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer>
+  <div class="wrap">
+    <div class="foot-brand"><b>Innondu</b>, <span data-site-text="founder.city"></span>. Founded by <span data-site-text="founder.name"></span>.</div>
+    <div class="foot-contact">
+      <a data-site-tel="founder.phone" data-fallback="/contact/" href="/contact/">Phone</a>
+      <a data-site-wa="whatsapp.number" data-wa-msg="connect" data-fallback="/contact/" href="/contact/" target="_blank" rel="noopener">WhatsApp</a>
+      <a data-site-mail="founder.email" data-fallback="/contact/" href="/contact/">Email</a>
+    </div>
+    <nav aria-label="Footer"><a href="/about/">About</a><a href="/connect/" aria-current="page">Connect</a><a href="/faq/">FAQ</a><a href="/contact/">Contact</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/admin/">Owner login</a></nav>
+  </div>
+</footer>
+<script src="/assets/site.config.js?v=1"></script>
+<script src="/assets/i18n.js?v=1"></script>
+<script src="/assets/site.js?v=2"></script>
 </body>
 </html>

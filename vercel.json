@@ -41,11 +41,27 @@
   ],
   "rewrites": [
     {
+      "source": "/connect/:slug/admin",
+      "destination": "/connect-admin/index.html"
+    },
+    {
+      "source": "/connect/:slug/admin/",
+      "destination": "/connect-admin/index.html"
+    },
+    {
       "source": "/connect/:slug",
-      "destination": "/connect/index.html"
+      "destination": "/connect-shop/index.html"
     },
     {
       "source": "/connect/:slug/",
+      "destination": "/connect-shop/index.html"
+    },
+    {
+      "source": "/connect",
+      "destination": "/connect/index.html"
+    },
+    {
+      "source": "/connect/",
       "destination": "/connect/index.html"
     },
     {

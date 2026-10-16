@@ -33,6 +33,9 @@
       [tr('faq.q.exit', 'What if I stop using it or you shut down?'), 'exit'],
       [tr('faq.q.compat', 'Does it work on cheap Android phones and slow data?'), 'compat'],
       [tr('faq.q.install', 'Do my customers need to install anything?'), 'install'],
+      [tr('faq.q.connect', 'What is the Connect page, and how is it different from the stamp card?'), 'connect'],
+      [tr('faq.q.connectEdit', 'Who edits the Connect page, and how?'), 'connectEdit'],
+      [tr('faq.q.connectNfc', 'Does the NFC keychain cost extra, and is it included?'), 'connectNfc']
     ];
   }
   function render() {
