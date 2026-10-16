@@ -108,6 +108,112 @@
 })();
 
 (function () {
+  // Founder page, footer text and structured data, all read from window.SITE. Real values are
+  // injected; anything still marked TODO_ shows a small inline placeholder instead of shipping a
+  // wrong claim. The JSON-LD is built from the same values, so it cannot drift from the page.
+  var cfg = window.SITE || {};
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function readPath(path) {
+    return path.split('.').reduce(function (o, k) { return (o || {})[k]; }, cfg);
+  }
+  function isTodo(v) { return typeof v === 'string' && /TODO_/.test(v); }
+  function real(v) { return typeof v === 'string' && !isTodo(v) && v.trim() ? v.trim() : ''; }
+  function phMark(path) {
+    var key = path.split('.').pop();
+    return '<span class="tbd-ph" title="Set ' + esc(path) + ' in assets/site.config.js">[' + esc(key) + ']</span>';
+  }
+  function textOf(path) {
+    var v = readPath(path);
+    return real(v) ? esc(v) : phMark(path);
+  }
+  function digits(v) { return String(v || '').replace(/\D/g, ''); }
+  function abs(p) {
+    if (!p) return '';
+    if (/^https?:/i.test(p)) return p;
+    return (cfg.siteUrl || '').replace(/\/$/, '') + (p.charAt(0) === '/' ? p : '/' + p);
+  }
+
+  // Inline text from config (footer, founder's paragraphs).
+  [].forEach.call(document.querySelectorAll('[data-site-text]'), function (el) {
+    el.innerHTML = textOf(el.getAttribute('data-site-text'));
+  });
+
+  // tel: and mailto: links. Until the value is set, the link falls back to the contact page.
+  [].forEach.call(document.querySelectorAll('[data-site-tel]'), function (a) {
+    var path = a.getAttribute('data-site-tel'), v = readPath(path), d = digits(v);
+    if (real(v)) { a.textContent = v; a.href = d.length >= 4 ? 'tel:' + d : (a.getAttribute('data-fallback') || '/contact/'); }
+    else { a.innerHTML = phMark(path); a.href = a.getAttribute('data-fallback') || '/contact/'; }
+  });
+  [].forEach.call(document.querySelectorAll('[data-site-mail]'), function (a) {
+    var path = a.getAttribute('data-site-mail'), v = readPath(path);
+    if (real(v)) { a.textContent = v; a.href = 'mailto:' + v; }
+    else { a.innerHTML = phMark(path); a.href = a.getAttribute('data-fallback') || '/contact/'; }
+  });
+
+  // A WhatsApp link for a chosen number (defaults to the site-wide one).
+  [].forEach.call(document.querySelectorAll('[data-site-wa]'), function (a) {
+    var path = a.getAttribute('data-site-wa') || 'whatsapp.number';
+    var d = digits(readPath(path));
+    if (d.length >= 10) a.href = 'https://wa.me/' + d + '?text=' + encodeURIComponent((cfg.whatsapp && cfg.whatsapp.message) || '');
+    else a.href = a.getAttribute('data-fallback') || '/contact/';
+  });
+
+  // Founder photo: the real image, or a labelled placeholder box.
+  var photoBox = document.getElementById('founder-photo-box');
+  if (photoBox) {
+    var photo = readPath('founder.photo'), nm = real(readPath('founder.name')) || 'Founder';
+    photoBox.innerHTML = real(photo)
+      ? '<img src="' + esc(photo) + '" alt="' + esc(nm) + '" loading="lazy" decoding="async">'
+      : '<span class="founder-photo-ph">' + phMark('founder.photo') + '</span>';
+  }
+
+  var f = cfg.founder || {};
+
+  // Homepage strip: "Who is behind this".
+  var strip = document.getElementById('founder-strip');
+  if (strip) {
+    var line = real(f.name) ? esc(f.name) : phMark('founder.name');
+    line += ' &middot; ' + (real(f.role) ? esc(f.role) : phMark('founder.role'));
+    line += ' &middot; ' + (real(f.city) ? esc(f.city) : phMark('founder.city'));
+    strip.innerHTML =
+      '<div class="founder-strip-in">' +
+        (real(f.photo) ? '<img src="' + esc(f.photo) + '" alt="' + esc(real(f.name) || 'Founder') + '" loading="lazy" decoding="async" width="168" height="168">' : '') +
+        '<div><div class="eyebrow">Who is behind this</div>' +
+        '<p class="founder-line">' + line + '</p>' +
+        '<p class="lead">' + textOf('founder.why') + '</p>' +
+        '<a class="linkbtn" href="/about/">More about ' + esc(real(f.name) || 'Innondu') + '</a></div>' +
+      '</div>';
+  }
+
+  // Person + Organization JSON-LD, from the config (only real values, never a placeholder).
+  var ld = document.getElementById('ld-founder');
+  if (ld) {
+    var site = (cfg.siteUrl || '').replace(/\/$/, '');
+    var person = { '@type': 'Person' };
+    if (real(f.name)) person.name = real(f.name);
+    if (real(f.role)) person.jobTitle = real(f.role);
+    if (real(f.city)) person.address = { '@type': 'PostalAddress', addressLocality: real(f.city) };
+    if (real(f.photo)) person.image = abs(real(f.photo));
+    if (real(f.email)) person.email = real(f.email);
+    if (real(f.phone)) person.telephone = real(f.phone);
+    if (real(f.portfolio)) person.url = real(f.portfolio);
+    var org = { '@type': 'Organization', '@id': site + '/#org', name: cfg.siteName || 'Innondu', url: site + '/' };
+    var graph = [];
+    if (person.name) { person['@id'] = site + '/#founder'; org.founder = { '@id': site + '/#founder' }; graph.push(person); }
+    graph.push(org);
+    ld.textContent = JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 2);
+  }
+
+  // A page can carry a hidden draft note that only appears while placeholders remain (legal pages).
+  var draft = document.querySelector('[data-draft-note]');
+  if (draft && document.querySelector('.tbd-ph')) draft.hidden = false;
+})();
+
+(function () {
   // Fade sections in as they scroll into view. Without IntersectionObserver or with reduced motion, everything just shows.
   var els = [].slice.call(document.querySelectorAll('.reveal'));
   var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;

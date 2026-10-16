@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>Privacy. Innondu</title>
+<meta name="description" content="What Innondu stores, who owns it, and how to export or delete it.">
+<meta name="robots" content="index, follow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Kannada:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=2">
+<link rel="stylesheet" href="/assets/home.css?v=2">
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="/" aria-label="Innondu home"><svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><circle class="ring" cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 4.2" stroke-linecap="round"/><text x="20" y="25" text-anchor="middle" font-size="13" font-weight="800" fill="currentColor" font-family="Inter,system-ui,sans-serif">+1</text></svg>Innondu</a>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-menu"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <nav id="site-menu" aria-label="Main">
+      <a href="/about/">About</a>
+      <a href="/contact/">Contact</a>
+      <a class="btn sm accent" href="/contact/">Get Innondu</a>
+    </nav>
+  </div>
+</header>
+<main id="top">
+
+<section class="hero sm">
+  <div class="wrap narrow">
+    <div class="eyebrow rise" style="--d:0s">Legal</div>
+    <h1 class="rise" style="--d:.08s">Privacy notice.</h1>
+    <p class="lead rise" style="--d:.16s">What Innondu stores, who owns it, and how to take it with you or have it deleted.</p>
+  </div>
+</section>
+
+<section class="line">
+  <div class="wrap doc">
+    <p class="tbd-note" data-draft-note hidden><b>Draft.</b> Values shown in <code>[brackets]</code> are still placeholders in <code>assets/site.config.js</code>. Fill them in before this notice is published.</p>
+
+    <h2>Who we are</h2>
+    <p>Innondu is run by <span data-site-text="legal.entity"></span> (<span data-site-text="founder.city"></span>). For any privacy question, write to <a data-site-mail="legal.grievanceEmail" data-fallback="/contact/" href="/contact/">&nbsp;</a>.</p>
+
+    <h2>What we store</h2>
+    <p>For a shop&rsquo;s customers, the loyalty card needs a <b>name</b>, a <b>phone number</b>, and the <b>stamps, rewards and offers</b> that belong to that card. For the shop owner, we store the <b>email and password</b> used to sign in and the <b>brand and offer settings</b>.</p>
+    <p>We do not collect anything else: no contact list, no location, no payment details.</p>
+
+    <h2>Why we hold it</h2>
+    <p>Only to run the card. A stamp has to be counted, a reward has to be found at the counter, and a message the owner chooses to send has to reach the right person. Nothing is used to build a profile or to advertise Innondu or anyone else to your customers.</p>
+
+    <h2>Who owns it</h2>
+    <p>The shop owns its customer list. Innondu is a custodian: we run the software and keep it secure, but the data about a shop&rsquo;s customers belongs to that shop.</p>
+
+    <h2>Who can see it</h2>
+    <p>The shop&rsquo;s own login can see its customers. Innondu runs on hosted infrastructure (Supabase) that stores the data on our behalf, under access rules that keep each shop apart. We do not sell the data, and we do not share it for advertising.</p>
+
+    <h2>How long we keep it</h2>
+    <p>For as long as the shop uses Innondu. When a shop asks to leave, the data is exported and then deleted.</p>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li><b>Customers:</b> ask the shop to see or delete your card. The shop can do both from its dashboard.</li>
+      <li><b>Shops:</b> export every customer as a spreadsheet, and ask us to delete the shop&rsquo;s data. Both are free.</li>
+    </ul>
+
+    <h2>Contact</h2>
+    <p>Grievance and data requests: <a data-site-mail="legal.grievanceEmail" data-fallback="/contact/" href="/contact/">&nbsp;</a>. You can also reach <span data-site-text="founder.name"></span> directly through the <a href="/contact/">contact page</a>.</p>
+
+    <p class="doc-meta">Last updated: <span data-site-text="legal.lastUpdated"></span>.</p>
+  </div>
+</section>
+
+</main>
+<footer>
+  <div class="wrap">
+    <div class="foot-brand"><b>Innondu</b>, <span data-site-text="founder.city"></span>. Founded by <span data-site-text="founder.name"></span>.</div>
+    <div class="foot-contact">
+      <a data-site-tel="founder.phone" data-fallback="/contact/" href="/contact/">Phone</a>
+      <a data-site-href="whatsapp" data-fallback="/contact/" href="/contact/" target="_blank" rel="noopener">WhatsApp</a>
+      <a data-site-mail="founder.email" data-fallback="/contact/" href="/contact/">Email</a>
+    </div>
+    <nav aria-label="Footer"><a href="/about/">About</a><a href="/contact/">Contact</a><a href="/privacy/" aria-current="page">Privacy</a><a href="/terms/">Terms</a><a href="/admin/">Owner login</a></nav>
+  </div>
+</footer>
+<script src="/assets/site.config.js?v=1"></script>
+<script src="/assets/site.js?v=2"></script>
+</body>
+</html>

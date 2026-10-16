@@ -1,9 +1,11 @@
 # Loyalty Kit (Phase 2: shared backend)
 
-Website at `/` (plus `/about/` and `/contact/`), customer app at `/app/`, owner dashboard at `/admin/`. One free Supabase database serves every client. Plain HTML/CSS/JS, no build step.
+Website at `/` (plus `/about/`, `/contact/`, `/privacy/` and `/terms/`), customer app at `/app/`, owner dashboard at `/admin/`. One free Supabase database serves every client. Plain HTML/CSS/JS, no build step.
 
 ```
 index.html            Innondu landing page (public site root)
+about/index.html      founder page          privacy/index.html    privacy notice
+contact/index.html    contact               terms/index.html      terms of use
 app/index.html        customer app          assets/customer.js
 admin/index.html      owner dashboard       assets/admin.js + assets/admin.css
 assets/config.js      per-deployment settings (the only file you edit)
@@ -24,8 +26,12 @@ and the docs out of the published site.
 `assets/config.js` holds deployment settings (Supabase keys, slug). `assets/site.config.js`
 holds everything the Home, About and Contact pages say or link to. It is the only place to edit:
 
-- `founder.*` — name, role, city, bio, photo, phone, email, WhatsApp number, portfolio URL.
-  `assets/site.js` uses `portfolio` for the footer credit.
+- `founder.*` — name, role, city, `why` (one honest paragraph on why Innondu exists), `work`
+  (what you do, e.g. design and creative strategy), photo, phone, email, WhatsApp number and
+  portfolio URL. `assets/site.js` fills the About founder page, the footer ("Innondu, [city].
+  Founded by [name]."), the homepage "Who is behind this" strip, and the Person/Organization
+  JSON-LD on the About page — all from this one block. Values left as `TODO_...` show as a small
+  inline `[placeholder]` mark instead of shipping a wrong claim.
 - `whatsapp.number` / `whatsapp.message` — every "WhatsApp us" button becomes
   `https://wa.me/<number>?text=<message>`. Digits only, country code first (`919876543210`).
   Until a real number is set the buttons fall back to `/contact/`.
@@ -42,7 +48,9 @@ holds everything the Home, About and Contact pages say or link to. It is the onl
 - `siteUrl`, `siteName`, `defaultOgImage` — canonical URL, site name, link-preview image
   (1200x630). Crawlers do not run JavaScript, so once the image exists copy the `og:image` tag
   into each page's `<head>` as well.
-- `legal.*` — business/legal entity name, grievance contact email, last updated date.
+- `legal.*` — business/legal entity name, grievance / data-deletion email, jurisdiction and the
+  last-updated date. These feed the `/privacy/` and `/terms/` pages; while any value is still a
+  placeholder those pages show a visible "Draft" note, so unfinished legal text cannot ship quietly.
 
 Anything left as `TODO_...` is a placeholder. Open the site locally or on a preview deploy and
 the console lists every one still set; the warning is suppressed on `siteUrl`'s host, so it
@@ -61,7 +69,7 @@ shop names or photos are invented.
 1. Authentication -> Users -> **Add user**: the owner's email + password, tick *Auto Confirm User*.
 2. SQL Editor: open `supabase/new-client.sql`, change the slug, name and owner email, Run.
 3. In `assets/config.js` set `supabaseUrl`, `supabaseKey` and `slug` (same slug as step 2).
-4. Test locally (VS Code Live Server, open the folder root). Website: `/`, `/about/`, `/contact/`. Customer app: `/app/`. Owner: `/admin/`.
+4. Test locally (VS Code Live Server, open the folder root). Website: `/`, `/about/`, `/contact/`, `/privacy/`, `/terms/`. Customer app: `/app/`. Owner: `/admin/`.
    Menu and the Contact form need one extra SQL run: `supabase/2026-10-11-menu-leads.sql` (already folded into `schema.sql` for new projects). Contact messages land in Table Editor -> `leads`. To show a WhatsApp button on the Contact page, set `whatsapp.number` in `assets/site.config.js`.
 
 Branding, offers, cooldown, expiry, first stamp and card length are then edited by the owner in **/admin -> Offers and More** and apply to everyone instantly. No redeploy needed.
@@ -129,7 +137,7 @@ Every shop also lives at one shared address: customers at `https://www.innondu.c
 
 - Sign-ins and small saved settings are kept per shop on these addresses, so two shops on one domain never share a login. Owners and customers who use `/app/<shop>/` sign in once, separately from `/app/`.
 - QR codes, NFC tags and WhatsApp links use `publicOrigin` from `config.js` (set to `https://www.innondu.com`).
-- Reserved names that can never be shops: `www app admin api platform mail static assets about contact docs support status index`.
+- Reserved names that can never be shops: `www app admin api platform mail static assets about contact privacy terms docs support status index`.
 - Supabase -> Authentication -> URL Configuration -> add `https://www.innondu.com/app/**` to **Redirect URLs** so the owner password reset email can return to `/app/<shop>/admin/`.
 - Local testing: `node scripts/dev-server.js` (applies the same rewrites; `python -m http.server` cannot). Offline routing tests: `npx playwright test tests/path-routing.spec.js`.
 

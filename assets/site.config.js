@@ -15,8 +15,9 @@ window.SITE = {
     name: 'Aryan Swaroop',
     role: 'TODO_FOUNDER_ROLE',                  // e.g. Founder
     city: 'TODO_FOUNDER_CITY',
-    bio: 'TODO_FOUNDER_BIO',                    // one or two sentences, plain
     photo: 'TODO_FOUNDER_PHOTO',                // path to the photo, e.g. '/assets/aryan.jpg'
+    why: 'TODO_FOUNDER_WHY',                    // one short, honest paragraph: why Innondu exists
+    work: 'TODO_FOUNDER_WORK',                  // what you do, e.g. design and creative strategy
     phone: 'TODO_FOUNDER_PHONE',                // display number, any format
     email: 'TODO_FOUNDER_EMAIL',
     whatsapp: 'TODO_FOUNDER_WHATSAPP',          // international, digits only: 919876543210
@@ -45,7 +46,8 @@ window.SITE = {
 
   legal: {
     entity: 'TODO_LEGAL_ENTITY',                // business / legal entity name
-    grievanceEmail: 'TODO_GRIEVANCE_EMAIL',     // grievance redressal contact
+    grievanceEmail: 'TODO_GRIEVANCE_EMAIL',     // grievance / data-deletion contact
+    jurisdiction: 'TODO_LEGAL_JURISDICTION',    // e.g. Karnataka, India
     lastUpdated: 'TODO_LEGAL_LAST_UPDATED'      // e.g. '16 October 2026'
   }
 };

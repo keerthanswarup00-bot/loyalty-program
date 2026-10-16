@@ -1140,7 +1140,7 @@ declare s text := lower(btrim(coalesce(p_slug, ''))); uid uuid; bid uuid; col te
 begin
   if not _is_platform_admin() then raise exception 'Not allowed'; end if;
   if s !~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$' then raise exception 'The shop address must be 3 to 40 letters, numbers or hyphens'; end if;
-  if s in ('www', 'app', 'admin', 'api', 'platform', 'mail', 'static', 'assets', 'about', 'contact', 'docs', 'support', 'status') then
+  if s in ('www', 'app', 'admin', 'api', 'platform', 'mail', 'static', 'assets', 'about', 'contact', 'privacy', 'terms', 'docs', 'support', 'status') then
     raise exception 'That address is reserved'; end if;
   if btrim(coalesce(p_name, '')) = '' then raise exception 'Enter the shop name'; end if;
   if col !~ '^#[0-9a-fA-F]{6}$' then col := '#8a4b2a'; end if;
