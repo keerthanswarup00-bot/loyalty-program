@@ -17,6 +17,8 @@ const first = u => (u.name || '').split(' ')[0];
 const syncLinks = () => { if (biz && biz.slug && CFG.publicOrigin) linkSlug = biz.slug };
 const scanUrl = () => pubOrigin() + appBase() + '#scan=' + biz.scan_token;
 const joinUrl = () => pubOrigin() + appBase() + '#join=' + biz.join_token;
+// The shop's public Connect page: one link with rewards, menu and social links, safe to share or print.
+const connectUrl = () => pubOrigin() + '/connect/' + biz.slug + '/';
 const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).length;
 // When this customer's current card runs out (null = no deadline: no stamps yet, full card, or no limit).
 const cardEnd = u => { if (!biz.card_months || !u.card_started_at || !(u.stamps > 0) || u.stamps >= biz.need) return null; const d = new Date(u.card_started_at); d.setMonth(d.getMonth() + biz.card_months); return d };
@@ -783,6 +785,11 @@ function supV() {
 function moreV() {
   return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${brandKit()}${dbHint()}</div>
   <div class="a-card"><h2>Links</h2>${fld('ci', 'Instagram', biz.ig, '', 'https://…')}${fld('cf', 'Facebook', biz.fb, '', 'https://…')}${fld('cw', 'WhatsApp', biz.wa, '', 'https://wa.me/…')}${fld('cs', 'Website', biz.web, '', 'https://…')}</div>
+  <div class="a-card"><h2>Connect page</h2><p class="sub">One public page for your shop with your rewards, menu and social links. Share it in your bio or on WhatsApp, or print the QR for the counter.</p>
+    <label class="lb">Connect link</label><input readonly class="ro" value="${esc(connectUrl())}" onclick="this.select()">
+    <div class="qr" id="qrc"></div>
+    <div class="row"><button class="btn sm alt" onclick="cpConnect()">Copy link</button><button class="btn sm alt" onclick="dlConnectQR()">Download QR</button><button class="btn sm alt" onclick="window.open(connectUrl(),'_blank','noopener')">Preview</button></div>
+    <p class="hint">Looks best in a phone: a big Join button, your menu and your links. It updates automatically when you change your branding or links.</p></div>
   <div class="a-card"><h2>What's new</h2><p class="sub">A short note shown at the top of every customer's card (an event, new menu item, holiday hours). Leave blank to hide it.</p><textarea id="nw" rows="3" maxlength="280">${esc(biz.news_text || '')}</textarea><p class="hint">Up to 280 characters. Customers who already closed the old note see the new one.</p></div>
   <div class="a-card"><h2>Refer a friend</h2><p class="sub">Each customer gets a personal code. A friend who enters it when joining gets this offer, and the customer gets it too after the friend's next stamp.</p>
     <label class="lb">Referrals</label><select id="rfon"><option value="1"${biz.ref_on ? ' selected' : ''}>On</option><option value="0"${biz.ref_on ? '' : ' selected'}>Off</option></select>
@@ -832,12 +839,15 @@ async function regen(col) {
 }
 
 // ---------- QR, export, CSV import ----------
-function qrSvg() { if (typeof qrcode == 'undefined') return ''; const z = qrcode(0, 'M'); z.addData(joinUrl()); z.make(); return z.createSvgTag({ cellSize: 6, margin: 2, scalable: true }) }
+function qrSvg(url) { if (typeof qrcode == 'undefined') return ''; const z = qrcode(0, 'M'); z.addData(url || joinUrl()); z.make(); return z.createSvgTag({ cellSize: 6, margin: 2, scalable: true }) }
 function drawQR() { const b = $('#qrb'); if (b) b.innerHTML = qrSvg() || '<p class="mut">QR library could not load.</p>' }
+function drawCQR() { const b = $('#qrc'); if (b) b.innerHTML = qrSvg(connectUrl()) || '<p class="mut">QR library could not load.</p>' }
 async function cpL(k) { try { await navigator.clipboard.writeText(k == 's' ? scanUrl() : joinUrl()); toast('Link copied') } catch (e) { toast('Tap the link box and copy it') } }
+async function cpConnect() { try { await navigator.clipboard.writeText(connectUrl()); toast('Connect link copied') } catch (e) { toast('Tap the link box and copy it') } }
 function dl(name, data, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove() }
 const slug = () => biz.name.replace(/\W+/g, '-');
 function dlQR() { const x = qrSvg(); if (x) dl(slug() + '-signup-QR.svg', x, 'image/svg+xml') }
+function dlConnectQR() { const x = qrSvg(connectUrl()); if (x) dl(biz.slug + '-connect-QR.svg', x, 'image/svg+xml') }
 function exp() {
   const cell = x => { let s = String(x == null ? '' : x); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"' };
   const rows = [['Name', 'Phone', 'Birthday', 'Current stamps', 'Card ends', 'Total visits', 'Rewards redeemed', 'Joined', 'Last visit', 'WhatsApp opted out']]
@@ -1148,7 +1158,7 @@ function render() {
   const m = $('#app'); m.className = sg ? 'a' : '';
   m.innerHTML = recover ? recoverV() : !signed ? loginV() : !biz ? deniedV() : view();
   if (sg && tab == 'h') drawQR();
-  if (sg && tab == 'm') { dgSum(); brPv() }
+  if (sg && tab == 'm') { dgSum(); brPv(); drawCQR() }
   if (sg && tab == 'o' && ov == 'stamp') pvStamps();
   if (y) window.scrollTo(0, y);
 }
