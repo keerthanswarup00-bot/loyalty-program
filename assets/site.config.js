@@ -26,7 +26,14 @@ window.SITE = {
 
   whatsapp: {
     number: 'TODO_WHATSAPP_NUMBER',             // international, digits only: 919876543210
-    message: 'Hi, I would like to know more about Innondu.'
+    message: 'Hi, I would like to know more about Innondu.',
+    messages: {
+      hero: 'TODO_WA_MSG_HERO',                  // hero call to action
+      contact: 'TODO_WA_MSG_CONTACT',            // contact page
+      pilot: 'TODO_WA_MSG_PILOT',                // pilot block
+      connect: 'TODO_WA_MSG_CONNECT',            // connect page
+      float: 'TODO_WA_MSG_FLOAT'                 // floating button
+    }
   },
 
   pricing: {
