@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e1116">
 <title>Privacy. Innondu</title>
-<meta name="description" content="What Innondu stores, who owns it, and how to export or delete it.">
+<meta name="description" content="What Innondu stores, why, who can see it, and how to export or delete it.">
 <meta name="robots" content="index, follow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,6 +20,7 @@
     <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-menu"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <nav id="site-menu" aria-label="Main">
       <a href="/about/">About</a>
+      <a href="/faq/">FAQ</a>
       <a href="/contact/">Contact</a>
       <a class="btn sm accent" href="/contact/">Get Innondu</a>
     </nav>
@@ -31,41 +32,44 @@
   <div class="wrap narrow">
     <div class="eyebrow rise" style="--d:0s">Legal</div>
     <h1 class="rise" style="--d:.08s">Privacy notice.</h1>
-    <p class="lead rise" style="--d:.16s">What Innondu stores, who owns it, and how to take it with you or have it deleted.</p>
+    <p class="lead rise" style="--d:.16s">What Innondu stores, why, who can see it, and how to take it with you or have it deleted.</p>
   </div>
 </section>
 
 <section class="line">
   <div class="wrap doc">
-    <p class="tbd-note" data-draft-note hidden><b>Draft.</b> Values shown in <code>[brackets]</code> are still placeholders in <code>assets/site.config.js</code>. Fill them in before this notice is published.</p>
+    <p class="tbd-note" data-draft-note><b>Draft.</b> To be reviewed by a qualified lawyer before launch. This is not legal advice. Values shown in <code>[brackets]</code> are still placeholders in <code>assets/site.config.js</code> where indicated.</p>
 
     <h2>Who we are</h2>
     <p>Innondu is run by <span data-site-text="legal.entity"></span> (<span data-site-text="founder.city"></span>). For any privacy question, write to <a data-site-mail="legal.grievanceEmail" data-fallback="/contact/" href="/contact/">&nbsp;</a>.</p>
 
-    <h2>What we store</h2>
-    <p>For a shop&rsquo;s customers, the loyalty card needs a <b>name</b>, a <b>phone number</b>, and the <b>stamps, rewards and offers</b> that belong to that card. For the shop owner, we store the <b>email and password</b> used to sign in and the <b>brand and offer settings</b>.</p>
-    <p>We do not collect anything else: no contact list, no location, no payment details.</p>
+    <h2>What we collect</h2>
+    <p>When a shop sets up Innondu, we collect the shop name, owner email address, and shop details (area/city) needed to run the loyalty card. When customers join a shop&rsquo;s card, we collect their name and phone number. As customers use the card, we store visit/stamp history and reward history. We do not collect sensitive personal data beyond what is necessary.</p>
 
-    <h2>Why we hold it</h2>
-    <p>Only to run the card. A stamp has to be counted, a reward has to be found at the counter, and a message the owner chooses to send has to reach the right person. Nothing is used to build a profile or to advertise Innondu or anyone else to your customers.</p>
+    <h2>Why we collect it</h2>
+    <p>To operate the loyalty card: track stamps and rewards, help the shop identify a customer at the counter, and communicate with the shop when needed. We only collect and process data for the purpose stated.</p>
 
-    <h2>Who owns it</h2>
-    <p>The shop owns its customer list. Innondu is a custodian: we run the software and keep it secure, but the data about a shop&rsquo;s customers belongs to that shop.</p>
+    <h2>Who sees it</h2>
+    <p>The shop owner (and any staff the owner authorises) sees their own shop&rsquo;s customer names, phone numbers, and visit/stamp history from the owner dashboard. Innondu (operated by <span data-site-text="legal.entity"></span>) has access to the data needed to provide and maintain the service (hosting). We do not sell or rent customer data.</p>
 
-    <h2>Who can see it</h2>
-    <p>The shop&rsquo;s own login can see its customers. Innondu runs on hosted infrastructure (Supabase) that stores the data on our behalf, under access rules that keep each shop apart. We do not sell the data, and we do not share it for advertising.</p>
+    <h2>Third parties</h2>
+    <p>We use hosting (Supabase) to store data securely. Clicking WhatsApp links opens WhatsApp (a third-party service); those links are generated with a prefilled message and the shop&rsquo;s configured number. We do not add tracking pixels to WhatsApp links beyond what is necessary to construct the link. No other third-party advertising or analytics services are used by default.</p>
+
+    <h2>Cookies and storage</h2>
+    <p>The public site uses minimal cookies/storage only as required for basic functionality (e.g. the app keeps the signed-in shop context locally). Where used, it is strictly functional and not for cross-site tracking.</p>
 
     <h2>How long we keep it</h2>
-    <p>For as long as the shop uses Innondu. When a shop asks to leave, the data is exported and then deleted.</p>
+    <p>We keep customer data for as long as the shop is actively using Innondu. On request, we will delete a shop&rsquo;s data or export it (see below). Backups are retained for a short period only to help restore from accidental loss.</p>
 
-    <h2>Your choices</h2>
-    <ul>
-      <li><b>Customers:</b> ask the shop to see or delete your card. The shop can do both from its dashboard.</li>
-      <li><b>Shops:</b> export every customer as a spreadsheet, and ask us to delete the shop&rsquo;s data. Both are free.</li>
-    </ul>
+    <h2>Your rights (export, deletion and consent)</h2>
+    <p>Under applicable law (including India&rsquo;s Digital Personal Data Protection Act), you may ask for access, export or erasure of data. For shops, export and deletion are available from the dashboard. For customers, you can ask the shop to export or delete your card. For direct requests, contact <a data-site-mail="legal.grievanceEmail" data-fallback="/contact/" href="/contact/">&nbsp;</a>.</p>
+    <p>Consent: by providing your phone number or email through our forms, you consent to our collecting and processing that information for the purpose described here. You can withdraw consent by requesting deletion.</p>
 
-    <h2>Contact</h2>
-    <p>Grievance and data requests: <a data-site-mail="legal.grievanceEmail" data-fallback="/contact/" href="/contact/">&nbsp;</a>. You can also reach <span data-site-text="founder.name"></span> directly through the <a href="/contact/">contact page</a>.</p>
+    <h2>Children</h2>
+    <p>Innondu is not intended for children under 13. We do not knowingly collect information from children.</p>
+
+    <h2>Grievances</h2>
+    <p>If you have a privacy concern, contact <a data-site-mail="legal.grievanceEmail" data-fallback="/contact/" href="/contact/">&nbsp;</a>. We will acknowledge and address it in line with our obligations. You can also reach <span data-site-text="founder.name"></span> directly through the <a href="/contact/">contact page</a>.</p>
 
     <p class="doc-meta">Last updated: <span data-site-text="legal.lastUpdated"></span>.</p>
   </div>
@@ -80,7 +84,7 @@
       <a data-site-wa="whatsapp.number" data-wa-msg="contact" data-fallback="/contact/" href="/contact/" target="_blank" rel="noopener">WhatsApp</a>
       <a data-site-mail="founder.email" data-fallback="/contact/" href="/contact/">Email</a>
     </div>
-    <nav aria-label="Footer"><a href="/about/">About</a><a href="/contact/">Contact</a><a href="/privacy/" aria-current="page">Privacy</a><a href="/terms/">Terms</a><a href="/admin/">Owner login</a></nav>
+    <nav aria-label="Footer"><a href="/about/">About</a><a href="/faq/">FAQ</a><a href="/contact/">Contact</a><a href="/privacy/" aria-current="page">Privacy</a><a href="/terms/">Terms</a><a href="/admin/">Owner login</a></nav>
   </div>
 </footer>
 <script src="/assets/site.config.js?v=1"></script>

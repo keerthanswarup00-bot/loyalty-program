@@ -246,3 +246,6 @@
   .foilcard::after,.stamp-wrap,.stamp-hint{animation:none}
   .ph-st.pop,.ph-reward,.foilcard.done .prize b{animation:none}
 }
+
+.consent{margin:0;font-size:.85rem;color:var(--mut)}
+.consent a{color:var(--accent)}

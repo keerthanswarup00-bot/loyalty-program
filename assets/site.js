@@ -212,9 +212,10 @@
     ld.textContent = JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 2);
   }
 
-  // A page can carry a hidden draft note that only appears while placeholders remain (legal pages).
+  // Legal pages carry a visible draft note; it should always show (placeholder values still
+  // render inline as [brackets] via the data-site-text fillers above).
   var draft = document.querySelector('[data-draft-note]');
-  if (draft && document.querySelector('.tbd-ph')) draft.hidden = false;
+  if (draft) draft.hidden = false;
 
   // Floating WhatsApp button on mobile only; small, dismissible, and not shown over forms/inputs.
   try {
