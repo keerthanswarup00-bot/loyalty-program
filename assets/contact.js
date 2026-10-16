@@ -2,7 +2,7 @@
 (function () {
   var cfg = window.LK || {}, f = document.getElementById('cf'), msg = document.getElementById('cmsg'), btn = document.getElementById('cb');
   var wa = (window.INNONDU && window.INNONDU.WHATSAPP || '').replace(/\D/g, '');
-  if (wa) { var a = document.getElementById('waBtn'); a.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent('Hi, I would like to know more about Innondu.'); document.getElementById('waCard').hidden = false; }
+  if (wa) { var a = document.getElementById('waBtn'); a.href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent((window.INNONDU.WHATSAPP_MESSAGE || 'Hi, I would like to know more about Innondu.')); document.getElementById('waCard').hidden = false; }
 
   function say(t, ok) { msg.textContent = t; msg.className = 'form-msg' + (ok ? ' ok' : ''); }
   f.addEventListener('submit', function (e) {
