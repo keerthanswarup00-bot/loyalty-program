@@ -18,7 +18,7 @@ const missingSql = e => /function|schema cache|does not exist|relation/i.test(St
 const bad = e => toast(missingSql(e) || nice(e));
 const R = slug => rows.find(r => r.slug == slug);
 const num = n => (+n || 0).toLocaleString();
-const AUD = { support_open: 'Opened the dashboard as owner', settings_changed: 'Changed settings', view_customers: 'Viewed the customer list', export: 'Exported data', delete_customer: 'Deleted a customer', reset_customer_password: 'Reset a customer password', import_customers: 'Imported customers', domain_added: 'Added a domain', domain_removed: 'Removed a domain', owner_changed: 'Changed the owner', shop_created: 'Created the shop', owner_reset_email: 'Sent the owner a password reset email', note: 'Note' };
+const AUD = { support_open: 'Opened the dashboard as owner', settings_changed: 'Changed settings', view_customers: 'Viewed the customer list', export: 'Exported data', delete_customer: 'Deleted a customer', reset_customer_password: 'Reset a customer password', import_customers: 'Imported customers', domain_added: 'Added a domain', domain_removed: 'Removed a domain', owner_changed: 'Changed the owner', shop_created: 'Created the shop', owner_reset_email: 'Sent the owner a password reset email', owner_email_changed: 'Changed the owner login email', owner_temp_password: 'Set a temporary owner password', note: 'Note' };
 
 // What needs your attention for this shop. level: 2 = problem, 1 = heads-up.
 function flags(r) {
@@ -101,6 +101,60 @@ async function ownerReset() {
   try { await rpc(sb, 'platform_log', { p_slug: sel, p_action: 'owner_reset_email' }); shopAudit = null } catch (e) { }
   toast('Reset link sent to ' + r.owner_email);
 }
+// Change the owner's login email. Accepts "null" so the SQL function leaves the current password alone.
+async function changeOwnerEmail(slug, btn) {
+  const r = R(slug); if (!r) return;
+  const email = (prompt('New login email for the owner of "' + r.name + '"' + (r.owner_email ? ' (currently ' + r.owner_email + ')' : '') + ':') || '').trim().toLowerCase();
+  if (!email) return;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('Enter a valid email');
+  if (btn) btn.disabled = true;
+  try {
+    await rpc(sb, 'platform_set_owner', { p_business: r.id, p_email: email, p_password: null });
+    await reload(); shopAudit = null; render(); toast('Owner email changed to ' + email);
+    rpc(sb, 'platform_log', { p_slug: slug, p_action: 'owner_email_changed' }).catch(() => { });
+  } catch (e) { if (btn) btn.disabled = false; bad(e) }
+}
+// Generate a temporary password. crypto only, never Math.random: this is a real credential.
+function genPw(n) {
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', b = new Uint32Array(n || 12);
+  crypto.getRandomValues(b);
+  return Array.from(b, x => A[x % A.length]).join('');
+}
+// Create a temp password and show it once. The password is never stored in state or logged.
+async function tempOwnerPassword(slug, btn) {
+  const r = R(slug); if (!r) return;
+  if (!r.owner_email) return toast('This shop has no owner account');
+  if (!confirm('Create a temporary password for the owner of "' + r.name + '"?\n\nThis signs the owner out everywhere. Copy the password and hand it over; it is shown only once.')) return;
+  if (btn) btn.disabled = true;
+  try {
+    const pw = genPw();
+    await rpc(sb, 'platform_set_owner', { p_business: r.id, p_email: null, p_password: pw });
+    await reload(); shopAudit = null; render();
+    showPwModal(r.name, r.owner_email, pw);
+    rpc(sb, 'platform_log', { p_slug: slug, p_action: 'owner_temp_password' }).catch(() => { });
+  } catch (e) { if (btn) btn.disabled = false; bad(e) }
+}
+function showPwModal(shop, email, pw) {
+  closeModal();
+  const el = document.createElement('div');
+  el.className = 'modal-wrap';
+  el.innerHTML = `<div class="modal-card" role="dialog" aria-modal="true" aria-label="Temporary owner password">
+    <h2>Temporary password</h2>
+    <p class="sub">Hand this to the owner of <b>${esc(shop)}</b>. Shown once, and it signs them out everywhere.</p>
+    <div style="font:600 20px/1.4 'JetBrains Mono',ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0;word-break:break-all">${esc(pw)}</div>
+    <p class="sub" style="margin:0">Login: <b>${esc(email)}</b><br>${esc(location.origin + '/admin/')}</p>
+    <div class="row" style="margin-top:16px"><button class="btn sm" style="margin-top:0" onclick="copyText('${esc(pw)}','Password copied')">Copy password</button><button class="btn sm alt" style="margin-top:0" onclick="closeModal()">Done</button></div>
+  </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el) closeModal() });
+  document.documentElement.classList.add('modal-open');
+  el.querySelector('.btn').focus();
+}
+function closeModal() {
+  document.querySelectorAll('.modal-wrap').forEach(el => el.remove());
+  document.documentElement.classList.remove('modal-open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal() });
 async function saveMeta(btn) {
   btn.disabled = true;
   try { await rpc(sb, 'platform_save_meta', { p_slug: sel, p_plan: v('mpl'), p_contact: v('mct'), p_notes: v('mno'), p_renews: v('mrn') || null }); await reload(); render(); toast('Saved') }
@@ -183,9 +237,10 @@ function listV() {
   }[fsort];
   const L = rows.filter(r => !q || (r.name + ' ' + r.slug + ' ' + (r.owner_email || '') + ' ' + (r.domains || []).join(' ') + ' ' + r.contact).toLowerCase().includes(q)).sort(S);
   const tot = k => rows.reduce((a, r) => a + (+r[k] || 0), 0), need = rows.filter(r => score(r) > 0).length;
-  const row = r => `<button class="pf-row" onclick="openShop('${esc(r.slug)}')"><i class="pf-dot" style="background:${esc(HEX6.test(r.color) ? r.color : '#8a4b2a')}"></i>
+  const row = r => `<div class="pf-row" role="button" tabindex="0" onclick="openShop('${esc(r.slug)}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openShop('${esc(r.slug)}')}"><i class="pf-dot" style="background:${esc(HEX6.test(r.color) ? r.color : '#8a4b2a')}"></i>
     <span class="pf-main"><b>${esc(r.name)}</b><small>${esc(r.slug)} · ${esc(r.owner_email || 'no owner')}</small><span class="pf-chips">${chips(r)}</span></span>
-    <span class="pf-nums"><span><b>${num(r.members)}</b>customers</span><span><b>${num(r.stamps_7d)}</b>stamps 7d</span><span><b>${esc(ago(r.last_stamp))}</b>last stamp</span></span></button>`;
+    <span class="pf-nums"><span><b>${num(r.members)}</b>customers</span><span><b>${num(r.stamps_7d)}</b>stamps 7d</span><span><b>${esc(ago(r.last_stamp))}</b>last stamp</span></span>
+    <button class="btn sm alt" onclick="event.stopPropagation();openShop('${esc(r.slug)}','access')">Owner</button></div>`;
   return topV() + `<div class="card"><div class="a-sts"><div class="a-st"><b>${rows.length}</b><span>Shops</span></div><div class="a-st"><b>${num(tot('members'))}</b><span>Customers</span></div><div class="a-st"><b>${num(tot('stamps_30d'))}</b><span>Stamps, 30 days</span></div><div class="a-st"><b>${need}</b><span>Need a look</span></div></div></div>
     <div class="card"><h2 style="font-size:17px">Find a customer in any shop</h2><input id="gq" placeholder="Phone number or name" value="${esc(gq)}" oninput="gFind()" autocomplete="off"><div id="gres">${gV()}</div></div>
     <div class="pf-bar"><input id="fq" placeholder="Search shops, owners, domains" value="${esc(fq)}" oninput="fq=this.value;drawList()"><select onchange="fsort=this.value;drawList()" aria-label="Sort">${[['attention', 'Needs attention'], ['active', 'Most active'], ['newest', 'Newest'], ['name', 'Name']].map(o => `<option value="${o[0]}"${fsort == o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select><button class="btn sm" onclick="go('#new')">+ New shop</button></div>
@@ -247,8 +302,8 @@ function custV(r) {
 function accessV(r) {
   const dom = (r.domains || []).map(d => `<span class="chip">${esc(d)} <button class="lnk" aria-label="Remove ${esc(d)}" onclick="rmDomain('${esc(d)}')">×</button></span>`).join('');
   return `<div class="card"><h2 style="font-size:17px">Owner</h2><p class="sub">${esc(r.owner_email || 'No owner set')}</p>
-      <div class="row"><button class="btn sm alt" onclick="setOwner()">Change owner</button>${r.owner_email ? '<button class="btn sm alt" onclick="ownerReset()">Email password reset link</button>' : ''}</div>
-      <p class="hint">The reset link goes to the owner's own email. You never see or set their password.</p></div>
+      <div class="row"><button class="btn sm alt" onclick="setOwner()">Change owner</button><button class="btn sm alt" onclick="changeOwnerEmail('${esc(r.slug)}',this)">Change email</button><button class="btn sm alt" onclick="tempOwnerPassword('${esc(r.slug)}',this)">Temp password</button>${r.owner_email ? '<button class="btn sm alt" onclick="ownerReset()">Email password reset link</button>' : ''}</div>
+      <p class="hint">Change owner hands the shop to another existing account. Change email sets the owner's login email. Temp password signs the owner out everywhere and shows a password you hand over once. Email password reset link sends the owner a reset email instead.</p></div>
     <div class="card"><h2 style="font-size:17px">Domains</h2><div class="chips" style="margin:0 0 8px">${dom || '<span class="hint">None. ' + (shopHost(r) ? 'Opens at ' + esc(shopHost(r)) + '.' : 'Only reachable through the deployment address.') + '</span>'}</div>
       <div class="row"><input id="dmn" placeholder="rewards.theirshop.com" autocapitalize="off"><button class="btn sm alt" onclick="addDomain()">Add domain</button></div>
       <p class="hint">Also add the domain in Vercel and point its DNS there (see README).</p></div>

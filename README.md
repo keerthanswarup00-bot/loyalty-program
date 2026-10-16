@@ -113,6 +113,7 @@ Limits to know: platform admins cannot see a shop's customers, and cannot open a
 
 - **Owner forgot password:** "Forgot password?" on `/admin` emails a reset link. One-time setup: Supabase -> Authentication -> URL Configuration -> set **Site URL** to the client's domain and add `https://their-domain/admin/` (and `http://127.0.0.1:5500/admin/` for local tests) to **Redirect URLs**.
 - **Customer forgot password:** customers have no real email, so the owner opens **Customers -> Reset password**, types a temporary password, and tells the customer. The customer signs in and uses **Change password** on their card.
+- **Owner locked out (platform admin):** on `/platform/`, the shop's **Access and notes -> Owner** card (or the **Owner** button on a shop row) has **Change email** and **Temp password**. They set the owner's login email and/or a temporary password (`platform_set_owner(uuid, text, text)`, guarded by `_is_platform_admin()`); the call signs the owner out everywhere and the password is shown once to hand over. Run `supabase/2026-10-16-platform-owner.sql` first (safe to re-run).
 
 ## Reminders and home screen
 
