@@ -14,6 +14,8 @@ const baseDom = () => String(CFG.baseDomain || '').replace(/^\./, '');
 const shopHost = r => (r.domains && r.domains[0]) || (baseDom() ? r.slug + '.' + baseDom() : null);
 // Link for a shop: its own domain if it has one, otherwise the shared address /app/<shop>/ (and /app/<shop>/admin/).
 const shopUrl = (r, path) => { const h = shopHost(r); if (h) return 'https://' + h + path; return (CFG.publicOrigin || location.origin) + '/app/' + r.slug + (path == '/admin/' ? '/admin/' : '/') };
+// The shop's public Connect page (rewards, menu and links in one place), on its own domain when it has one.
+const connectUrl = r => { const h = shopHost(r); return (h ? 'https://' + h : (CFG.publicOrigin || location.origin)) + '/connect/' + r.slug + '/' };
 const missingSql = e => /function|schema cache|does not exist|relation/i.test(String(e && e.message || e)) ? 'Run the latest supabase/schema.sql in Supabase first.' : null;
 const bad = e => toast(missingSql(e) || nice(e));
 const R = slug => rows.find(r => r.slug == slug);
@@ -31,6 +33,10 @@ function flags(r) {
 }
 const score = r => flags(r).reduce((a, x) => a + x[1], 0);
 const chips = r => flags(r).map(x => `<span class="pf-chip l${x[1]}">${esc(x[0])}</span>`).join('');
+// QR code + download for the shop's Connect page (the same helper the owner dashboard uses).
+function qrSvg(url) { if (typeof qrcode == 'undefined') return ''; const z = qrcode(0, 'M'); z.addData(url); z.make(); return z.createSvgTag({ cellSize: 6, margin: 2, scalable: true }) }
+const drawShopQR = slug => { const b = $('#pfqrc'), r = R(slug); if (b && r) b.innerHTML = qrSvg(connectUrl(r)) };
+function dlConnectQR(slug) { const r = R(slug); if (!r) return; const x = qrSvg(connectUrl(r)); if (!x) return toast('QR library could not load.'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([x], { type: 'image/svg+xml' })); a.download = slug + '-connect-QR.svg'; document.body.appendChild(a); a.click(); a.remove() }
 
 // ---------- data ----------
 async function reload() { rows = await rpc(sb, 'platform_overview') }
@@ -253,7 +259,9 @@ function shopV() {
     <div class="pf-head"><i class="pf-dot big" style="background:${esc(HEX6.test(r.color) ? r.color : '#8a4b2a')}"></i><div><h2 style="margin:0">${esc(r.name)}</h2><div class="mut sm">${esc(r.slug)}${shopHost(r) ? ' · ' + esc(shopHost(r)) : ''}</div></div></div>
     <div class="pf-chips" style="margin:8px 0 12px">${chips(r)}</div>
     <div class="row"><a class="btn sm" href="${ad}" target="_blank" rel="noopener">Open dashboard as owner</a><a class="btn sm alt" href="${ad}&tab=ins" target="_blank" rel="noopener">Insights</a>${cu ? `<a class="btn sm alt" href="${esc(cu)}" target="_blank" rel="noopener">Customer app</a>` : ''}</div>
-    <p class="hint">Opening the dashboard lets you change anything the owner can (offers, brand, menu, customers). It is logged and the owner sees it in their dashboard.</p></div>
+    <div class="row" style="margin-top:10px"><a class="btn sm alt" href="${esc(connectUrl(r))}" target="_blank" rel="noopener">Connect page</a><button class="btn sm alt" onclick="copyText('${esc(connectUrl(r))}','Connect link copied')">Copy link</button><button class="btn sm alt" onclick="dlConnectQR('${esc(r.slug)}')">Download QR</button></div>
+    <div class="qr" id="pfqrc" style="margin:14px auto 0"></div>
+    <p class="hint">The Connect page is public: rewards, menu and this shop's own social links in one link, safe to share or print as a QR.</p></div>
     <div class="tabs">${tabs}</div>` + (ptab == 'customers' ? custV(r) : ptab == 'access' ? accessV(r) : overviewV(r));
 }
 function overviewV(r) {
@@ -297,6 +305,7 @@ function render() {
   if (denied) return void (el.innerHTML = deniedV());
   el.innerHTML = view == 'new' ? newV() : view == 'audit' ? auditV() : view == 'shop' ? shopV() : listV();
   if (view == 'new') initNew();
+  if (view == 'shop') drawShopQR(sel);
 }
 (async () => {
   if (notReady()) { $('#app').innerHTML = setupMsg; return }

@@ -1,0 +1,69 @@
+// Innondu marketing-site content config — the only file you edit for copy, contact details,
+// pricing, proof and legal text. Read by assets/site.js on the Home, About and Contact pages.
+//
+// Anything left as TODO_... is a placeholder. Nothing here is invented: no testimonials, no
+// numbers, no shop names, no photos. When you open a page locally (or on a preview deploy)
+// with placeholders still set, the browser console prints a warning listing every one of them.
+//
+// See README -> "Site content config" for what each field feeds.
+window.SITE = {
+  siteUrl: 'https://www.innondu.com',
+  siteName: 'Innondu',
+  defaultOgImage: 'TODO_DEFAULT_OG_IMAGE',      // path to a 1200x630 image, e.g. '/assets/og.png'
+
+  founder: {
+    name: 'Aryan Swaroop',
+    role: 'TODO_FOUNDER_ROLE',                  // e.g. Founder
+    city: 'TODO_FOUNDER_CITY',
+    bio: 'TODO_FOUNDER_BIO',                    // one or two sentences, plain
+    photo: 'TODO_FOUNDER_PHOTO',                // path to the photo, e.g. '/assets/aryan.jpg'
+    phone: 'TODO_FOUNDER_PHONE',                // display number, any format
+    email: 'TODO_FOUNDER_EMAIL',
+    whatsapp: 'TODO_FOUNDER_WHATSAPP',          // international, digits only: 919876543210
+    portfolio: 'https://aryanswaroop.com'
+  },
+
+  whatsapp: {
+    number: 'TODO_WHATSAPP_NUMBER',             // international, digits only: 919876543210
+    message: 'Hi, I would like to know more about Innondu.'
+  },
+
+  pricing: {
+    pilot: 'TODO_PRICING_PILOT',                // free pilot period: how long, what it includes
+    price: 'TODO_PRICING_PRICE',                // price after the pilot. Do not guess.
+    included: 'TODO_PRICING_INCLUDED',          // what the price includes
+    notIncluded: 'TODO_PRICING_NOT_INCLUDED'    // what it does not include
+  },
+
+  // Real shops only, with written consent. Empty until you have them — a section renders
+  // nothing while this is empty. Shape: { name, area, quote, metric, photo, consent }
+  proof: [],
+
+  legal: {
+    entity: 'TODO_LEGAL_ENTITY',                // business / legal entity name
+    grievanceEmail: 'TODO_GRIEVANCE_EMAIL',     // grievance redressal contact
+    lastUpdated: 'TODO_LEGAL_LAST_UPDATED'      // e.g. '16 October 2026'
+  }
+};
+
+// Dev-only warning: list every placeholder still set, but only when the page is not served
+// from siteUrl (localhost, 127.0.0.1 and preview deploys count as dev).
+(function () {
+  var todos = [];
+  (function walk(v, path) {
+    if (typeof v === 'string') { if (/TODO_[A-Z0-9_]+/.test(v)) todos.push(path + ' = ' + v); return; }
+    if (v && typeof v === 'object') {
+      Object.keys(v).forEach(function (k) { walk(v[k], path ? path + '.' + k : k); });
+    }
+  })(window.SITE, '');
+
+  var prodHost = '';
+  try { prodHost = new URL(window.SITE.siteUrl).hostname; } catch (e) { }
+  var onProd = prodHost && location.hostname === prodHost;
+  if (!todos.length || onProd) return;
+
+  console.warn(
+    '[Innondu site.config] ' + todos.length + ' placeholder' + (todos.length === 1 ? '' : 's') +
+    ' still set in assets/site.config.js:\n  ' + todos.join('\n  ')
+  );
+})();

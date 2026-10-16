@@ -1,5 +1,37 @@
-// Shared bits for the marketing pages. Set WHATSAPP to the number customers should message, digits only with country code (e.g. '919876543210').
-window.INNONDU = { WHATSAPP: '' };
+// Shared bits for the marketing pages. Contact details and copy live in assets/site.config.js;
+// this file reads window.SITE and fills the parts of the page that point at it.
+(function () {
+  var cfg = window.SITE || {};
+  var wa = String((cfg.whatsapp && cfg.whatsapp.number) || '').replace(/\D/g, '');
+  window.INNONDU = {
+    WHATSAPP: wa,
+    WHATSAPP_MESSAGE: (cfg.whatsapp && cfg.whatsapp.message) || ''
+  };
+
+  function read(path) {
+    var v = path.split('.').reduce(function (o, k) { return (o || {})[k]; }, cfg);
+    return typeof v === 'string' ? v : '';
+  }
+  var waHref = wa.length >= 10
+    ? 'https://wa.me/' + wa + '?text=' + encodeURIComponent(window.INNONDU.WHATSAPP_MESSAGE)
+    : '';
+
+  // [data-site-href="whatsapp"] -> click-to-chat link, falling back to the contact page until
+  // a number is set. Any other value is a dotted path into window.SITE.
+  [].forEach.call(document.querySelectorAll('[data-site-href]'), function (a) {
+    var key = a.getAttribute('data-site-href');
+    var href = key === 'whatsapp' ? (waHref || a.getAttribute('data-fallback') || '/contact/') : read(key);
+    if (href) a.href = href;
+  });
+
+  // og:image is injected only when a real path is set. Crawlers do not run JavaScript: once the
+  // image exists, copy the tag into each page's <head> so link previews work too.
+  if (cfg.defaultOgImage && !/TODO_/.test(cfg.defaultOgImage)) {
+    var og = document.querySelector('meta[property="og:image"]');
+    if (!og) { og = document.createElement('meta'); og.setAttribute('property', 'og:image'); document.head.appendChild(og); }
+    og.content = cfg.defaultOgImage;
+  }
+})();
 
 (function () {
   // Fade sections in as they scroll into view. Without IntersectionObserver or with reduced motion, everything just shows.

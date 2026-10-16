@@ -7,6 +7,7 @@ index.html            Innondu landing page (public site root)
 app/index.html        customer app          assets/customer.js
 admin/index.html      owner dashboard       assets/admin.js + assets/admin.css
 assets/config.js      per-deployment settings (the only file you edit)
+assets/site.config.js marketing-site content: founder, WhatsApp, pricing, proof, legal
 assets/common.js, style.css   shared
 assets/vendor/        supabase-js and qrcode-generator, served from this site (no CDN)
 supabase/schema.sql   run once        supabase/new-client.sql   run per client (single-shop deployments)
@@ -17,6 +18,31 @@ archive/              unused old code, kept for reference only (never deployed)
 `archive/` holds the retired Phase 1 app (`app.js`, `config.js`, `style.css`) and an old
 copy of the project. Nothing loads from it. `.vercelignore` keeps `archive/`, `supabase/`
 and the docs out of the published site.
+
+## Site content config (`assets/site.config.js`)
+
+`assets/config.js` holds deployment settings (Supabase keys, slug). `assets/site.config.js`
+holds everything the Home, About and Contact pages say or link to. It is the only place to edit:
+
+- `founder.*` — name, role, city, bio, photo, phone, email, WhatsApp number, portfolio URL.
+  `assets/site.js` uses `portfolio` for the footer credit.
+- `whatsapp.number` / `whatsapp.message` — every "WhatsApp us" button becomes
+  `https://wa.me/<number>?text=<message>`. Digits only, country code first (`919876543210`).
+  Until a real number is set the buttons fall back to `/contact/`.
+- `pricing.*` — free pilot period, price after the pilot, what is and is not included. Left as
+  placeholders until you decide. Do not guess.
+- `proof` — real shops only: `{ name, area, quote, metric, photo, consent }`. Empty by default
+  and a page renders nothing while it is empty. Never add a shop without consent, or a metric
+  you cannot stand behind.
+- `siteUrl`, `siteName`, `defaultOgImage` — canonical URL, site name, link-preview image
+  (1200x630). Crawlers do not run JavaScript, so once the image exists copy the `og:image` tag
+  into each page's `<head>` as well.
+- `legal.*` — business/legal entity name, grievance contact email, last updated date.
+
+Anything left as `TODO_...` is a placeholder. Open the site locally or on a preview deploy and
+the console lists every one still set; the warning is suppressed on `siteUrl`'s host, so it
+never appears in production. Nothing in this file is written for you: no testimonials, numbers,
+shop names or photos are invented.
 
 ## One-time setup (about 10 minutes)
 
@@ -31,7 +57,7 @@ and the docs out of the published site.
 2. SQL Editor: open `supabase/new-client.sql`, change the slug, name and owner email, Run.
 3. In `assets/config.js` set `supabaseUrl`, `supabaseKey` and `slug` (same slug as step 2).
 4. Test locally (VS Code Live Server, open the folder root). Website: `/`, `/about/`, `/contact/`. Customer app: `/app/`. Owner: `/admin/`.
-   Menu and the Contact form need one extra SQL run: `supabase/2026-10-11-menu-leads.sql` (already folded into `schema.sql` for new projects). Contact messages land in Table Editor -> `leads`. To show a WhatsApp button on the Contact page, set `WHATSAPP` in `assets/site.js`.
+   Menu and the Contact form need one extra SQL run: `supabase/2026-10-11-menu-leads.sql` (already folded into `schema.sql` for new projects). Contact messages land in Table Editor -> `leads`. To show a WhatsApp button on the Contact page, set `whatsapp.number` in `assets/site.config.js`.
 
 Branding, offers, cooldown, expiry, first stamp and card length are then edited by the owner in **/admin -> Offers and More** and apply to everyone instantly. No redeploy needed.
 

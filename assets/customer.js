@@ -850,6 +850,7 @@ addEventListener('hashchange', () => {
   const s = location.hash.match(/scan=([\w-]+)/), j = location.hash.match(/join=([\w-]+)/);
   if (j) { joinTok = j[1]; try { sessionStorage.setItem(sk('lk-join'), j[1]) } catch (e) { } render() }
   if (s) { pend = s[1]; if (card) scan(); else { if (!joinTok) joinTok = pend; render() } }
+  if (location.hash == '#menu' && card) goTo('menu');   // the shop's Connect page links straight to the menu
 });
 // Coming back to the page (e.g. after staff taps the tag, or a day later) shows fresh stamps and offers.
 document.addEventListener('visibilitychange', async () => {
@@ -922,6 +923,7 @@ function skelV() {
         if (card && x.r && x.r.error == 'nomember') { pend = tok; await scan(true) }
         else explainStamp(x.r, x.e);
       } else if (card && pend) await scan();
+      else if (card && location.hash == '#menu') goTo('menu');   // arrived from the Connect page's Menu button
     }
     if (card) setTimeout(loadMenu, 1500);              // so the Menu tab opens already filled
   } catch (e) { $('#app').innerHTML = `<div class="card"><h2>Something went wrong</h2><p class="sub">${esc(nice(e))}</p><button class="btn" onclick="location.reload()">Try again</button></div>` }
