@@ -2,10 +2,12 @@
 const CFG = window.LK;
 // ---- Path routing: many shops on one address ----
 // /app/<slug>/ is a shop's customer app and /app/<slug>/admin/ its owner dashboard (vercel.json rewrites both to the shared pages).
-// The slug is read synchronously here so the login storage below is already per shop. The old /app/ and /admin/ addresses are
+// /connect/<slug>/ is the shop's public Connect page and /connect/<slug>/admin/ its Connect editor (same rewrites).
+// The slug is read synchronously here so the login storage below is already per shop, and so the same owner
+// session (per shop) is shared between the dashboard and the Connect editor. The old /app/ and /admin/ addresses are
 // untouched: they still use config.js `slug`, or the host name (see resolveShop).
 const ROUTE_SLUG = (() => {
-  const m = location.pathname.match(/^\/app\/([a-z0-9][a-z0-9-]*)(?:\/admin)?\/?$/i), s = m && m[1].toLowerCase();
+  const m = location.pathname.match(/^\/(?:app|connect)\/([a-z0-9][a-z0-9-]*)(?:\/admin)?\/?$/i), s = m && m[1].toLowerCase();
   if (!s || ['assets', 'admin', 'platform', 'index'].includes(s)) return null;
   CFG.slug = s; return s;
 })();
@@ -13,6 +15,8 @@ const ROUTE_SLUG = (() => {
 let linkSlug = ROUTE_SLUG;
 const appBase = () => linkSlug ? '/app/' + linkSlug + '/' : '/app/';
 const adminBase = () => linkSlug ? '/app/' + linkSlug + '/admin/' : '/admin/';
+const connectBase = () => linkSlug ? '/connect/' + linkSlug + '/' : '/connect/';
+const connectAdminBase = () => linkSlug ? '/connect/' + linkSlug + '/admin/' : '/connect/admin/';
 // Printed or sent links (QR, NFC, WhatsApp) use the public domain from config.js when the shop is path-routed.
 const pubOrigin = () => (linkSlug && CFG.publicOrigin) || location.origin;
 // Browser storage is per shop on a path-routed address, because every shop then shares one origin. Unchanged elsewhere.

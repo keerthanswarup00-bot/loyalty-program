@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e1116">
 <title>Innondu. Come back for one more.</title>
-<meta name="description" content="Stamp cards, a daily scratch card and offers for neighbourhood shops. No new POS, nothing to install.">
+<meta name="description" content="Digital stamp cards, a daily scratch card and one-tap WhatsApp win-backs for neighbourhood shops. Runs in your customers' browser &mdash; no app, no new billing system.">
 <meta property="og:title" content="Innondu. Come back for one more.">
-<meta property="og:description" content="Stamp cards, a daily scratch card and offers for neighbourhood shops. No new POS, nothing to install.">
+<meta property="og:description" content="Digital stamp cards, a daily scratch card and one-tap WhatsApp win-backs for neighbourhood shops. Runs in your customers' browser &mdash; no app, no new billing system.">
 <script>
 // Printed NFC/QR links (#scan=, #join=) and already-installed home-screen apps still open the customer app.
 (function(){try{var h=location.hash;if(/(^|[#&])(scan|join)=/.test(h)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true){location.replace('/app/'+h)}}catch(e){}})();
@@ -26,56 +26,46 @@
 </svg>
 <header>
   <div class="wrap nav">
-    <a class="brand" href="/" aria-label="Innondu home"><svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><circle class="ring" cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 4.2" stroke-linecap="round"/><text x="20" y="25" text-anchor="middle" font-size="13" font-weight="800" fill="currentColor" font-family="Inter,system-ui,sans-serif">+1</text></svg>Innondu</a>
+    <a class="brand" href="/"><svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><circle class="ring" cx="20" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 4.2" stroke-linecap="round"/><text x="20" y="25" text-anchor="middle" font-size="13" font-weight="800" fill="currentColor" font-family="Inter,system-ui,sans-serif">+1</text></svg>Innondu</a>
     <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="site-menu"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <nav id="site-menu" aria-label="Main">
       <a href="/about/">About</a>
+      <a href="/connect/">Connect</a>
       <a href="/contact/">Contact</a>
+      <label class="lang-pick"><span class="sr-only" data-i18n="lang.label">Language</span>
+        <select id="lang-pick" aria-label="Language">
+          <option value="en">English</option>
+          <option value="hi">हिन्दी</option>
+          <option value="kn">ಕನ್ನಡ</option>
+        </select>
+      </label>
       <a class="btn sm accent" href="/contact/">Get Innondu</a>
     </nav>
   </div>
 </header>
 <main id="top">
 
-<section class="hero">
-  <div class="wrap hero-grid">
-    <div>
-      <div class="eyebrow rise" style="--d:0s"><span lang="kn">ಇನ್ನೊಂದು</span> &middot; one more</div>
-      <h1 class="rise" style="--d:.08s">Come back for one more.</h1>
-      <p class="lead rise" style="--d:.16s">Stamps, a daily scratch card and offers for neighbourhood shops. On your customers&rsquo; phones. Nothing to install.</p>
-      <div class="cta rise" style="--d:.24s">
-        <a class="btn accent" href="/contact/">Get Innondu</a>
-        <a class="btn ghost" href="#demo">Try the stamp</a>
-        <a class="btn ghost" href="/dts/">See a shop page</a>
-      </div>
-    </div>
-    <div class="deck rise" style="--d:.3s">
-      <div class="foilcard" id="fc">
-        <div class="prize">
-          <small>Today&rsquo;s scratch card</small>
-          <b id="prizeTxt">10% off your next visit</b>
-          <span>Sample prize</span>
-        </div>
-        <svg class="ghost" aria-hidden="true" viewBox="0 0 40 40"><use href="#mark"/></svg>
-        <canvas id="foil" aria-label="Scratch card. Scratch to reveal the prize."></canvas>
-      </div>
-      <p class="cap" id="cap">Scratch it with your finger or mouse.</p>
-      <div class="row">
-        <button class="btn sm ghost" id="again" hidden>Another card</button>
-        <button class="linkbtn" id="reveal" type="button">Reveal it for me</button>
-      </div>
+<section class="hero hero-owner">
+  <div class="wrap">
+    <div class="eyebrow rise" style="--d:0s"><span lang="kn">ಇನ್ನೊಂದು</span> &middot; one more &middot; for shop owners</div>
+    <h1 class="rise" style="--d:.08s" data-i18n="hero.h1">Turn first-timers into regulars.</h1>
+    <p class="lead rise" style="--d:.16s" data-i18n="hero.lead">Digital stamp cards, a daily scratch card and one-tap WhatsApp win-backs for neighbourhood shops. Runs in your customers&rsquo; browser. No app, no new billing system.</p>
+    <div class="cta rise" style="--d:.24s">
+      <a class="btn accent" href="/contact/" data-i18n="hero.cta1">Set up my shop</a>
+      <a class="btn ghost" data-site-wa="whatsapp.number" data-wa-msg="hero" data-fallback="/contact/" href="/contact/" target="_blank" rel="noopener" data-i18n="hero.cta2">WhatsApp us</a>
+      <a class="linkbtn" href="#demo" data-i18n="hero.cta3">Try the demo</a>
     </div>
   </div>
 </section>
 
 <section id="demo" class="line">
   <div class="wrap demo-wrap">
-    <div class="reveal">
-      <div class="first"><i>First on Innondu</i><span>Renteison</span></div>
-      <h2>Your brand on every screen.</h2>
-      <p class="lead" style="margin-top:14px">Drag the stamp onto the card. Or just tap it.</p>
+    <div class="demo-ctrl reveal">
+      <div class="eyebrow">Live demo</div>
+      <h2 style="margin-top:14px">See what your customers see.</h2>
+      <p class="lead" style="margin-top:14px">Start with your shop: type the name, pick a colour, and the card wears it. Drag the stamp onto the card &mdash; or just tap it. Then scratch today&rsquo;s card, the way a customer at your counter would.</p>
       <div class="ctrl">
-        <label for="brandName">Shop name<input id="brandName" type="text" value="Renteison" maxlength="18" autocomplete="off"></label>
+        <label for="brandName">Shop name<input id="brandName" type="text" value="Your shop" maxlength="18" autocomplete="off"></label>
         <div>
           <div class="eyebrow" style="margin-bottom:10px">Colour</div>
           <div class="sw" id="sw">
@@ -89,14 +79,16 @@
         </div>
       </div>
     </div>
-    <div class="stage reveal">
+    <div class="stage demo-stage reveal">
+      <div class="eyebrow" style="margin-bottom:10px">On their phone</div>
       <div class="phone" id="phone" style="--brand:#3a2ee0">
         <div class="ph">
-          <div class="ph-head"><div class="ph-logo" id="phLogo">R</div><b id="phName">Renteison</b><span>Come back for one more.</span></div>
+          <div class="ph-head"><div class="ph-logo" id="phLogo">Y</div><b id="phName">Your shop</b><span>Come back for one more.</span></div>
           <div class="ph-card" id="phCard">
             <div class="ph-count"><b id="phN">3</b><span>of 8 stamps</span></div>
             <div class="ph-bar"><i id="phBar" style="width:37.5%"></i></div>
             <div class="ph-grid" id="phGrid"></div>
+            <p class="sr-only" id="phLive" role="status" aria-live="polite"></p>
             <p class="ph-rule">8 stamps earn <b>a free reward</b>.</p>
           </div>
           <div class="ph-reward" id="phReward" hidden><small>Reward unlocked. Show this code to staff.</small><b>K7M2QX</b></div>
@@ -106,7 +98,7 @@
         </div>
       </div>
       <div class="stamp-wrap">
-        <button class="stamp" id="stamp" type="button" aria-label="Stamp. Drag it onto the card, or press to stamp."><svg viewBox="0 0 120 230" aria-hidden="true" focusable="false">
+        <button class="stamp" id="stamp" type="button" aria-label="Stamp. Press to stamp, or drag it onto the card."><svg viewBox="0 0 120 230" aria-hidden="true" focusable="false">
   <defs>
     <linearGradient id="sg-h" x1="0" x2="1"><stop offset="0" stop-color="#b9a064"/><stop offset=".28" stop-color="#ead9a2"/><stop offset=".6" stop-color="#d4be84"/><stop offset="1" stop-color="#a98f55"/></linearGradient>
     <linearGradient id="sg-b" x1="0" x2="1"><stop offset="0" stop-color="#a68c52"/><stop offset=".35" stop-color="#d9c58c"/><stop offset="1" stop-color="#9c824a"/></linearGradient>
@@ -129,8 +121,81 @@
   <path d="M60 6 C80 6 90 24 89 52 C88 80 74 100 71 126 C69.5 140 75 150 78 168 Q60 176 42 168 C45 150 50.5 140 49 126 C46 100 32 80 31 52 C30 24 40 6 60 6 Z" fill="url(#sg-l)"/>
   <path d="M44 30 C42 50 46 72 56 96" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="5" stroke-linecap="round"/>
 </svg></button>
-        <span class="stamp-hint" id="stampHint" aria-hidden="true">Drag me onto the card</span>
+        <span class="stamp-hint" id="stampHint" aria-hidden="true">Tap me, or drag me onto the card</span>
       </div>
+    </div>
+    <div class="deck demo-deck reveal">
+      <div class="eyebrow">Daily scratch card</div>
+      <div class="foilcard" id="fc">
+        <div class="prize">
+          <small>Today&rsquo;s scratch card</small>
+          <b id="prizeTxt">10% off your next visit</b>
+          <span>Sample prize</span>
+        </div>
+        <svg class="ghost" aria-hidden="true" viewBox="0 0 40 40"><use href="#mark"/></svg>
+        <canvas id="foil" aria-label="Scratch card. Scratch to reveal the prize."></canvas>
+      </div>
+      <p class="cap" id="cap">Scratch it with your finger or mouse.</p>
+      <div class="row">
+        <button class="btn sm ghost" id="again" hidden>Another card</button>
+        <button class="linkbtn" id="reveal" type="button">Reveal it for me</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="winback" class="line">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Not seen in 10 days</div>
+      <h2>Win back customers who went quiet.</h2>
+      <p class="lead">Someone who came twice and then stopped is still on your customer list. Innondu puts them in front of you, with a message ready to go.</p>
+    </div>
+    <ol class="steps reveal">
+      <li><b>The list</b><p>Customers who have not visited in 10 days, longest gone first.</p></li>
+      <li><b>One tap</b><p>WhatsApp opens with a note you can edit and a unique offer code.</p></li>
+      <li><b>You press send</b><p>Nothing goes out on its own. When they come back and stamp, you see it on your dashboard.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section id="vs" class="line">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">What you use today</div>
+      <h2>A paper punch card and your memory.</h2>
+      <p class="lead">Paper works until the card is left at home or thrown in a drawer. Then the stamps are gone, and nothing on your side tells you the customer stopped coming.</p>
+    </div>
+    <div class="reveal">
+      <table class="compare">
+        <caption class="sr-only">A paper punch card compared with Innondu</caption>
+        <thead>
+          <tr><th scope="col"><span class="sr-only">Task</span></th><th scope="col">Paper card</th><th scope="col">Innondu</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Who stopped coming</th>
+            <td>You would have to remember.</td>
+            <td>A list, longest gone first.</td>
+          </tr>
+          <tr>
+            <th scope="row">Bringing someone back</th>
+            <td>A card in a drawer cannot be messaged.</td>
+            <td>One tap opens WhatsApp with an offer.</td>
+          </tr>
+          <tr>
+            <th scope="row">Changing the reward</th>
+            <td>Print a new stack of cards.</td>
+            <td>Change it in your dashboard, live for everyone.</td>
+          </tr>
+          <tr>
+            <th scope="row">A lost card</th>
+            <td>The stamps go with it.</td>
+            <td>The card stays on their phone.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="compare-line">Paper cannot tell you who stopped coming. One screen can.</p>
     </div>
   </div>
 </section>
@@ -147,6 +212,7 @@
         <li><b>Redeem</b> Type the code, confirm, done.</li>
         <li><b>Offers</b> Your rules, your rewards, changed any time.</li>
       </ul>
+      <p class="counter-note reveal" style="margin-top:18px;color:var(--mut);font-size:.92rem;max-width:46ch" data-i18n="counter.note">At the counter: the customer shows a 6-character code on their phone, your staff type it into the Redeem tab and confirm. Each code works once.</p>
     </div>
     <div class="dash reveal" role="img" aria-label="Sample owner dashboard with member counts and reminders">
       <div class="dash-bar">Renteison <span>Owner</span></div>
@@ -158,11 +224,11 @@
         <div class="stat"><b>41%</b>Repeat</div>
       </div>
       <div class="rem">
-        <h4>Say thanks</h4>
+        <div class="rem-title">Say thanks</div>
         <div class="rem-row"><div><small>Birthday &middot; tomorrow</small><b>Asha K.</b></div><span class="pill">WhatsApp</span></div>
         <div class="rem-row"><div><small>Not seen in 10 days</small><b>Rahul M.</b></div><span class="pill">WhatsApp</span></div>
       </div>
-      <div class="dash-note">Sample data.</div>
+      <div class="dash-note">Sample data shown for demo.</div>
     </div>
   </div>
 </section>
@@ -170,8 +236,8 @@
 <section id="kit" class="line">
   <div class="wrap">
     <div class="sec-head reveal">
-      <div class="eyebrow">Free for every shop</div>
-      <h2>An NFC stamp and a poster, on us.</h2>
+      <div class="eyebrow">What you get</div>
+      <h2>An NFC stamp and a poster.</h2>
     </div>
     <div class="kit">
       <div class="reveal">
@@ -183,7 +249,6 @@
             <g transform="translate(66 64) scale(3.4)" style="color:var(--accent)"><use href="#nfc"/></g>
           </svg>
         </div>
-        <span class="tagline tag-free">Free</span>
         <h3>NFC stamp</h3>
         <p>Tap the phone, get the stamp.</p>
       </div>
@@ -195,7 +260,6 @@
             <small>Innondu &middot; one more</small>
           </div>
         </div>
-        <span class="tagline tag-free">Free</span>
         <h3>Poster with QR</h3>
         <p>For phones without NFC.</p>
       </div>
@@ -223,12 +287,64 @@
   </div>
 </section>
 
+<section id="connect-page" class="line">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Your shop&rsquo;s Connect page</div>
+      <h2>One link for everything your customers need.</h2>
+      <p class="lead">Directions, call and WhatsApp, your menu with prices, and a button to join your loyalty card &mdash; on one fast page that opens straight in a browser. No app to install.</p>
+    </div>
+    <ul class="tick-list reveal">
+      <li><b>At the top</b> Your name, logo, tagline and colour.</li>
+      <li><b>Get in touch</b> Directions, call and WhatsApp buttons.</li>
+      <li><b>Join the card</b> One tap into your loyalty card.</li>
+      <li><b>Your list</b> Menu, services or products, with prices and photos.</li>
+      <li><b>Share</b> Send the link on WhatsApp, or print the QR code for the counter.</li>
+    </ul>
+    <p class="cap reveal" style="margin-top:14px;max-width:60ch">You edit it yourself from your phone, with the same login as your dashboard. The words change with your shop: a cafe gets a menu, a salon gets a price list. <a class="linkbtn" href="/connect/">See what&rsquo;s on the page</a> &rarr;</p>
+  </div>
+</section>
+
+<section id="pricing" class="line">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow" data-i18n="pricing.eyebrow">What it costs</div>
+      <h2 data-i18n="pricing.h2">Plain pricing.</h2>
+      <p class="lead" data-i18n="pricing.lead">One line per question: the app, a subscription, a fee per reward, the hardware, and what happens after the pilot.</p>
+    </div>
+    <div id="pricing-body" class="reveal"></div>
+  </div>
+</section>
+
+<section id="proof" class="line">
+  <div class="wrap reveal" id="proof-body"></div>
+</section>
+
+<section id="founder" class="line">
+  <div class="wrap reveal" id="founder-strip"></div>
+</section>
+
+<section class="line">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow" data-i18n="faq.eyebrow">FAQ</div>
+      <h2 data-i18n="faq.h2">Answers to common questions.</h2>
+      <p class="lead" data-i18n-html="faq.lead">Short and honest. For anything else, <a href="/contact/">ask</a>.</p>
+    </div>
+    <div id="faq-list-home" class="faq-list"></div>
+    <p class="reveal" style="margin-top:18px"><a class="linkbtn" href="/faq/" data-i18n="faq.more">See all questions</a> &rarr;</p>
+  </div>
+</section>
+
 <section class="line">
   <div class="wrap">
     <div class="cta-band reveal">
-      <h2>Your shop could be next.</h2>
-      <p style="opacity:.75;max-width:40ch">Not another POS. A small add-on your customers will actually use.</p>
-      <a class="btn" href="/contact/">Talk to us</a>
+      <h2>The next visit costs less than the first.</h2>
+      <p style="opacity:.75;max-width:52ch">A customer who comes back is revenue you did not have to buy with an ad or a fresh discount. Innondu keeps the reason to return on their phone: no POS, no billing system, nothing to install &mdash; it runs in your customers&rsquo; browser.</p>
+      <div class="band-cta">
+        <a class="btn" href="/contact/">Set up my shop</a>
+        <a class="linkbtn band-link" data-site-wa="whatsapp.number" data-wa-msg="hero" data-fallback="/contact/" href="/contact/" target="_blank" rel="noopener">or WhatsApp us</a>
+      </div>
     </div>
   </div>
 </section>
@@ -236,13 +352,19 @@
 </main>
 <footer>
   <div class="wrap">
-    <div><b>Innondu</b> &middot; <span lang="kn">ಇನ್ನೊಂದು</span> means &ldquo;one more&rdquo;</div>
-    <nav aria-label="Footer"><a href="/about/">About</a><a href="/contact/">Contact</a><a href="/admin/">Owner login</a></nav>
-    <div class="credit">Created by <a data-site-href="founder.portfolio" href="https://aryanswaroop.com" target="_blank" rel="noopener">aryanswaroop.com</a></div>
+    <div class="foot-brand"><b>Innondu</b>, <span data-site-text="founder.city"></span>. Founded by <span data-site-text="founder.name"></span>.</div>
+    <div class="foot-contact">
+      <a data-site-tel="founder.phone" data-fallback="/contact/" href="/contact/">Phone</a>
+      <a data-site-wa="whatsapp.number" data-wa-msg="contact" data-fallback="/contact/" href="/contact/" target="_blank" rel="noopener">WhatsApp</a>
+      <a data-site-mail="founder.email" data-fallback="/contact/" href="/contact/">Email</a>
+    </div>
+    <nav aria-label="Footer"><a href="/about/">About</a><a href="/connect/">Connect</a><a href="/contact/">Contact</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/admin/">Owner login</a></nav>
   </div>
 </footer>
 <script src="/assets/site.config.js?v=1"></script>
+<script src="/assets/i18n.js?v=1"></script>
 <script src="/assets/site.js?v=2"></script>
+<script src="/assets/faq-home.js?v=1"></script>
 <script src="/assets/home.js?v=2"></script>
 </body>
 </html>

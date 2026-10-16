@@ -772,7 +772,7 @@ function joinV() {
   <label class="lb">Password <span>(6+ characters)</span></label>${pwField('w', 'new-password')}
   <label class="lb">Birthday <span>(optional)</span></label><input id="b" type="date"><p class="hint">Your birthday offer is valid only on that day each year.</p>
   ${biz.ref_on ? `<label class="lb">Friend's code <span>(optional, for ${esc(biz.ref_offer)})</span></label><input id="rf" autocapitalize="characters" placeholder="e.g. ASHA-4K7">` : ''}
-  <label class="chk"><input type="checkbox" id="cons"><span>I agree to receive offers and to ${esc(biz.name)} storing my details.</span></label>
+  <label class="chk"><input type="checkbox" id="cons"><span>I agree to receive offers and to ${esc(biz.name)} storing my details as described in the <a href="/privacy/">Privacy Policy</a>.</span></label>
   <button class="btn" data-go onclick="reg(this)">Join</button>
   <p class="note" style="text-align:center;margin:14px 0 0"><a href="#" onclick="introShow=true;render();return false">How it works</a></p>`;
 }

@@ -15,8 +15,9 @@ window.SITE = {
     name: 'Aryan Swaroop',
     role: 'TODO_FOUNDER_ROLE',                  // e.g. Founder
     city: 'TODO_FOUNDER_CITY',
-    bio: 'TODO_FOUNDER_BIO',                    // one or two sentences, plain
     photo: 'TODO_FOUNDER_PHOTO',                // path to the photo, e.g. '/assets/aryan.jpg'
+    why: 'TODO_FOUNDER_WHY',                    // one short, honest paragraph: why Innondu exists
+    work: 'TODO_FOUNDER_WORK',                  // what you do, e.g. design and creative strategy
     phone: 'TODO_FOUNDER_PHONE',                // display number, any format
     email: 'TODO_FOUNDER_EMAIL',
     whatsapp: 'TODO_FOUNDER_WHATSAPP',          // international, digits only: 919876543210
@@ -25,25 +26,51 @@ window.SITE = {
 
   whatsapp: {
     number: 'TODO_WHATSAPP_NUMBER',             // international, digits only: 919876543210
-    message: 'Hi, I would like to know more about Innondu.'
+    message: 'Hi, I would like to know more about Innondu.',
+    messages: {
+      hero: 'TODO_WA_MSG_HERO',                  // hero call to action
+      contact: 'TODO_WA_MSG_CONTACT',            // contact page
+      pilot: 'TODO_WA_MSG_PILOT',                // pilot block
+      connect: 'TODO_WA_MSG_CONNECT',            // connect page
+      float: 'TODO_WA_MSG_FLOAT'                 // floating button
+    }
   },
 
   pricing: {
-    pilot: 'TODO_PRICING_PILOT',                // free pilot period: how long, what it includes
-    price: 'TODO_PRICING_PRICE',                // price after the pilot. Do not guess.
-    included: 'TODO_PRICING_INCLUDED',          // what the price includes
-    notIncluded: 'TODO_PRICING_NOT_INCLUDED'    // what it does not include
+    software: 'TODO_PRICING_SOFTWARE',            // Is the app itself free to use?
+    subscription: 'TODO_PRICING_SUBSCRIPTION',    // Monthly / yearly subscription, or none?
+    perRedemption: 'TODO_PRICING_PER_REDEMPTION', // Any fee when a reward is redeemed?
+    hardware: 'TODO_PRICING_HARDWARE',            // What the NFC stamp and the poster cost
+    pilot: 'TODO_PRICING_PILOT',                  // Free pilot: how long, what it includes
+    afterPilot: 'TODO_PRICING_AFTER_PILOT',       // What happens when the pilot ends
+    included: 'TODO_PRICING_INCLUDED',            // What the price includes
+    notIncluded: 'TODO_PRICING_NOT_INCLUDED'      // What it does not
   },
 
-  // Real shops only, with written consent. Empty until you have them — a section renders
-  // nothing while this is empty. Shape: { name, area, quote, metric, photo, consent }
+  // Real shops only, with written consent. While empty (or without any consent:true entry) the
+  // proof section shows the free-pilot block instead. Shape: { name, area, quote, metric, photo, consent }
   proof: [],
+
+  faq: {
+    identity: 'TODO_FAQ_IDENTITY',
+    abuse: 'TODO_FAQ_ABUSE',
+    ownership: 'TODO_FAQ_OWNERSHIP',
+    setup: 'TODO_FAQ_SETUP',
+    cost: 'TODO_FAQ_COST',
+    compat: 'TODO_FAQ_COMPAT',
+    install: 'TODO_FAQ_INSTALL',
+    exit: 'TODO_FAQ_EXIT',
+    connect: 'TODO_FAQ_CONNECT',              // What is the Connect page, and how is it different from the stamp card?
+    connectEdit: 'TODO_FAQ_CONNECT_EDIT',      // Who edits the Connect page, and how?
+    connectNfc: 'TODO_FAQ_CONNECT_NFC'         // Does the NFC keychain cost extra, and is it included?
+  },
 
   legal: {
     entity: 'TODO_LEGAL_ENTITY',                // business / legal entity name
-    grievanceEmail: 'TODO_GRIEVANCE_EMAIL',     // grievance redressal contact
+    grievanceEmail: 'TODO_GRIEVANCE_EMAIL',     // grievance / data-deletion contact
+    jurisdiction: 'TODO_LEGAL_JURISDICTION',    // e.g. Karnataka, India
     lastUpdated: 'TODO_LEGAL_LAST_UPDATED'      // e.g. '16 October 2026'
-  }
+  },
 };
 
 // Dev-only warning: list every placeholder still set, but only when the page is not served

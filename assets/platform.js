@@ -71,7 +71,7 @@ const openShop = (slug, tab) => { if (tab) ptab = tab; sel = null; go('#shop=' +
 const setTab = t => { ptab = t; if (t == 'customers' && !cust) loadCust(true); if (t == 'access' && !shopAudit) loadShopAudit(); render() };
 
 // ---------- shop creation, domains, owner ----------
-const RESERVED = ['www', 'app', 'admin', 'api', 'platform', 'mail', 'static', 'assets', 'about', 'contact', 'docs', 'support', 'status', 'index'];
+const RESERVED = ['www', 'app', 'admin', 'api', 'platform', 'mail', 'static', 'assets', 'about', 'contact', 'privacy', 'terms', 'docs', 'support', 'status', 'index'];
 const slugify = t => String(t || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 36).replace(/-+$/, '');
 const genPw = () => { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', a = new Uint32Array(12); crypto.getRandomValues(a); return Array.from(a, x => c[x % c.length]).join('') };
 let slugTouched = false;

@@ -34,6 +34,223 @@
 })();
 
 (function () {
+  // Pricing and proof sections, rendered from window.SITE. A value still marked TODO_ shows as a
+  // visible placeholder, never as a claim. The proof grid is never empty or invented: without a
+  // consented shop it becomes the "run a free pilot" block instead.
+  var cfg = window.SITE || {};
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function isTodo(v) { return typeof v === 'string' && /TODO_/.test(v); }
+  function tr(key, fallback) { return (window.I18N && window.I18N.t(key, fallback)) || fallback; }
+  function val(v, where) {
+    return isTodo(v)
+      ? '<span class="tbd"><span class="tbd-tag">' + esc(tr('pricing.placeholderTag', 'Placeholder')) + '</span> set <code>pricing.' + esc(where) + '</code> in assets/site.config.js</span>'
+      : esc(v);
+  }
+  var wa = window.INNONDU && window.INNONDU.WHATSAPP;
+  var waHref = wa && wa.length >= 10
+    ? 'https://wa.me/' + wa + '?text=' + encodeURIComponent(window.INNONDU.WHATSAPP_MESSAGE || '')
+    : '/contact/';
+
+  // Pricing: one row per question an owner asks. Re-rendered when the language changes.
+  function renderPricing() {
+    var pBody = document.getElementById('pricing-body');
+    if (!pBody) return;
+    var price = cfg.pricing || {};
+    var rows = [
+      [tr('pricing.software', 'The app itself'), 'software', price.software],
+      [tr('pricing.subscription', 'Subscription'), 'subscription', price.subscription],
+      [tr('pricing.perRedemption', 'Each reward redeemed'), 'perRedemption', price.perRedemption],
+      [tr('pricing.hardware', 'NFC stamp and poster'), 'hardware', price.hardware],
+      [tr('pricing.pilot', 'The free pilot'), 'pilot', price.pilot],
+      [tr('pricing.afterPilot', 'After the pilot'), 'afterPilot', price.afterPilot],
+      [tr('pricing.included', 'Included'), 'included', price.included],
+      [tr('pricing.notIncluded', 'Not included'), 'notIncluded', price.notIncluded]
+    ].filter(function (r) { return r[2] !== undefined && r[2] !== null && r[2] !== ''; });
+    var draft = rows.some(function (r) { return isTodo(r[2]); });
+    pBody.innerHTML =
+      (draft ? '<p class="tbd-note" role="status"><b>Draft.</b> ' + esc(tr('pricing.draftNote', 'Rows marked Placeholder are still to be decided.')) + '</p>' : '') +
+      '<dl class="price-list">' + rows.map(function (r) {
+        return '<div class="price-row"><dt>' + esc(r[0]) + '</dt><dd>' + val(r[2], r[1]) + '</dd></div>';
+      }).join('') + '</dl>';
+  }
+  renderPricing();
+  document.addEventListener('i18n:change', renderPricing);
+
+  // Proof: consented shops only.
+  var sBody = document.getElementById('proof-body');
+  if (sBody) {
+    var shops = (cfg.proof || []).filter(function (s) { return s && s.consent === true; });
+    if (shops.length) {
+      sBody.innerHTML =
+        '<div class="sec-head"><div class="eyebrow">From real shops</div><h2>Shops using Innondu.</h2></div>' +
+        '<div class="proof-grid">' + shops.map(function (s) {
+          return '<figure class="proof-card">' +
+            (s.photo ? '<img src="' + esc(s.photo) + '" alt="" loading="lazy" decoding="async" width="480" height="320">' : '') +
+            '<blockquote>&ldquo;' + esc(s.quote) + '&rdquo;</blockquote>' +
+            '<figcaption><b>' + esc(s.name) + '</b>' +
+            (s.area ? '<span>' + esc(s.area) + '</span>' : '') +
+            (s.metric ? '<span class="metric">' + esc(s.metric) + '</span>' : '') +
+            '</figcaption></figure>';
+        }).join('') + '</div>';
+    } else {
+      var pilot = cfg.pricing || {};
+      sBody.innerHTML =
+        '<div class="sec-head"><div class="eyebrow">Free pilot</div><h2>Run a free pilot with your shop.</h2>' +
+        '<p class="lead">No shops are listed here yet &mdash; we are running pilots first. Try Innondu with your regulars for a fixed period, see who comes back, then decide.</p></div>' +
+        '<dl class="price-list">' +
+        '<div class="price-row"><dt>The pilot</dt><dd>' + val(pilot.pilot, 'pilot') + '</dd></div>' +
+        '<div class="price-row"><dt>After the pilot</dt><dd>' + val(pilot.afterPilot, 'afterPilot') + '</dd></div>' +
+        '</dl>' +
+        '<div class="pilot-cta"><a class="btn accent" data-site-wa="whatsapp.number" data-wa-msg="pilot" data-fallback="/contact/" href="/contact/" target="_blank" rel="noopener">WhatsApp us</a>' +
+        '<a class="linkbtn" href="/contact/">Or set up my shop</a></div>';
+    }
+  }
+})();
+
+(function () {
+  // Founder page, footer text and structured data, all read from window.SITE. Real values are
+  // injected; anything still marked TODO_ shows a small inline placeholder instead of shipping a
+  // wrong claim. The JSON-LD is built from the same values, so it cannot drift from the page.
+  var cfg = window.SITE || {};
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function readPath(path) {
+    return path.split('.').reduce(function (o, k) { return (o || {})[k]; }, cfg);
+  }
+  function isTodo(v) { return typeof v === 'string' && /TODO_/.test(v); }
+  function real(v) { return typeof v === 'string' && !isTodo(v) && v.trim() ? v.trim() : ''; }
+  function phMark(path) {
+    var key = path.split('.').pop();
+    return '<span class="tbd-ph" title="Set ' + esc(path) + ' in assets/site.config.js">[' + esc(key) + ']</span>';
+  }
+  function textOf(path) {
+    var v = readPath(path);
+    return real(v) ? esc(v) : phMark(path);
+  }
+  function digits(v) { return String(v || '').replace(/\D/g, ''); }
+  function abs(p) {
+    if (!p) return '';
+    if (/^https?:/i.test(p)) return p;
+    return (cfg.siteUrl || '').replace(/\/$/, '') + (p.charAt(0) === '/' ? p : '/' + p);
+  }
+
+  // Inline text from config (footer, founder's paragraphs).
+  [].forEach.call(document.querySelectorAll('[data-site-text]'), function (el) {
+    el.innerHTML = textOf(el.getAttribute('data-site-text'));
+  });
+
+  // tel: and mailto: links. Until the value is set, the link falls back to the contact page.
+  [].forEach.call(document.querySelectorAll('[data-site-tel]'), function (a) {
+    var path = a.getAttribute('data-site-tel'), v = readPath(path), d = digits(v);
+    if (real(v)) { a.textContent = v; a.href = d.length >= 4 ? 'tel:' + d : (a.getAttribute('data-fallback') || '/contact/'); }
+    else { a.innerHTML = phMark(path); a.href = a.getAttribute('data-fallback') || '/contact/'; }
+  });
+  [].forEach.call(document.querySelectorAll('[data-site-mail]'), function (a) {
+    var path = a.getAttribute('data-site-mail'), v = readPath(path);
+    if (real(v)) { a.textContent = v; a.href = 'mailto:' + v; }
+    else { a.innerHTML = phMark(path); a.href = a.getAttribute('data-fallback') || '/contact/'; }
+  });
+
+  // A WhatsApp link for a chosen number (defaults to the site-wide one).
+  [].forEach.call(document.querySelectorAll('[data-site-wa]'), function (a) {
+    var path = a.getAttribute('data-site-wa') || 'whatsapp.number';
+    var d = digits(readPath(path));
+    if (d.length >= 10) {
+      var msgs = (cfg.whatsapp && cfg.whatsapp.messages) || {};
+      var key = a.getAttribute('data-wa-msg') || 'contact';
+      var msgTxt = (msgs[key] && real(msgs[key])) ? msgs[key] : ((cfg.whatsapp && cfg.whatsapp.message) || '');
+      a.href = 'https://wa.me/' + d + '?text=' + encodeURIComponent(msgTxt);
+    } else a.href = a.getAttribute('data-fallback') || '/contact/';
+  });
+
+  // Founder photo: the real image, or a labelled placeholder box.
+  var photoBox = document.getElementById('founder-photo-box');
+  if (photoBox) {
+    var photo = readPath('founder.photo'), nm = real(readPath('founder.name')) || 'Founder';
+    photoBox.innerHTML = real(photo)
+      ? '<img src="' + esc(photo) + '" alt="' + esc(nm) + '" loading="lazy" decoding="async">'
+      : '<span class="founder-photo-ph">' + phMark('founder.photo') + '</span>';
+  }
+
+  var f = cfg.founder || {};
+
+  // Homepage strip: "Who is behind this".
+  var strip = document.getElementById('founder-strip');
+  if (strip) {
+    var line = real(f.name) ? esc(f.name) : phMark('founder.name');
+    line += ' &middot; ' + (real(f.role) ? esc(f.role) : phMark('founder.role'));
+    line += ' &middot; ' + (real(f.city) ? esc(f.city) : phMark('founder.city'));
+    strip.innerHTML =
+      '<div class="founder-strip-in">' +
+        (real(f.photo) ? '<img src="' + esc(f.photo) + '" alt="' + esc(real(f.name) || 'Founder') + '" loading="lazy" decoding="async" width="168" height="168">' : '') +
+        '<div><div class="eyebrow">Who is behind this</div>' +
+        '<p class="founder-line">' + line + '</p>' +
+        '<p class="lead">' + textOf('founder.why') + '</p>' +
+        '<a class="linkbtn" href="/about/">More about ' + esc(real(f.name) || 'Innondu') + '</a></div>' +
+      '</div>';
+  }
+
+  // Person + Organization JSON-LD, from the config (only real values, never a placeholder).
+  var ld = document.getElementById('ld-founder');
+  if (ld) {
+    var site = (cfg.siteUrl || '').replace(/\/$/, '');
+    var person = { '@type': 'Person' };
+    if (real(f.name)) person.name = real(f.name);
+    if (real(f.role)) person.jobTitle = real(f.role);
+    if (real(f.city)) person.address = { '@type': 'PostalAddress', addressLocality: real(f.city) };
+    if (real(f.photo)) person.image = abs(real(f.photo));
+    if (real(f.email)) person.email = real(f.email);
+    if (real(f.phone)) person.telephone = real(f.phone);
+    if (real(f.portfolio)) person.url = real(f.portfolio);
+    var org = { '@type': 'Organization', '@id': site + '/#org', name: cfg.siteName || 'Innondu', url: site + '/' };
+    var graph = [];
+    if (person.name) { person['@id'] = site + '/#founder'; org.founder = { '@id': site + '/#founder' }; graph.push(person); }
+    graph.push(org);
+    ld.textContent = JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 2);
+  }
+
+  // Legal pages carry a visible draft note; it should always show (placeholder values still
+  // render inline as [brackets] via the data-site-text fillers above).
+  var draft = document.querySelector('[data-draft-note]');
+  if (draft) draft.hidden = false;
+
+  // Floating WhatsApp button on mobile only; small, dismissible, and not shown over forms/inputs.
+  try {
+    if (!window.matchMedia('(max-width: 640px)').matches) return;
+    if (document.querySelector('form')) return;
+    if (document.querySelector('input, textarea, select, [contenteditable="true"]')) return;
+    var fw = document.getElementById('wa-float');
+    if (fw) return;
+    var d = digits(readPath('whatsapp.number'));
+    if (d.length < 10) return;
+    var msgs = (cfg.whatsapp && cfg.whatsapp.messages) || {};
+    var msgTxt = (msgs.float && real(msgs.float)) ? msgs.float : ((cfg.whatsapp && cfg.whatsapp.message) || '');
+    var a = document.createElement('a');
+    a.id = 'wa-float';
+    a.className = 'wa-float';
+    a.href = 'https://wa.me/' + d + '?text=' + encodeURIComponent(msgTxt);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.setAttribute('aria-label', 'Message us on WhatsApp');
+    a.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12.004 2C6.486 2 2 6.486 2 12c0 2.117.557 4.093 1.528 5.77L2 22l4.34-1.507A9.97 9.97 0 0 0 12.004 22C17.522 22 22 17.514 22 12S17.522 2 12.004 2z" fill="currentColor"/></svg>';
+    var close = document.createElement('button');
+    close.className = 'wa-float-close';
+    close.setAttribute('aria-label', 'Close WhatsApp');
+    close.textContent = '×';
+    close.onclick = function (e) { e.preventDefault(); a.remove(); };
+    a.appendChild(close);
+    document.body.appendChild(a);
+  } catch (e) {}
+})();
+
+(function () {
   // Fade sections in as they scroll into view. Without IntersectionObserver or with reduced motion, everything just shows.
   var els = [].slice.call(document.querySelectorAll('.reveal'));
   var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;

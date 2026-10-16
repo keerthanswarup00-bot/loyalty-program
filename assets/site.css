@@ -2,8 +2,6 @@
 :root{
   --bg:#0e1116; --surface:#161a21; --fg:#f2f4f8; --mut:#9aa3b2; --line:#232830;
   --accent:#8b7bff; --accent-fg:#0e1116; --soft:#1e1c3f; --good:#4ade80;
-  /* aliases used by the About page's page-specific styles */
-  --card:var(--surface); --tx:var(--fg); --ac:var(--accent);
   --display:'Instrument Serif','Noto Sans Kannada',Georgia,serif;
   --body:'Inter','Noto Sans Kannada',system-ui,sans-serif;
   --mono:'Inter','Noto Sans Kannada',system-ui,sans-serif;
@@ -25,7 +23,7 @@ p{margin:0}
 a{color:inherit}
 :focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:6px}
 
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 24px;border-radius:999px;border:1.5px solid var(--fg);background:var(--fg);color:var(--bg);font:600 .98rem/1 var(--body);text-decoration:none;cursor:pointer;transition:transform .2s ease,opacity .2s ease}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 24px;border-radius:999px;border:1.5px solid var(--fg);background:var(--fg);color:var(--bg);font:600 .98rem/1 var(--body);text-decoration:none;cursor:pointer;white-space:nowrap;transition:transform .2s ease,opacity .2s ease}
 .btn:hover{transform:translateY(-1px)}
 .btn.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
 .btn.sm{padding:10px 18px;font-size:.9rem}
@@ -48,9 +46,30 @@ footer .wrap{display:flex;gap:14px 40px;justify-content:space-between;flex-wrap:
 footer b{font-family:var(--display);color:var(--fg)}
 footer nav{display:flex;gap:20px;flex-wrap:wrap}
 footer a{text-decoration:none}footer a:hover{color:var(--fg)}
-.credit{width:100%;text-align:center;padding-top:22px;margin-top:4px;border-top:1px solid var(--line);font-size:.84rem}
-.credit a{color:var(--accent)}
-.credit a:hover{color:var(--fg)}
+.foot-brand{flex:1 1 260px}
+.foot-contact{display:flex;gap:20px;flex-wrap:wrap}
+.foot-contact a{color:var(--mut)}
+@media (max-width:600px){footer .wrap{flex-direction:column;align-items:flex-start;gap:16px}}
+
+/* floating WhatsApp (mobile only) */
+.wa-float{position:fixed;right:12px;bottom:12px;z-index:40;width:52px;height:52px;border-radius:999px;background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 20px 40px -20px rgba(18,140,126,.9);text-decoration:none;border:2px solid rgba(255,255,255,.25);transition:transform .2s ease,opacity .2s ease}
+.wa-float:hover{transform:translateY(-1px);opacity:.95}
+.wa-float svg{width:26px;height:26px;display:block}
+.wa-float-close{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:var(--fg);color:var(--bg);font-weight:700;line-height:1;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.35);font-size:14px}
+
+/* inline placeholder mark, used where a config value is still TODO_ */
+.tbd-ph{color:var(--accent);border-bottom:1px dashed currentColor;font-weight:600;white-space:nowrap}
+
+/* legal / long-form pages */
+.doc{max-width:760px}
+.doc h2{font-size:clamp(1.35rem,2.6vw,1.85rem);margin-top:clamp(34px,5vw,52px)}
+.doc h2:first-of-type{margin-top:0}
+.doc p,.doc li{color:var(--mut)}
+.doc p{margin-top:14px;max-width:64ch}
+.doc ul{margin:14px 0 0;padding-left:1.2em;display:grid;gap:8px}
+.doc b,.doc strong{color:var(--fg)}
+.doc a{color:var(--accent)}
+.doc-meta{margin-top:clamp(34px,5vw,52px);padding-top:20px;border-top:1px solid var(--line);font-size:.9rem}
 
 .cta-band{background:var(--fg);color:var(--bg);border-radius:28px;padding:clamp(32px,6vw,72px);display:grid;gap:22px;justify-items:start}
 .cta-band .btn{background:var(--bg);color:var(--fg);border-color:var(--bg)}
@@ -65,4 +84,8 @@ footer a{text-decoration:none}footer a:hover{color:var(--fg)}
   .nav nav a:not(.btn){padding:12px 4px}
   .nav nav .btn{margin-top:8px}
 }
-.btn{white-space:nowrap}
+
+/* language picker (owner-facing sections) */
+.lang-pick{display:inline-flex;align-items:center}
+.lang-pick select{appearance:none;-webkit-appearance:none;padding:8px 26px 8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;color:var(--mut);font:600 .88rem/1 var(--body);cursor:pointer}
+.lang-pick select:hover{color:var(--fg);border-color:var(--mut)}
