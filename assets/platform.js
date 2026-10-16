@@ -18,6 +18,9 @@ const custUrl = r => (shopHost(r) ? 'https://' + shopHost(r) : location.origin) 
 const missingSql = e => /function|schema cache|does not exist|relation/i.test(String(e && e.message || e)) ? 'Run the latest supabase/schema.sql in Supabase first.' : null;
 const bad = e => toast(missingSql(e) || nice(e));
 const R = slug => rows.find(r => r.slug == slug);
+// Every shop a login owns. One login can run several shops; used to warn before edits that would
+// affect them all (the platform_set_owner SQL keeps multi-shop logins safe — see 2026-10-16).
+const ownerShops = r => r.owner_email ? rows.filter(x => x.owner_email === r.owner_email) : [];
 const num = n => (+n || 0).toLocaleString();
 const AUD = { support_open: 'Opened the dashboard as owner', settings_changed: 'Changed settings', view_customers: 'Viewed the customer list', export: 'Exported data', delete_customer: 'Deleted a customer', reset_customer_password: 'Reset a customer password', import_customers: 'Imported customers', domain_added: 'Added a domain', domain_removed: 'Removed a domain', owner_changed: 'Changed the owner', shop_created: 'Created the shop', owner_reset_email: 'Sent the owner a password reset email', owner_email_changed: 'Changed the owner login email', owner_temp_password: 'Set a temporary owner password', note: 'Note' };
 
@@ -103,15 +106,20 @@ async function ownerReset() {
   toast('Reset link sent to ' + r.owner_email);
 }
 // Change the owner's login email. Accepts "null" so the SQL function leaves the current password alone.
+// If the login runs several shops, the SQL moves only this shop to the new account (create it in
+// Supabase first); it never rewrites the shared login's email.
 async function changeOwnerEmail(slug, btn) {
   const r = R(slug); if (!r) return;
-  const email = (prompt('New login email for the owner of "' + r.name + '"' + (r.owner_email ? ' (currently ' + r.owner_email + ')' : '') + ':') || '').trim().toLowerCase();
+  const oc = ownerShops(r).length;
+  const extra = oc > 1 ? '\n\nThis login runs ' + oc + ' shops. Entering a new email moves only "' + r.name + '" to that account; the other shops stay on the current login. The new account must already exist in Supabase.' : '';
+  const email = (prompt('New login email for the owner of "' + r.name + '"' + (r.owner_email ? ' (currently ' + r.owner_email + ')' : '') + extra + ':') || '').trim().toLowerCase();
   if (!email) return;
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('Enter a valid email');
   if (btn) btn.disabled = true;
   try {
-    await rpc(sb, 'platform_set_owner', { p_business: r.id, p_email: email, p_password: null });
-    await reload(); shopAudit = null; render(); toast('Owner email changed to ' + email);
+    const res = await rpc(sb, 'platform_set_owner', { p_business: r.id, p_email: email, p_password: null });
+    await reload(); shopAudit = null; render();
+    toast(res && res.reassigned ? 'Moved ' + r.name + ' to ' + email : 'Owner email changed to ' + email);
     rpc(sb, 'platform_log', { p_slug: slug, p_action: 'owner_email_changed' }).catch(() => { });
   } catch (e) { if (btn) btn.disabled = false; bad(e) }
 }
@@ -125,6 +133,8 @@ function genPw(n) {
 async function tempOwnerPassword(slug, btn) {
   const r = R(slug); if (!r) return;
   if (!r.owner_email) return toast('This shop has no owner account');
+  const oc = ownerShops(r).length;
+  if (oc > 1) return toast('This login runs ' + oc + ' shops, so its password cannot be reset here. Use Change email to move this shop to another account, or reset the password in Supabase.');
   if (!confirm('Create a temporary password for the owner of "' + r.name + '"?\n\nThis signs the owner out everywhere. Copy the password and hand it over; it is shown only once.')) return;
   if (btn) btn.disabled = true;
   try {
@@ -141,7 +151,7 @@ function showPwModal(shop, email, pw) {
   el.className = 'modal-wrap';
   el.innerHTML = `<div class="modal-card" role="dialog" aria-modal="true" aria-label="Temporary owner password">
     <h2>Temporary password</h2>
-    <p class="sub">Hand this to the owner of <b>${esc(shop)}</b>. Shown once, and it signs them out everywhere.</p>
+    <p class="sub">Hand this to the owner of <b>${esc(shop)}</b>. This login runs only this shop. Shown once, and it signs them out everywhere.</p>
     <div style="font:600 20px/1.4 'JetBrains Mono',ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0;word-break:break-all">${esc(pw)}</div>
     <p class="sub" style="margin:0">Login: <b>${esc(email)}</b><br>${esc(location.origin + '/admin/')}</p>
     <div class="row" style="margin-top:16px"><button class="btn sm" style="margin-top:0" onclick="copyText('${esc(pw)}','Password copied')">Copy password</button><button class="btn sm alt" style="margin-top:0" onclick="closeModal()">Done</button></div>
@@ -238,10 +248,11 @@ function listV() {
   }[fsort];
   const L = rows.filter(r => !q || (r.name + ' ' + r.slug + ' ' + (r.owner_email || '') + ' ' + (r.domains || []).join(' ') + ' ' + r.contact).toLowerCase().includes(q)).sort(S);
   const tot = k => rows.reduce((a, r) => a + (+r[k] || 0), 0), need = rows.filter(r => score(r) > 0).length;
-  const row = r => `<div class="pf-row" role="button" tabindex="0" onclick="openShop('${esc(r.slug)}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openShop('${esc(r.slug)}')}"><i class="pf-dot" style="background:${esc(HEX6.test(r.color) ? r.color : '#8a4b2a')}"></i>
-    <span class="pf-main"><b>${esc(r.name)}</b><small>${esc(r.slug)} · ${esc(r.owner_email || 'no owner')}</small><span class="pf-chips">${chips(r)}</span></span>
+  const row = r => { const oc = ownerShops(r).length; return `<div class="pf-row" role="button" tabindex="0" onclick="openShop('${esc(r.slug)}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openShop('${esc(r.slug)}')}"><i class="pf-dot" style="background:${esc(HEX6.test(r.color) ? r.color : '#8a4b2a')}"></i>
+    <span class="pf-main"><b>${esc(r.name)}</b><small>${esc(r.slug)} · ${esc(r.owner_email || 'no owner')}${oc > 1 ? ' · ' + oc + ' shops' : ''}</small><span class="pf-chips">${chips(r)}</span></span>
     <span class="pf-nums"><span><b>${num(r.members)}</b>customers</span><span><b>${num(r.stamps_7d)}</b>stamps 7d</span><span><b>${esc(ago(r.last_stamp))}</b>last stamp</span></span>
     <button class="btn sm alt" onclick="event.stopPropagation();openShop('${esc(r.slug)}','access')">Owner</button></div>`;
+  }
   return topV() + `<div class="card"><div class="a-sts"><div class="a-st"><b>${rows.length}</b><span>Shops</span></div><div class="a-st"><b>${num(tot('members'))}</b><span>Customers</span></div><div class="a-st"><b>${num(tot('stamps_30d'))}</b><span>Stamps, 30 days</span></div><div class="a-st"><b>${need}</b><span>Need a look</span></div></div></div>
     <div class="card"><h2 style="font-size:17px">Find a customer in any shop</h2><input id="gq" placeholder="Phone number or name" value="${esc(gq)}" oninput="gFind()" autocomplete="off"><div id="gres">${gV()}</div></div>
     <div class="pf-bar"><input id="fq" placeholder="Search shops, owners, domains" value="${esc(fq)}" oninput="fq=this.value;drawList()"><select onchange="fsort=this.value;drawList()" aria-label="Sort">${[['attention', 'Needs attention'], ['active', 'Most active'], ['newest', 'Newest'], ['name', 'Name']].map(o => `<option value="${o[0]}"${fsort == o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select><button class="btn sm" onclick="go('#new')">+ New shop</button></div>
@@ -273,14 +284,15 @@ function shopV() {
     <div class="pf-head"><i class="pf-dot big" style="background:${esc(HEX6.test(r.color) ? r.color : '#8a4b2a')}"></i><div><h2 style="margin:0">${esc(r.name)}</h2><div class="mut sm">${esc(r.slug)}${shopHost(r) ? ' · ' + esc(shopHost(r)) : ''}</div></div></div>
     <div class="pf-chips" style="margin:8px 0 12px">${chips(r)}</div>
     <div class="row"><a class="btn sm" href="${ad}" target="_blank" rel="noopener">Open dashboard as owner</a><a class="btn sm alt" href="${ad}&tab=ins" target="_blank" rel="noopener">Insights</a><a class="btn sm alt" href="/admin/" target="_blank" rel="noopener">Open admin</a><a class="btn sm alt" href="${esc(cu)}" target="_blank" rel="noopener">Customer app</a></div>
-    <p class="hint">Open admin goes to /admin/ — sign in with this shop's owner email (${esc(r.owner_email || 'not set')}). Opening the dashboard as owner lets you change anything the owner can (offers, brand, menu, customers) and is logged. The owner sees it in their dashboard.</p></div>
+    <p class="hint">Open admin goes to /admin/ — sign in with this shop's owner email (${esc(r.owner_email || 'not set')}${ownerShops(r).length > 1 ? ', a login that runs ' + ownerShops(r).length + ' shops' : ''}). Opening the dashboard as owner lets you change anything the owner can (offers, brand, menu, customers) and is logged. The owner sees it in their dashboard.</p></div>
     <div class="tabs">${tabs}</div>` + (ptab == 'customers' ? custV(r) : ptab == 'access' ? accessV(r) : overviewV(r));
 }
 function overviewV(r) {
   const st = (b, l) => `<div class="a-st"><b>${b}</b><span>${l}</span></div>`;
   const rate = r.coupons_30d ? Math.round(r.redeemed_30d / r.coupons_30d * 100) + '%' : '—';
+  const oc = ownerShops(r).length;
   return `<div class="card"><div class="a-sts">${st(num(r.members), 'Customers')}${st('+' + num(r.new_members_7d), 'New, 7 days')}${st(num(r.stamps_7d), 'Stamps, 7 days')}${st(num(r.stamps_30d), 'Stamps, 30 days')}${st(num(r.coupons_30d), 'Coupons issued, 30d')}${st(num(r.redeemed_30d) + ' (' + rate + ')', 'Redeemed, 30d')}</div>
-    <p class="sub" style="margin-top:14px">Owner <b>${esc(r.owner_email || 'none')}</b> · last stamp ${esc(ago(r.last_stamp))} · created ${esc(fd(r.created_at))}<br>Card: ${r.need} stamps for "${esc(r.reward)}" · time zone ${esc(r.tz)}</p></div>
+    <p class="sub" style="margin-top:14px">Owner <b>${esc(r.owner_email || 'none')}</b>${oc > 1 ? ' <span class="mut">(this login runs ' + oc + ' shops)</span>' : ''} · last stamp ${esc(ago(r.last_stamp))} · created ${esc(fd(r.created_at))}<br>Card: ${r.need} stamps for "${esc(r.reward)}" · time zone ${esc(r.tz)}</p></div>
     <div class="card"><h2 style="font-size:17px">Your notes <span class="mut sm">(private, never shown to the shop)</span></h2>
       <label class="lb">Plan</label><input id="mpl" value="${esc(r.plan)}" placeholder="e.g. Monthly 999">
       <label class="lb">Contact</label><input id="mct" value="${esc(r.contact)}" placeholder="Name, phone, best time to call">
@@ -302,9 +314,11 @@ function custV(r) {
 }
 function accessV(r) {
   const dom = (r.domains || []).map(d => `<span class="chip">${esc(d)} <button class="lnk" aria-label="Remove ${esc(d)}" onclick="rmDomain('${esc(d)}')">×</button></span>`).join('');
-  return `<div class="card"><h2 style="font-size:17px">Owner</h2><p class="sub">${esc(r.owner_email || 'No owner set')}</p>
+  const oc = ownerShops(r).length;
+  const shops = ownerShops(r).map(x => x.name).join(', ');
+  return `<div class="card"><h2 style="font-size:17px">Owner</h2><p class="sub">${esc(r.owner_email || 'No owner set')}${oc > 1 ? ' <span class="mut">· this login runs ' + oc + ' shops (' + esc(shops) + ')</span>' : r.owner_email ? ' <span class="mut">· this login runs only this shop</span>' : ''}</p>
       <div class="row"><button class="btn sm alt" onclick="setOwner()">Change owner</button><button class="btn sm alt" onclick="changeOwnerEmail('${esc(r.slug)}',this)">Change email</button><button class="btn sm alt" onclick="tempOwnerPassword('${esc(r.slug)}',this)">Temp password</button>${r.owner_email ? '<button class="btn sm alt" onclick="ownerReset()">Email password reset link</button>' : ''}</div>
-      <p class="hint">Change owner hands the shop to another existing account. Change email sets the owner's login email. Temp password signs the owner out everywhere and shows a password you hand over once. Email password reset link sends the owner a reset email instead.</p></div>
+      <p class="hint">Change owner hands the whole shop to another existing account. Change email sets the login email; if that login runs several shops, only this shop moves to the new account. Temp password signs the owner out everywhere and shows a password you hand over once — it is available only when the login runs this shop alone. Email password reset link sends the owner a reset email instead.</p></div>
     <div class="card"><h2 style="font-size:17px">Domains</h2><div class="chips" style="margin:0 0 8px">${dom || '<span class="hint">None. ' + (shopHost(r) ? 'Opens at ' + esc(shopHost(r)) + '.' : 'Only reachable through the deployment address.') + '</span>'}</div>
       <div class="row"><input id="dmn" placeholder="rewards.theirshop.com" autocapitalize="off"><button class="btn sm alt" onclick="addDomain()">Add domain</button></div>
       <p class="hint">Also add the domain in Vercel and point its DNS there (see README).</p></div>
