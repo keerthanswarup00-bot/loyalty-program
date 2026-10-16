@@ -66,7 +66,7 @@
     ctx.fillStyle = '#667078'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = '800 ' + (26 * dpr) + 'px "Bricolage Grotesque",system-ui,sans-serif';
     ctx.fillText('SCRATCH HERE', w / 2, h / 2);
-    ctx.font = '500 ' + (11 * dpr) + 'px "JetBrains Mono",monospace';
+    ctx.font = '500 ' + (11 * dpr) + 'px Inter,system-ui,sans-serif';
     ctx.fillText('INNONDU  +1', w / 2, h / 2 + 30 * dpr);
   }
   function pt(e) { var r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; }

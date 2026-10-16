@@ -55,27 +55,45 @@
     ? 'https://wa.me/' + wa + '?text=' + encodeURIComponent(window.INNONDU.WHATSAPP_MESSAGE || '')
     : '/contact/';
 
-  // Pricing: one row per question an owner asks. Re-rendered when the language changes.
+  // Pricing: three plans, same features, different commitment. Re-rendered when the language changes.
+  var PLAN_ICONS = {
+    monthly: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="9" r="5.5"/><circle cx="24" cy="9" r="1.6"/><path d="M24 14.5V44M24 32l-8-7M24 32l8-7"/><circle cx="14" cy="23" r="3"/><circle cx="34" cy="23" r="3"/></svg>',
+    '1y': '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="9" r="5.5"/><circle cx="24" cy="9" r="1.6"/><path d="M24 14.5V44M24 36l-9-8M24 36l9-8M24 27l-9-8M24 27l9-8"/><circle cx="13" cy="26" r="3"/><circle cx="35" cy="26" r="3"/><circle cx="13" cy="17" r="3"/><circle cx="35" cy="17" r="3"/></svg>',
+    '2y': '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="9" r="5.5"/><circle cx="24" cy="9" r="1.6"/><path d="M24 14.5V44M24 38l-11-7M24 38l11-7M24 30l-9-7M24 30l9-7M24 22l-6-5M24 22l6-5"/><circle cx="11" cy="32" r="3"/><circle cx="37" cy="32" r="3"/><circle cx="13" cy="24" r="3"/><circle cx="35" cy="24" r="3"/><circle cx="17" cy="19" r="2.6"/><circle cx="31" cy="19" r="2.6"/></svg>'
+  };
+  var TICK = '<svg class="pl-tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  function rupees(n) { return '\u20b9' + Math.round(n).toLocaleString('en-IN'); }
+  function termLabel(m) { return m === 1 ? tr('pricing.billedMonthly', 'billed monthly') : tr('pricing.billedEvery', 'billed every') + ' ' + (m === 12 ? tr('pricing.year', 'year') : (m / 12) + ' ' + tr('pricing.years', 'years')); }
   function renderPricing() {
     var pBody = document.getElementById('pricing-body');
     if (!pBody) return;
-    var price = cfg.pricing || {};
-    var rows = [
-      [tr('pricing.software', 'The app itself'), 'software', price.software],
-      [tr('pricing.subscription', 'Subscription'), 'subscription', price.subscription],
-      [tr('pricing.perRedemption', 'Each reward redeemed'), 'perRedemption', price.perRedemption],
-      [tr('pricing.hardware', 'NFC stamp and poster'), 'hardware', price.hardware],
-      [tr('pricing.pilot', 'The free pilot'), 'pilot', price.pilot],
-      [tr('pricing.afterPilot', 'After the pilot'), 'afterPilot', price.afterPilot],
-      [tr('pricing.included', 'Included'), 'included', price.included],
-      [tr('pricing.notIncluded', 'Not included'), 'notIncluded', price.notIncluded]
-    ].filter(function (r) { return r[2] !== undefined && r[2] !== null && r[2] !== ''; });
-    var draft = rows.some(function (r) { return isTodo(r[2]); });
-    pBody.innerHTML =
-      (draft ? '<p class="tbd-note" role="status"><b>Draft.</b> ' + esc(tr('pricing.draftNote', 'Rows marked Placeholder are still to be decided.')) + '</p>' : '') +
-      '<dl class="price-list">' + rows.map(function (r) {
-        return '<div class="price-row"><dt>' + esc(r[0]) + '</dt><dd>' + val(r[2], r[1]) + '</dd></div>';
-      }).join('') + '</dl>';
+    var plans = ((cfg.pricing || {}).plans || []).filter(function (p) { return p && p.perMonth > 0 && p.months > 0; });
+    if (!plans.length) { pBody.innerHTML = ''; return; }
+    var base = plans[0].perMonth * 1; // first plan is the month-to-month reference
+    var features = [
+      tr('pricing.f1', 'Digital stamp card, in your customers\u2019 browser'),
+      tr('pricing.f2', 'Daily scratch card'),
+      tr('pricing.f3', 'One-tap WhatsApp win-backs'),
+      tr('pricing.f4', 'Your own Connect page with QR code'),
+      tr('pricing.f5', 'Owner dashboard on your phone')
+    ];
+    pBody.innerHTML = '<div class="plans">' + plans.map(function (p, i) {
+      var total = p.perMonth * p.months, full = base * p.months, saved = full - total, pct = Math.round((1 - p.perMonth / base) * 100);
+      var isBase = i === 0;
+      var perks = features;
+      var head = tr('pricing.everything', 'Everything you need:');
+      var note = isBase ? tr('pricing.noCommit', 'No commitment') : tr('pricing.save', 'Save') + ' ' + rupees(saved) + ' ' + tr('pricing.vsMonthly', 'compared with paying monthly');
+      var cta = p.recommended ? 'btn accent' : 'btn ghost';
+      return '<article class="plan' + (p.recommended ? ' rec' : '') + '">' +
+        '<div class="plan-top">' + '<div class="plan-ic">' + (PLAN_ICONS[p.id] || '') + '</div>' +
+          (p.recommended ? '<span class="plan-badge">' + esc(tr('pricing.recommended', 'Recommended')) + '</span>' : (pct > 0 ? '<span class="plan-save">' + esc(tr('pricing.save', 'Save')) + ' ' + pct + '%</span>' : '')) + '</div>' +
+        '<h3>' + esc(p.name) + '</h3><p class="plan-tag">' + esc(p.tagline) + '</p>' +
+        '<div class="plan-price"><div><b>' + rupees(p.perMonth) + '</b><span> / ' + esc(tr('pricing.perMonth', 'month')) + '</span></div><small>' + esc(termLabel(p.months)) + (p.months > 1 ? ' \u00b7 ' + rupees(total) : '') + '</small></div>' +
+        '<a class="' + cta + ' plan-cta" href="/contact/?plan=' + encodeURIComponent(p.id) + '">' + esc(tr('pricing.cta', 'Get started')) + ' \u2014 ' + esc(p.name) + '</a>' +
+        '<p class="plan-note">' + esc(note) + '</p>' +
+        '<div class="plan-list"><p>' + esc(head) + '</p><ul>' + perks.map(function (f) { return '<li>' + TICK + '<span>' + esc(f) + '</span></li>'; }).join('') + '</ul></div>' +
+        '</article>';
+    }).join('') + '</div><p class="plans-foot">' + esc(tr('pricing.foot', 'Prices are per shop, in Indian rupees. Every plan has the same features; a longer term only lowers the monthly price.')) + '</p>';
   }
   renderPricing();
   document.addEventListener('i18n:change', renderPricing);

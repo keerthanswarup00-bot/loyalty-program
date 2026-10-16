@@ -1,5 +1,12 @@
 // Contact form: sends the message to Supabase through the submit_lead function (no library, one fetch).
 (function () {
+  // Pricing buttons link here as /contact/?plan=1y: pre-fill the message so the owner does not retype it.
+  try {
+    var plans = ((window.SITE || {}).pricing || {}).plans || [];
+    var pm = new URLSearchParams(location.search).get('plan'), box = document.getElementById('cm');
+    var hit = plans.filter(function (p) { return p.id === pm; })[0];
+    if (box && hit && !box.value) box.value = 'I would like the ' + hit.name + ' plan (\u20b9' + hit.perMonth + ' a month).';
+  } catch (e) {}
   var cfg = window.LK || {}, f = document.getElementById('cf'), msg = document.getElementById('cmsg'), btn = document.getElementById('cb');
   var wa = (window.INNONDU && window.INNONDU.WHATSAPP || '').replace(/\D/g, '');
   if (wa) {

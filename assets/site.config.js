@@ -37,6 +37,13 @@ window.SITE = {
   },
 
   pricing: {
+    // The three plans on the homepage. perMonth is in rupees; months is the commitment. Totals and
+    // "save X%" are calculated from these two numbers, so the page cannot disagree with itself.
+    plans: [
+      { id: 'monthly', name: 'Monthly',  tagline: 'No commitment',               perMonth: 699, months: 1 },
+      { id: '1y',      name: '1 Year',   tagline: 'Best for most shops',         perMonth: 499, months: 12, recommended: true },
+      { id: '2y',      name: '2 Years',  tagline: 'Lowest price per month',      perMonth: 449, months: 24 }
+    ],
     software: 'TODO_PRICING_SOFTWARE',            // Is the app itself free to use?
     subscription: 'TODO_PRICING_SUBSCRIPTION',    // Monthly / yearly subscription, or none?
     perRedemption: 'TODO_PRICING_PER_REDEMPTION', // Any fee when a reward is redeemed?
