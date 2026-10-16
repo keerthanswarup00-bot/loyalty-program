@@ -78,11 +78,18 @@ async function enter() {
 }
 async function load() {
   try {
-    // The shop comes from the signed-in owner, not the URL. RLS returns only this owner's shops
-    // (a platform admin sees all; support mode narrows to the requested one).
+    // The shop comes from the signed-in owner, not the URL. We filter by owner_id = this login
+    // (on top of RLS), so /admin only ever lists shops this account owns. Platform admins open
+    // other shops through /platform, or /admin/?as=<slug> (support mode) — never through the picker.
     const target = support || SUPPORT_AS;
     let qr = sb.from('businesses').select('*').order('created_at');
     if (target) qr = qr.eq('slug', target);
+    else {
+      const { data: { session } } = await sb.auth.getSession();
+      const uid = session && session.user ? session.user.id : null;
+      if (!uid) { shops = null; biz = null; M = []; V = []; MSG = []; return }
+      qr = qr.eq('owner_id', uid);
+    }
     const { data, error } = await qr;
     if (error) throw error;
     let list = data || [];
@@ -158,23 +165,31 @@ const pickerV = () => `<div class="a-card" style="margin-top:40px"><h2>Choose a 
 function pickShop(slug) { try { sessionStorage.setItem(SHOP_KEY, slug) } catch (e) { } load().then(render) }
 
 // ---------- shell: hero + bottom nav ----------
+const TITLES = { h: 'Home', c: 'Customers', r: 'Redeem', b: 'Message', o: 'Offers', p: 'Menu', m: 'More' };
 function hero() {
   const home = tab == 'h' && !ov;
   const n = M.length, tot = M.reduce((a, u) => a + u.total, 0), rw = M.reduce((a, u) => a + u.redeemed, 0);
   const rep = n ? Math.round(M.filter(u => u.total >= 2).length / n * 100) : 0;
   const chip = (ic, val, lab) => `<div class="a-chip">${ic}<b>${val}</b><span>${lab}</span></div>`;
+  const title = ov == 'ins' ? 'Insights' : (TITLES[tab] || 'Home');
+  const initial = esc((((me || biz.name || '?').trim())[0] || '?').toUpperCase());
   return `<header class="a-hero${home ? '' : ' slim'}"><div class="a-in">
     ${support ? `<div class="a-support"><b>Support mode</b> · you are managing this shop for its owner. Changes are logged. <a href="/platform/#shop=${esc(support)}">Back to platform</a></div>` : ''}
     <div class="a-brand"><div class="a-logo">${mark(biz)}</div><div class="a-bt"><b>${esc(biz.name)}</b><span>Owner dashboard</span></div>
     <button class="a-ib" aria-label="Refresh" onclick="refresh()">${AI.refresh}</button></div>
+    <div class="a-tbar"><h1 class="a-ptitle">${esc(title)}</h1>
+    <div class="a-tacts"><button class="a-ib" aria-label="Refresh" onclick="refresh()">${AI.refresh}</button><button class="a-ib a-ib-acct" aria-label="Account settings" onclick="go('m')">${initial}</button></div></div>
     ${home ? `<div class="a-chips">${chip(AI.trend, tot, 'Stamps')}${chip(AI.users, n, 'Members')}${chip(AI.gift, rw, 'Rewards')}${chip(AI.repeat, rep + '%', 'Repeat')}</div>` : ''}
   </div></header>`;
 }
 function nav() {
   const T = [['h', 'Home', AI.home], ['c', 'Customers', AI.users], ['r', 'Redeem', AI.ok], ['b', 'Message', AI.send], ['o', 'Offers', AI.gift], ['p', 'Menu', AI.menu], ['m', 'More', AI.cog]];
-  const btns = T.map(t => `<button class="${tab == t[0] ? 'on' : ''}" onclick="go('${t[0]}')"><i>${t[2]}</i><span>${t[1]}</span></button>`).join('');
-  const sb = `<aside class="a-sidebar"><div class="a-side-brand"><div class="a-side-logo">${mark(biz)}</div><div class="a-side-bt"><b>${esc(biz.name)}</b><span>Owner dashboard</span></div></div><nav class="a-side-nav">${btns}</nav></aside>`;
-  return `${sb}<nav class="a-nav"><div class="a-in">${btns}</div></nav>`;
+  const item = t => `<button class="${tab == t[0] ? 'on' : ''}" onclick="go('${t[0]}')"><i>${t[2]}</i><span>${t[1]}</span></button>`;
+  const btns = T.map(item).join('');
+  const side = `<aside class="a-sidebar"><div class="a-side-brand"><div class="a-side-logo">${mark(biz)}</div><div class="a-side-bt"><b>${esc(biz.name)}</b><span>Owner dashboard</span></div></div>
+    <nav class="a-side-nav">${T.slice(0, 4).map(item).join('')}</nav><div class="a-side-div"></div><nav class="a-side-nav">${T.slice(4).map(item).join('')}</nav>
+    <div class="a-side-foot"><span class="a-side-mail" title="${esc(me || '')}">${esc(me || '')}</span><button class="a-side-out" onclick="out()">Sign out</button></div></aside>`;
+  return `${side}<nav class="a-nav"><div class="a-in">${btns}</div></nav>`;
 }
 
 // ---------- HOME ----------
@@ -220,7 +235,7 @@ function comeBack() {
     const msg = r.m ? daysAgo(new Date(r.m.created_at)) : -1;
     return `<div class="of"><div><b>${esc(r.u.name)}</b><div class="mut sm">${r.u.last_stamp ? 'Last seen ' + r.d + ' days ago · ' + r.u.stamps + ' stamps' : 'Joined ' + r.d + ' days ago, no visit yet'}</div></div>${msg >= 0 && msg < WB_COOLDOWN ? `<span class="mut sm">Messaged ${msg}d ago</span>` : `<button class="btn sm" onclick="winback('${r.u.id}',this)"${offer ? '' : ' disabled'}>Message</button>`}</div>`;
   };
-  return `<div class="a-card"><div class="a-h"><h2>Come back</h2></div>
+  return `<div class="a-card a-cb"><div class="a-h"><h2>Come back</h2></div>
     <p class="sub">Customers who haven't visited in ${biz.lapsed_days}+ days.</p>
     <p class="hint">Messaged ${recent.length} in the last 30 days · ${recent.filter(m => m.returned_at).length} came back</p>
     ${offer ? '' : '<p class="hint">Set a win-back offer in Settings to start messaging.</p>'}
@@ -255,18 +270,19 @@ function homeV() {
       + stat(d.filter(x => x.used_at).length, 'Daily coupons redeemed');
   }
   const kit = 'theme' in biz && !(biz.theme || {}).done && M.length < 5 ? `<div class="a-card"><div class="a-h"><h2>Make it yours</h2><span class="a-tag">2 minutes</span></div><p class="sub">Add your logo and pick your colour so the app looks like your shop.</p><button class="btn sm" onclick="go('m')">Set up branding</button></div>` : '';
-  return kit + `<div class="a-card"><div class="a-h"><h2>Sign-up QR</h2><span class="a-tag">At the counter</span></div>
+  const qr = `<div class="a-card a-qr"><div class="a-h"><h2>Sign-up QR</h2><span class="a-tag">At the counter</span></div>
     <p class="sub">Print this for the counter or door. Scanning it lets a new customer join and get their first stamp — it cannot add any later stamps.</p>
     <label class="lb">Sign-up link</label><input readonly class="ro" value="${esc(joinUrl())}" onclick="this.select()">
     <div class="qr" id="qrb"></div>
     <div class="row"><button class="btn sm" onclick="dlQR()">Download</button><button class="btn sm alt" onclick="cpL('j')">Copy link</button><button class="btn sm alt" onclick="regen('join_token')">Regenerate</button></div>
-    <p class="hint">Later stamps come from the NFC tag set up in More → QR/NFC setup and migration.</p></div>
-  <div class="a-quick"><button onclick="go('c'); q=''; render(); setTimeout(()=>{const s=document.querySelector('.a-bar2 input'); if(s)s.focus()},50)">${AI.users}<b>Find Customer</b><span>Search by name or phone</span></button><button onclick="go('c'); q=''; render(); setTimeout(()=>{const s=document.querySelector('.a-bar2 input'); if(s)s.focus()},50)">${AI.stamp}<b>Collect Stamp</b><span>Locate customer to stamp</span></button><button onclick="go('r')">${AI.ok}<b>Redeem Coupon</b><span>Enter a customer's code</span></button><button onclick="go('o')">${AI.gift}<b>Offers</b><span>Stamps, welcome, birthday</span></button></div>
-  ${comeBack()}
-  <div class="a-card"><h2>At a glance</h2><div class="a-sts">${stat(M.filter(u => u.last_stamp && new Date(u.last_stamp) > wk).length, 'Active, 7 days')}${stat(redeemedToday, 'Redeemed today')}${stat(M.reduce((a, u) => a + heldOffers(u), 0), 'Coupons out')}${stat(ending, 'Cards ending')}${stat(M.filter(u => sameMonth(u.bday)).length, 'Birthdays this month')}${daily}</div></div>
-  ${chartV()}
-  ${reminders()}
-  <div class="a-card"><div class="a-h"><h2>Latest sign-ups</h2><button class="lnk" onclick="go('c')">See all</button></div>${M.slice(0, 5).map(u => `<div class="of"><b>${esc(u.name)}</b><span class="mut sm">${esc(u.phone)} · ${fd(u.joined)}</span></div>`).join('') || '<p class="a-empty">No members yet. Print the QR above and put it at the counter.</p>'}</div>`;
+    <p class="hint">Later stamps come from the NFC tag set up in More → QR/NFC setup and migration.</p></div>`;
+  const quick = `<div class="a-quick a-qa"><button onclick="go('c'); q=''; render(); setTimeout(()=>{const s=document.querySelector('.a-bar2 input'); if(s)s.focus()},50)">${AI.users}<b>Find Customer</b><span>Search by name or phone</span></button><button onclick="go('c'); q=''; render(); setTimeout(()=>{const s=document.querySelector('.a-bar2 input'); if(s)s.focus()},50)">${AI.stamp}<b>Collect Stamp</b><span>Locate customer to stamp</span></button><button onclick="go('r')">${AI.ok}<b>Redeem Coupon</b><span>Enter a customer's code</span></button><button onclick="go('o')">${AI.gift}<b>Offers</b><span>Stamps, welcome, birthday</span></button></div>`;
+  const glance = `<div class="a-card a-gl"><h2>At a glance</h2><div class="a-sts">${stat(M.filter(u => u.last_stamp && new Date(u.last_stamp) > wk).length, 'Active, 7 days')}${stat(redeemedToday, 'Redeemed today')}${stat(M.reduce((a, u) => a + heldOffers(u), 0), 'Coupons out')}${stat(ending, 'Cards ending')}${stat(M.filter(u => sameMonth(u.bday)).length, 'Birthdays this month')}${daily}</div></div>`;
+  const latest = `<div class="a-card"><div class="a-h"><h2>Latest sign-ups</h2><button class="lnk" onclick="go('c')">See all</button></div>${M.slice(0, 5).map(u => `<div class="of"><b>${esc(u.name)}</b><span class="mut sm">${esc(u.phone)} · ${fd(u.joined)}</span></div>`).join('') || '<p class="a-empty">No members yet. Print the QR above and put it at the counter.</p>'}</div>`;
+  // >=1100px the a-home wrappers become two columns (Come back + At a glance | quick actions + QR card).
+  // Below that they are display:contents so the cards flow in one column in the mobile order below.
+  return kit + `<div class="a-home"><div class="a-home-l">${comeBack()}${glance}</div><div class="a-home-r">${quick}${qr}</div></div>`
+    + chartV() + reminders() + latest;
 }
 
 // ---------- CUSTOMERS ----------

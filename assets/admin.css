@@ -15,6 +15,7 @@ body.a-body{min-height:100dvh;display:flex;flex-direction:column}
 .a-chip{background:color-mix(in srgb,var(--on-brand,#fff) 13%,transparent);border-radius:18px;padding:12px 4px 10px;text-align:center}
 .a-chip svg{width:18px;height:18px;opacity:.8;display:block;margin:0 auto 6px}
 .a-chip b{display:block;font:600 22px/1.1 var(--f-d,Fraunces,Georgia,serif)}.a-chip span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.75;margin-top:3px}
+.a-tbar{display:none}   /* desktop top bar (page title + refresh/account); the brand row above covers phones */
 
 /* bottom nav (phone) */
 .a-nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -36,6 +37,12 @@ body.a-body{min-height:100dvh;display:flex;flex-direction:column}
 .a-quick svg{width:26px;height:26px;color:var(--brand-t,var(--brand));margin-bottom:8px}.a-quick b{font-size:15px}.a-quick span{font-size:12.5px;color:var(--mut)}
 .a-sts{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:12px}
 .a-st{background:var(--bg);border-radius:14px;padding:12px}.a-st b{display:block;font:600 24px/1.1 var(--f-d,Fraunces,Georgia,serif)}.a-st span{font-size:12px;color:var(--mut)}
+
+/* Home: phones/tablets flow in one column. These four cards keep their mobile order
+   (QR, quick actions, Come back, At a glance) and become two columns at >=1100px. */
+.a-home{display:flex;flex-direction:column}
+.a-home-l,.a-home-r{display:contents}
+.a-home .a-qr{order:1}.a-home .a-qa{order:2}.a-home .a-cb{order:3}.a-home .a-gl{order:4}
 
 /* customers */
 .a-bar2{display:flex;gap:10px;margin-bottom:12px;align-items:center}.a-bar2 input{flex:1}.a-bar2 .btn.sm{flex:none}.a-bar2 select{flex:none;max-width:150px}
@@ -149,31 +156,71 @@ a.btn.sm{display:inline-block}
   .a-facts{grid-template-columns:repeat(4,1fr)}
 }
 
-/* Responsive: laptop/desktop */
-@media (min-width:1280px){
-  body.a-body.signed{display:flex;min-height:100dvh}
-  .a-shell{display:flex;align-items:flex-start;gap:0;max-width:1400px;margin:0 auto;padding:0 32px}
-  main.a{flex:1;max-width:1100px;margin:0;padding:28px 0 calc(32px + env(safe-area-inset-bottom,0px))}
-  .a-in{max-width:1400px;padding:0 32px}
-  body:has(.a-nav) .toast{bottom:calc(24px + env(safe-area-inset-bottom,0px))}
-  .a-hero{border-radius:0 0 34px 0}
-  .a-hero.slim{border-radius:0 0 26px 0}
+/* Responsive: desktop (>=900px) — sticky sidebar app shell, left-aligned content, plain top bar */
+@media (min-width:900px){
+  .a-shell{display:grid;grid-template-columns:240px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);min-height:100dvh}
+  #top{display:contents}
   .a-nav{display:none}
-  .a-sidebar{display:flex;flex-direction:column;width:280px;min-height:100dvh;position:sticky;top:0;background:var(--card);border-right:1px solid var(--line);z-index:5;padding:calc(18px + env(safe-area-inset-top,0px)) 12px 24px}
-  .a-side-brand{display:flex;align-items:center;gap:12px;padding:6px 10px 18px}
-  .a-side-logo{width:42px;height:42px;border-radius:12px;background:color-mix(in srgb,var(--brand) 14%,transparent);color:var(--brand-t,var(--brand));display:grid;place-items:center;font:600 18px var(--f-d,Fraunces,Georgia,serif);overflow:hidden;flex:none}
+  body:has(.a-nav) .toast{bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+
+  /* sidebar: the brand lives here (and only here) on desktop, grouped nav, account at the foot */
+  .a-sidebar{display:flex;flex-direction:column;grid-column:1;grid-row:1/-1;position:sticky;top:0;align-self:start;height:100dvh;overflow-y:auto;background:var(--card);border-right:1px solid var(--line);z-index:5;padding:calc(16px + env(safe-area-inset-top,0px)) 10px 16px}
+  .a-side-brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+  .a-side-logo{width:40px;height:40px;border-radius:12px;background:color-mix(in srgb,var(--brand) 14%,transparent);color:var(--brand-t,var(--brand));display:grid;place-items:center;font:600 18px var(--f-d,Fraunces,Georgia,serif);overflow:hidden;flex:none}
   .a-side-logo img{width:100%;height:100%;object-fit:cover}
-  .a-side-bt b{display:block;font:600 16px/1.2 var(--f-d,Fraunces,Georgia,serif)}
-  .a-side-bt span{font-size:12px;color:var(--mut)}
-  .a-side-nav{display:flex;flex-direction:column;gap:4px}
-  .a-side-nav button{border:0;background:none;color:var(--tx);padding:10px 10px;border-radius:12px;text-align:left;display:flex;align-items:center;gap:10px;cursor:pointer;font:500 14px Inter,system-ui,sans-serif}
-  .a-side-nav button i{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;color:var(--mut)}
-  .a-side-nav button svg{width:18px;height:18px}
-  .a-side-nav button.on{background:color-mix(in srgb,var(--brand) 10%,transparent);color:var(--brand-t,var(--brand));font-weight:600}
-  .a-side-nav button.on i{color:var(--brand-t,var(--brand));background:color-mix(in srgb,var(--brand) 14%,transparent)}
+  .a-side-bt{min-width:0}.a-side-bt b{display:block;font:600 15px/1.2 var(--f-d,Fraunces,Georgia,serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .a-side-bt span{font-size:11.5px;color:var(--mut)}
+  .a-side-nav{display:flex;flex-direction:column;gap:8px;padding:0 6px}
+  .a-side-nav button{height:40px;border:0;background:none;color:var(--tx);padding:0 10px;border-radius:10px;text-align:left;display:flex;align-items:center;gap:10px;cursor:pointer;font:500 14px Inter,system-ui,sans-serif}
+  .a-side-nav button i{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--mut);flex:none}
+  .a-side-nav button svg{width:17px;height:17px}
   .a-side-nav button:hover{background:color-mix(in srgb,var(--brand) 6%,transparent)}
-  .a-quick{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .a-side-nav button.on{background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand-t,var(--brand));font-weight:600;box-shadow:inset 3px 0 0 var(--brand)}
+  .a-side-nav button.on i{color:var(--brand-t,var(--brand));background:color-mix(in srgb,var(--brand) 16%,transparent)}
+  .a-side-div{height:1px;background:var(--line);margin:14px 10px}
+  .a-side-foot{margin-top:auto;padding:12px 6px 0;border-top:1px solid var(--line)}
+  .a-side-mail{display:block;padding:0 10px 6px;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .a-side-out{width:100%;border:0;background:none;color:var(--mut);text-align:left;padding:8px 10px;border-radius:10px;cursor:pointer;font:500 13px Inter,system-ui,sans-serif}
+  .a-side-out:hover{background:color-mix(in srgb,var(--brand) 6%,transparent);color:var(--tx)}
+
+  /* the brown hero becomes a plain top bar: page title left, refresh + account right */
+  .a-hero{grid-column:2;grid-row:1;background:none;color:var(--tx);border-radius:0;box-shadow:none;padding:0;border-bottom:1px solid var(--line)}
+  .a-hero.slim{padding-bottom:0}
+  .a-in{max-width:1200px;margin:0;padding:0 32px}
+  .a-brand{display:none}
+  .a-tbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 0 4px}
+  .a-hero.slim .a-tbar{padding-bottom:16px}
+  .a-ptitle{margin:0;font:600 24px/1.2 var(--f-d,Fraunces,Georgia,serif)}
+  .a-tacts{display:flex;align-items:center;gap:8px}
+  .a-ib{border:1px solid var(--line);background:var(--card);color:var(--tx)}
+  .a-ib-acct{font:600 14px Inter,system-ui,sans-serif}
+
+  /* stat chips read as four cards across the content width */
+  .a-chips{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:16px 0}
+  .a-chip{background:var(--card);border:1px solid var(--line);border-radius:16px;color:var(--tx);text-align:left;padding:14px 16px}
+  .a-chip svg{margin:0 0 10px;opacity:1;color:var(--brand-t,var(--brand))}
+  .a-chip b{font-size:26px}
+  .a-chip span{color:var(--mut);opacity:1;margin-top:4px}
+
+  /* content: table-style cards span the width, forms cap at 720px, never a centred column */
+  #app{grid-column:2;grid-row:2}
+  .a-shell main.a{max-width:1200px;margin:0;padding:24px 32px calc(40px + env(safe-area-inset-bottom,0px))}
+  .a-shell main.a>.a-card:has(>.lb,>.btn,>textarea){max-width:720px}
+  .a-shell main.a>.btn{max-width:720px}
+
+  .a-quick{grid-template-columns:repeat(2,minmax(0,1fr))}   /* 2x2: four tiles, never 3+1 */
   .a-sts{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
   .a-facts{grid-template-columns:repeat(5,1fr)}
   .a-bar2 .a-bar2-group{display:flex;gap:8px;flex:1}
+
+  /* compact sign-up QR card (bottom-right of Home) */
+  .a-qr .lb,.a-qr .ro,.a-qr .hint{display:none}
+  .a-qr .sub{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .a-qr .qr{max-width:160px;margin:12px 0 14px}
+}
+
+/* Responsive: wide laptop — Home becomes two columns (Come back + At a glance | quick actions + QR) */
+@media (min-width:1100px){
+  .a-home{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:24px;align-items:start}
+  .a-home-l,.a-home-r{display:block}
 }
