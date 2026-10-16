@@ -12,6 +12,9 @@
 .hero{padding-block:clamp(40px,7vw,84px) clamp(48px,8vw,96px)}
 .hero.sm{padding-block:clamp(48px,8vw,96px) clamp(32px,5vw,56px)}
 .hero.sm h1{font-size:clamp(2.2rem,5.2vw,3.8rem);margin-block:16px 18px}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,72px);align-items:center}
+.hero-grid>*{min-width:0}
+@media (max-width:860px){.hero-grid{grid-template-columns:1fr}}
 .hero h1{margin-block:18px 22px}
 .hero .cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:30px}
 .hero .linkbtn{font-size:1rem;color:var(--mut)}
@@ -41,10 +44,9 @@
 .linkbtn{background:none;border:0;padding:0;color:var(--mut);font:inherit;font-size:.9rem;text-decoration:underline;cursor:pointer}
 
 /* demo: shop customizer, the customer's card, and the scratch card */
-.demo-wrap{display:grid;grid-template-columns:1fr 360px;grid-template-areas:"ctrl stage" "deck stage";gap:clamp(24px,4vw,44px) clamp(32px,6vw,88px);align-items:center}
+.demo-wrap{display:grid;grid-template-columns:1fr 360px;grid-template-areas:"ctrl stage";gap:clamp(24px,4vw,44px) clamp(32px,6vw,88px);align-items:center}
 .demo-wrap>*{min-width:0}
 .demo-ctrl{grid-area:ctrl}
-.demo-deck{grid-area:deck}
 .demo-stage{grid-area:stage}
 .ctrl{display:grid;gap:18px;margin-top:28px;max-width:420px}
 .ctrl label{display:grid;gap:8px;font:500 .78rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
@@ -99,7 +101,7 @@
 .stamp-hint::after{content:"";position:absolute;right:34px;top:-5px;width:10px;height:10px;background:var(--fg);transform:rotate(45deg);border-radius:2px}
 .stamp-hint.gone{opacity:0;transform:translateY(6px);animation:none}
 @keyframes nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(-5px)}}
-@media (max-width:860px){.demo-wrap{grid-template-columns:1fr;grid-template-areas:"ctrl" "stage" "deck"}.stage{justify-self:start}}
+@media (max-width:860px){.demo-wrap{grid-template-columns:1fr;grid-template-areas:"ctrl" "stage"}.stage{justify-self:start}}
 @media (max-width:420px){.stamp-wrap{right:-4px}}
 
 /* win back */
@@ -245,3 +247,4 @@
 
 .consent{margin:0;font-size:.85rem;color:var(--mut)}
 .consent a{color:var(--accent)}
+.deck [hidden]{display:none}
