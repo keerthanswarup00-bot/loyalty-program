@@ -51,12 +51,21 @@ window.SITE = {
   // proof section shows the free-pilot block instead. Shape: { name, area, quote, metric, photo, consent }
   proof: [],
 
+  faq: {
+    identity: 'TODO_FAQ_IDENTITY',
+    abuse: 'TODO_FAQ_ABUSE',
+    ownership: 'TODO_FAQ_OWNERSHIP',
+    setup: 'TODO_FAQ_SETUP',
+    cost: 'TODO_FAQ_COST',
+    compat: 'TODO_FAQ_COMPAT',
+    install: 'TODO_FAQ_INSTALL',
+    exit: 'TODO_FAQ_EXIT'
+  },
+
   legal: {
-    entity: 'TODO_LEGAL_ENTITY',                // business / legal entity name
-    grievanceEmail: 'TODO_GRIEVANCE_EMAIL',     // grievance / data-deletion contact
-    jurisdiction: 'TODO_LEGAL_JURISDICTION',    // e.g. Karnataka, India
-    lastUpdated: 'TODO_LEGAL_LAST_UPDATED'      // e.g. '16 October 2026'
-  }
+    compat: 'TODO_FAQ_COMPAT',
+    install: 'TODO_FAQ_INSTALL'
+  },
 };
 
 // Dev-only warning: list every placeholder still set, but only when the page is not served
