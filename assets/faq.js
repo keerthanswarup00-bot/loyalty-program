@@ -10,6 +10,7 @@
   function ph(v, key) {
     return real(v) ? esc(v) : '<span class="tbd-ph">[' + esc(key) + ']</span>';
   }
+  function tr(key, fallback) { return (window.I18N && window.I18N.t(key, fallback)) || fallback; }
   function append(container, q, a) {
     var item = document.createElement('details');
     item.className = 'faq-item reveal';
@@ -22,32 +23,42 @@
     item.appendChild(ans);
     container.appendChild(item);
   }
-  var list = document.getElementById('faq-list');
-  if (!list) return;
-  var faqs = [
-    ['How does a customer identify themselves?', ph(cfg.faq && cfg.faq.identity, 'faq.identity'), 'identity'],
-    ['What stops someone farming stamps by tapping repeatedly?', ph(cfg.faq && cfg.faq.abuse, 'faq.abuse'), 'abuse'],
-    ['Who owns the customer data, and can I export or delete it?', ph(cfg.faq && cfg.faq.ownership, 'faq.ownership'), 'ownership'],
-    ['How long does setup take and what do I need to do?', ph(cfg.faq && cfg.faq.setup, 'faq.setup'), 'setup'],
-    ['What does it cost, during and after the pilot?', ph(cfg.faq && cfg.faq.cost, 'faq.cost'), 'cost'],
-    ['What if I stop using it or you shut down?', ph(cfg.faq && cfg.faq.exit, 'faq.exit'), 'exit'],
-    ['Does it work on cheap Android phones and slow data?', ph(cfg.faq && cfg.faq.compat, 'faq.compat'), 'compat'],
-    ['Do my customers need to install anything?', ph(cfg.faq && cfg.faq.install, 'faq.install'), 'install']
-  ];
-  faqs.forEach(function (f) { append(list, f[0], f[1]); });
-  var ld = document.getElementById('ld-faq');
-  if (ld) {
-    var main = [];
-    faqs.forEach(function (f) {
-      var txt = (cfg.faq && cfg.faq[f[2]]) || '';
-      if (!real(txt)) return;
-      main.push({
-        '@type': 'Question',
-        name: f[0],
-        acceptedAnswer: { '@type': 'Answer', text: txt }
-      });
-    });
-    if (main.length) ld.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: main }, null, 2);
-    else ld.textContent = '{}';
+  function qa() {
+    return [
+      [tr('faq.q.identity', 'How does a customer identify themselves?'), 'identity'],
+      [tr('faq.q.abuse', 'What stops someone farming stamps by tapping repeatedly?'), 'abuse'],
+      [tr('faq.q.ownership', 'Who owns the customer data, and can I export or delete it?'), 'ownership'],
+      [tr('faq.q.setup', 'How long does setup take and what do I need to do?'), 'setup'],
+      [tr('faq.q.cost', 'What does it cost, during and after the pilot?'), 'cost'],
+      [tr('faq.q.exit', 'What if I stop using it or you shut down?'), 'exit'],
+      [tr('faq.q.compat', 'Does it work on cheap Android phones and slow data?'), 'compat'],
+      [tr('faq.q.install', 'Do my customers need to install anything?'), 'install'],
+    ];
   }
+  function render() {
+    var list = document.getElementById('faq-list');
+    if (!list) return;
+    list.innerHTML = '';
+    var faqs = qa();
+    faqs.forEach(function (f) {
+      append(list, f[0], ph(cfg.faq && cfg.faq[f[1]], 'faq.' + f[1]));
+    });
+    var ld = document.getElementById('ld-faq');
+    if (ld) {
+      var main = [];
+      faqs.forEach(function (f) {
+        var txt = (cfg.faq && cfg.faq[f[1]]) || '';
+        if (!real(txt)) return;
+        main.push({
+          '@type': 'Question',
+          name: f[0],
+          acceptedAnswer: { '@type': 'Answer', text: txt }
+        });
+      });
+      if (main.length) ld.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: main }, null, 2);
+      else ld.textContent = '{}';
+    }
+  }
+  render();
+  document.addEventListener('i18n:change', render);
 })();

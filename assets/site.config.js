@@ -59,12 +59,14 @@ window.SITE = {
     cost: 'TODO_FAQ_COST',
     compat: 'TODO_FAQ_COMPAT',
     install: 'TODO_FAQ_INSTALL',
-    exit: 'TODO_FAQ_EXIT'
+    exit: 'TODO_FAQ_EXIT',
   },
 
   legal: {
-    compat: 'TODO_FAQ_COMPAT',
-    install: 'TODO_FAQ_INSTALL'
+    entity: 'TODO_LEGAL_ENTITY',                // business / legal entity name
+    grievanceEmail: 'TODO_GRIEVANCE_EMAIL',     // grievance / data-deletion contact
+    jurisdiction: 'TODO_LEGAL_JURISDICTION',    // e.g. Karnataka, India
+    lastUpdated: 'TODO_LEGAL_LAST_UPDATED'      // e.g. '16 October 2026'
   },
 };
 

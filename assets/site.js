@@ -44,9 +44,10 @@
     });
   }
   function isTodo(v) { return typeof v === 'string' && /TODO_/.test(v); }
+  function tr(key, fallback) { return (window.I18N && window.I18N.t(key, fallback)) || fallback; }
   function val(v, where) {
     return isTodo(v)
-      ? '<span class="tbd"><span class="tbd-tag">Placeholder</span> set <code>pricing.' + esc(where) + '</code> in assets/site.config.js</span>'
+      ? '<span class="tbd"><span class="tbd-tag">' + esc(tr('pricing.placeholderTag', 'Placeholder')) + '</span> set <code>pricing.' + esc(where) + '</code> in assets/site.config.js</span>'
       : esc(v);
   }
   var wa = window.INNONDU && window.INNONDU.WHATSAPP;
@@ -54,27 +55,30 @@
     ? 'https://wa.me/' + wa + '?text=' + encodeURIComponent(window.INNONDU.WHATSAPP_MESSAGE || '')
     : '/contact/';
 
-  // Pricing: one row per question an owner asks.
-  var pBody = document.getElementById('pricing-body');
-  if (pBody) {
+  // Pricing: one row per question an owner asks. Re-rendered when the language changes.
+  function renderPricing() {
+    var pBody = document.getElementById('pricing-body');
+    if (!pBody) return;
     var price = cfg.pricing || {};
     var rows = [
-      ['The app itself', 'software', price.software],
-      ['Subscription', 'subscription', price.subscription],
-      ['Each reward redeemed', 'perRedemption', price.perRedemption],
-      ['NFC stamp and poster', 'hardware', price.hardware],
-      ['The free pilot', 'pilot', price.pilot],
-      ['After the pilot', 'afterPilot', price.afterPilot],
-      ['Included', 'included', price.included],
-      ['Not included', 'notIncluded', price.notIncluded]
+      [tr('pricing.software', 'The app itself'), 'software', price.software],
+      [tr('pricing.subscription', 'Subscription'), 'subscription', price.subscription],
+      [tr('pricing.perRedemption', 'Each reward redeemed'), 'perRedemption', price.perRedemption],
+      [tr('pricing.hardware', 'NFC stamp and poster'), 'hardware', price.hardware],
+      [tr('pricing.pilot', 'The free pilot'), 'pilot', price.pilot],
+      [tr('pricing.afterPilot', 'After the pilot'), 'afterPilot', price.afterPilot],
+      [tr('pricing.included', 'Included'), 'included', price.included],
+      [tr('pricing.notIncluded', 'Not included'), 'notIncluded', price.notIncluded]
     ].filter(function (r) { return r[2] !== undefined && r[2] !== null && r[2] !== ''; });
     var draft = rows.some(function (r) { return isTodo(r[2]); });
     pBody.innerHTML =
-      (draft ? '<p class="tbd-note" role="status"><b>Draft.</b> Rows marked Placeholder are still to be decided in assets/site.config.js. Do not treat this as final.</p>' : '') +
+      (draft ? '<p class="tbd-note" role="status"><b>Draft.</b> ' + esc(tr('pricing.draftNote', 'Rows marked Placeholder are still to be decided.')) + '</p>' : '') +
       '<dl class="price-list">' + rows.map(function (r) {
         return '<div class="price-row"><dt>' + esc(r[0]) + '</dt><dd>' + val(r[2], r[1]) + '</dd></div>';
       }).join('') + '</dl>';
   }
+  renderPricing();
+  document.addEventListener('i18n:change', renderPricing);
 
   // Proof: consented shops only.
   var sBody = document.getElementById('proof-body');

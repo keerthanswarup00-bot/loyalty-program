@@ -46,6 +46,10 @@
   /* ---------- Scratch card ---------- */
   var fc = document.getElementById('fc'), cv = document.getElementById('foil'), ctx = cv.getContext('2d', { willReadFrequently: true });
   var prizeTxt = document.getElementById('prizeTxt'), cap = document.getElementById('cap'), again = document.getElementById('again'), reveal = document.getElementById('reveal');
+  // Scratch is pointer-only, so the caption doubles as a polite live region for keyboard and
+  // screen-reader users who use the "Reveal it for me" button instead of scrubbing the canvas.
+  cap.setAttribute('role', 'status');
+  function sayLive(t) { if (cap) cap.textContent = t; }
   var prizes = ['10% off your next visit', 'One extra stamp on your card', 'A free add-on, on us', 'Not this time. Try again tomorrow.'];
   var pi = 0, dpr = 1, down = false, last = null, done = false, tmr = null, lastW = 0;
   function size() {
@@ -84,11 +88,13 @@
     if (done) return;
     done = true; fc.classList.add('done'); again.hidden = false; reveal.hidden = true;
     cap.textContent = 'A sample prize. On a real card, a new one unlocks every day.';
+    sayLive('Scratch card revealed. ' + prizeTxt.textContent);
     if (pi !== prizes.length - 1) { burstAt(fc, 70, 9); setTimeout(function () { burstAt(fc, 40, 6); }, 220); }
   }
   function resetCard() {
     done = false; fc.classList.remove('done', 'touched'); pi = (pi + 1) % prizes.length; prizeTxt.textContent = prizes[pi];
     again.hidden = true; reveal.hidden = false; cap.textContent = 'Scratch it with your finger or mouse.'; last = null; paint();
+    sayLive('A new scratch card. Scratch it or reveal it.');
   }
   cv.addEventListener('pointerdown', function (e) { down = true; last = null; try { cv.setPointerCapture(e.pointerId); } catch (_) { } scratch(e); });
   cv.addEventListener('pointermove', function (e) { if (down) scratch(e); });
@@ -133,6 +139,7 @@
       setTimeout(function () {
         s++; draw(s - 1);
         var full = s >= NEED, el = grid.children[s - 1];
+        sayStamp(s);
         burstAt(el, full ? 90 : 26, full ? 10 : 5, [getComputedStyle(phone).getPropertyValue('--brand').trim() || COLORS[0], '#f5b700', '#ffffff', '#06d6a0']);
         st.classList.remove('press');
         setTimeout(function () { st.classList.remove('snap'); st.classList.add('home'); setPos(0, 0); setTimeout(function () { st.classList.remove('home'); busy = false; }, 520); }, 160);
@@ -141,13 +148,20 @@
   }
   function auto() {
     if (busy || s >= NEED) return;
-    busy = true; hide();
+    busy = true; hide(); sayStamp(s + 1);
     // Aim the stamp at the next slot from where it rests.
     var slot = slotEl(), sr = slot.getBoundingClientRect(), t = tip();
     st.classList.add('lift', 'snap'); setPos(dx + (sr.left + sr.width / 2 - t.x), dy + (sr.top + sr.height / 2 - t.y));
     setTimeout(function () { st.classList.remove('lift'); land(); }, 320);
   }
   function hide() { if (hint) hint.classList.add('gone'); }
+  // A polite live region so a screen reader hears the stamp count change (the grid is decorative markup).
+  function sayStamp(n) {
+    var live = document.getElementById('phLive');
+    if (live) live.textContent = n >= NEED
+      ? 'Card full. ' + NEED + ' of ' + NEED + ' stamps. A reward is unlocked.'
+      : 'Stamp added. ' + n + ' of ' + NEED + ' stamps.';
+  }
 
   st.addEventListener('pointerdown', function (e) {
     if (busy || s >= NEED || e.button > 0) return;
