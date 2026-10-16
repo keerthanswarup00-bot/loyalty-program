@@ -92,13 +92,14 @@ function socials(b) {
 // ---- Which shop is this page for? ----
 // Single-shop deployment: config.js sets `slug` and nothing changes.
 // Multi-shop deployment: leave `slug` empty. The shop comes from the address:
-//   1) subdomain of config.js `baseDomain`   (cheesora.example.com -> "cheesora", needs no database lookup)
-//   2) a custom domain registered for the shop (looked up once with resolve_host(), remembered for the tab)
-//   3) ?shop=slug, on localhost only (for testing)
+//   1) ?shop=slug in the address             (one domain can serve every shop)
+//   2) subdomain of config.js `baseDomain`   (cheesora.example.com -> "cheesora", needs no database lookup)
+//   3) a custom domain registered for the shop (looked up once with resolve_host(), remembered for the tab)
 async function resolveShop() {
+  const q = new URLSearchParams(location.search).get('shop');
+  if (q && /^[a-z0-9-]+$/.test(q)) { CFG.slug = q; return true }
   if (CFG.slug) return true;
   const h = location.hostname.toLowerCase(), base = String(CFG.baseDomain || '').toLowerCase().replace(/^\./, '');
-  if (/^(localhost|127\.0\.0\.1)$/.test(h)) { const q = new URLSearchParams(location.search).get('shop'); if (q && /^[a-z0-9-]+$/.test(q)) { CFG.slug = q; return true } }
   if (base && h.endsWith('.' + base)) { const s = h.slice(0, -base.length - 1); if (/^[a-z0-9-]+$/.test(s) && !['www', 'app', 'admin', 'platform'].includes(s)) { CFG.slug = s; return true } }
   const key = 'lk-host-' + h;
   try { const c = sessionStorage.getItem(key); if (c) { CFG.slug = c; return true } } catch (e) { }

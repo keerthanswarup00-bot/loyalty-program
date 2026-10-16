@@ -5,15 +5,19 @@
 const SUPPORT_AS = (new URLSearchParams(location.search).get('as') || '').toLowerCase();
 const sb = notReady() ? null : mkClient(SUPPORT_AS ? 'lk-platform' : 'lk-admin');
 let support = null, SUP = [];
-let signed = false, recover = false, biz = null, M = [], V = [], MSG = [], MENU = null, tab = 'h', ov = null, openId = null, selMode = false, visCache = {};
+let shops = null;   // signed-in owner manages more than one shop: show a picker
+const SHOP_KEY = 'lk-admin-shop';
+let signed = false, recover = false, biz = null, M = [], V = [], MSG = [], MENU = null, tab = 'h', ov = null, openId = null, selMode = false, visCache = {}, me = null;   // me = the signed-in owner's email (sidebar footer)
 let q = '', rq = '', rc = '', rp = '', rd = null, rbusy = false;
 // Customers selection (feeds the Message tab) + Message tab state
 let sel = new Set(), bsel = new Set(), sortBy = 'joined', bseg = 'all', bmsg = 'Hi {name}! ', bimg = '', bfile = null, blink = true, bstop = true, bq = null, binit = false;
 let impRows = null;
 const first = u => (u.name || '').split(' ')[0];
 
-const scanUrl = () => location.origin + '/app/#scan=' + biz.scan_token;
-const joinUrl = () => location.origin + '/app/#join=' + biz.join_token;
+// The shop's customer page: /app/?shop=<slug>. Printed Cheesora tags use /app/#scan= with no ?shop and still work (fallback in common.js).
+const custBase = () => location.origin + '/app/?shop=' + encodeURIComponent(biz.slug);
+const scanUrl = () => custBase() + '#scan=' + biz.scan_token;
+const joinUrl = () => custBase() + '#join=' + biz.join_token;
 const heldOffers = u => (u.offers || []).filter(x => !x.used_at && !isExp(x)).length;
 // When this customer's current card runs out (null = no deadline: no stamps yet, full card, or no limit).
 const cardEnd = u => { if (!biz.card_months || !u.card_started_at || !(u.stamps > 0) || u.stamps >= biz.need) return null; const d = new Date(u.card_started_at); d.setMonth(d.getMonth() + biz.card_months); return d };
@@ -64,8 +68,9 @@ async function pages(make) {
 }
 async function enter() {
   signed = true;
+  try { const { data } = await sb.auth.getUser(); me = (data && data.user && data.user.email) || null } catch (e) { me = null }
   if (/^[a-z0-9-]+$/.test(SUPPORT_AS)) {
-    try { await rpc(sb, 'platform_support_open', { p_slug: SUPPORT_AS }); CFG.slug = SUPPORT_AS; support = SUPPORT_AS }
+    try { await rpc(sb, 'platform_support_open', { p_slug: SUPPORT_AS }); support = SUPPORT_AS }
     catch (e) { toast('Support mode needs a platform admin account') }
   }
   await load(); render();
@@ -73,16 +78,29 @@ async function enter() {
 }
 async function load() {
   try {
-    const { data, error } = await sb.from('businesses').select('*').eq('slug', CFG.slug).maybeSingle();
+    // The shop comes from the signed-in owner, not the URL. RLS returns only this owner's shops
+    // (a platform admin sees all; support mode narrows to the requested one).
+    const target = support || SUPPORT_AS;
+    let qr = sb.from('businesses').select('*').order('created_at');
+    if (target) qr = qr.eq('slug', target);
+    const { data, error } = await qr;
     if (error) throw error;
-    biz = data;
+    let list = data || [];
+    if (!target && list.length > 1) {
+      let saved = null; try { saved = sessionStorage.getItem(SHOP_KEY) } catch (e) { }
+      const chosen = list.find(b => b.slug == saved);
+      if (!chosen) { shops = list; biz = null; M = []; V = []; MSG = []; return }
+      list = [chosen];
+    }
+    shops = null;
+    biz = list[0] || null;
     if (biz) {
       brand(biz); document.title = 'Owner dashboard · ' + biz.name;
       M = await pages(() => sb.from('members').select('*,offers(id,type,text,code,valid_from,used_at,expires_at,created_at)').eq('business_id', biz.id).order('joined', { ascending: false }).order('id'));
       const mr = await sb.from('messages').select('member_id,created_at,returned_at').eq('business_id', biz.id).order('created_at', { ascending: false }).limit(1000);
       MSG = mr.error ? [] : mr.data;   // win-back table may not exist until 2026-10-08-winback.sql is run
       if (biz.lapsed_days == null) biz.lapsed_days = 10;
-      try { SUP = await rpc(sb, 'my_support_log', { p_slug: CFG.slug }) } catch (e) { SUP = [] }   // owner's view of support access; absent until the platform SQL is run
+      try { SUP = await rpc(sb, 'my_support_log', { p_slug: biz.slug }) } catch (e) { SUP = [] }   // owner's view of support access; absent until the platform SQL is run
       try {
         const since = new Date(Date.now() - 14 * 864e5).toISOString();
         V = (await pages(() => sb.from('visits').select('id,created_at').eq('business_id', biz.id).gte('created_at', since).order('id'))).map(x => x.created_at);
@@ -104,8 +122,9 @@ async function login(btn) {
 }
 async function out() {
   await sb.auth.signOut();
-  signed = false; biz = null; M = []; V = []; tab = 'h'; ov = null; openId = null; MENU = null; CATS = null; INS = null; SUP = []; support = null;
+  signed = false; biz = null; shops = null; M = []; V = []; tab = 'h'; ov = null; openId = null; MENU = null; CATS = null; INS = null; SUP = []; support = null; me = null;
   sel = new Set(); bsel = new Set(); selMode = false; bq = null; binit = false; impRows = null; visCache = {}; MSG = [];
+  try { sessionStorage.removeItem(SHOP_KEY) } catch (e) { }
   render();
 }
 async function forgot() {
@@ -132,7 +151,11 @@ const loginV = () => `<div class="a-card" style="margin-top:40px"><h2>Owner logi
   <label class="lb">Password</label>${pwField('pw', 'current-password')}
   <button class="btn" data-go onclick="login(this)">Sign in</button>
   <p class="note" style="margin:14px 0 0"><a href="#" onclick="forgot();return false">Forgot password?</a></p></div>`;
-const deniedV = () => `<div class="a-card" style="margin-top:40px"><h2>No access</h2><p class="sub">This account doesn't manage this business. Sign in with the owner account, or ask for access.</p><button class="btn alt" onclick="out()">Sign out</button></div>`;
+const deniedV = () => `<div class="a-card" style="margin-top:40px"><h2>No access</h2><p class="sub">This account doesn't manage a shop here. Sign in with the owner account, or ask for access.</p><button class="btn alt" onclick="out()">Sign out</button></div>`;
+const pickerV = () => `<div class="a-card" style="margin-top:40px"><h2>Choose a shop</h2><p class="sub">Your account manages more than one shop.</p>
+  ${shops.map(s => `<button class="btn alt" style="width:100%;justify-content:flex-start;margin-top:8px" onclick="pickShop('${esc(s.slug)}')">${esc(s.name)}</button>`).join('')}
+  <button class="btn alt" style="margin-top:14px" onclick="out()">Sign out</button></div>`;
+function pickShop(slug) { try { sessionStorage.setItem(SHOP_KEY, slug) } catch (e) { } load().then(render) }
 
 // ---------- shell: hero + bottom nav ----------
 function hero() {
@@ -149,7 +172,9 @@ function hero() {
 }
 function nav() {
   const T = [['h', 'Home', AI.home], ['c', 'Customers', AI.users], ['r', 'Redeem', AI.ok], ['b', 'Message', AI.send], ['o', 'Offers', AI.gift], ['p', 'Menu', AI.menu], ['m', 'More', AI.cog]];
-  return `<nav class="a-nav"><div class="a-in">${T.map(t => `<button class="${tab == t[0] ? 'on' : ''}" onclick="go('${t[0]}')"><i>${t[2]}</i><span>${t[1]}</span></button>`).join('')}</div></nav>`;
+  const btns = T.map(t => `<button class="${tab == t[0] ? 'on' : ''}" onclick="go('${t[0]}')"><i>${t[2]}</i><span>${t[1]}</span></button>`).join('');
+  const sb = `<aside class="a-sidebar"><div class="a-side-brand"><div class="a-side-logo">${mark(biz)}</div><div class="a-side-bt"><b>${esc(biz.name)}</b><span>Owner dashboard</span></div></div><nav class="a-side-nav">${btns}</nav></aside>`;
+  return `${sb}<nav class="a-nav"><div class="a-in">${btns}</div></nav>`;
 }
 
 // ---------- HOME ----------
@@ -163,7 +188,7 @@ function chartV() {
       : '<p class="sub" style="margin:8px 0 0">No stamps yet. They will show up here as customers tap the tag.</p>') + '</div>';
 }
 function reminders() {
-  const L = [], t = new Date(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), link = location.origin + '/app/';
+  const L = [], t = new Date(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), link = custBase();
   M.forEach(u => {
     if (u.bday && biz.bday_offer) {
       const [, mo, d] = u.bday.split('-').map(Number);
@@ -207,11 +232,11 @@ async function winback(id, btn) {
   const w = window.open('', '_blank');
   btn.disabled = true;
   try {
-    const r = await rpc(sb, 'winback_message', { p_slug: CFG.slug, p_member: id });
+    const r = await rpc(sb, 'winback_message', { p_slug: biz.slug, p_member: id });
     if (!r.ok) { if (w) w.close(); btn.disabled = false; return toast(WBERR[r.error] || 'Could not create the message') }
     const msg = `Hi ${first(u)}, we miss you at ${biz.name}! Here's a little something for your next visit: ${r.offer}.`
       + (r.expires_at ? ` Valid until ${fd(r.expires_at)}.` : '')
-      + ` Show this code at the counter: ${r.code}. You can also see it on your card: ${location.origin}/app/`;
+      + ` Show this code at the counter: ${r.code}. You can also see it on your card: ${custBase()}`;
     if (w) w.location.href = waLink(r.phone, msg);
     else { try { await navigator.clipboard.writeText(msg) } catch (e) { } toast('Pop-up blocked. Message copied: paste it into WhatsApp.') }
     await load(); render();
@@ -235,8 +260,8 @@ function homeV() {
     <label class="lb">Sign-up link</label><input readonly class="ro" value="${esc(joinUrl())}" onclick="this.select()">
     <div class="qr" id="qrb"></div>
     <div class="row"><button class="btn sm" onclick="dlQR()">Download</button><button class="btn sm alt" onclick="cpL('j')">Copy link</button><button class="btn sm alt" onclick="regen('join_token')">Regenerate</button></div>
-    <p class="hint">Later stamps come from the NFC tag set up in More → Stamp tag.</p></div>
-  <div class="a-quick"><button onclick="go('r')">${AI.ok}<b>Redeem a coupon</b><span>Enter a customer's code</span></button><button onclick="go('b')">${AI.send}<b>Message customers</b><span>WhatsApp group send</span></button><button onclick="go('o')">${AI.gift}<b>Edit offers</b><span>Stamps, welcome, birthday</span></button><button onclick="openIns()">${AI.trend}<b>Insights</b><span>Busy hours, retention</span></button></div>
+    <p class="hint">Later stamps come from the NFC tag set up in More → QR/NFC setup and migration.</p></div>
+  <div class="a-quick"><button onclick="go('c'); q=''; render(); setTimeout(()=>{const s=document.querySelector('.a-bar2 input'); if(s)s.focus()},50)">${AI.users}<b>Find Customer</b><span>Search by name or phone</span></button><button onclick="go('c'); q=''; render(); setTimeout(()=>{const s=document.querySelector('.a-bar2 input'); if(s)s.focus()},50)">${AI.stamp}<b>Collect Stamp</b><span>Locate customer to stamp</span></button><button onclick="go('r')">${AI.ok}<b>Redeem Coupon</b><span>Enter a customer's code</span></button><button onclick="go('o')">${AI.gift}<b>Offers</b><span>Stamps, welcome, birthday</span></button></div>
   ${comeBack()}
   <div class="a-card"><h2>At a glance</h2><div class="a-sts">${stat(M.filter(u => u.last_stamp && new Date(u.last_stamp) > wk).length, 'Active, 7 days')}${stat(redeemedToday, 'Redeemed today')}${stat(M.reduce((a, u) => a + heldOffers(u), 0), 'Coupons out')}${stat(ending, 'Cards ending')}${stat(M.filter(u => sameMonth(u.bday)).length, 'Birthdays this month')}${daily}</div></div>
   ${chartV()}
@@ -267,7 +292,7 @@ async function fetchVis(id) {
 }
 function detail(u) {
   const f = (l, x) => `<div><span>${l}</span><b>${x}</b></div>`;
-  const msg = `Hi ${first(u)}, thanks for being part of ${biz.name} rewards! ${location.origin}/app/`;
+  const msg = `Hi ${first(u)}, thanks for being part of ${biz.name} rewards! ${custBase()}`;
   const ce = cardEnd(u);
   const of = (u.offers || []).slice().sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   const st = x => x.used_at ? 'Used ' + fd(x.used_at) : isExp(x) ? 'Expired ' + fd(x.expires_at) : x.valid_from && new Date(x.valid_from) > Date.now() ? 'Valid on ' + fd(x.valid_from) : x.expires_at ? 'Until ' + fd(x.expires_at) : 'No expiry';
@@ -351,7 +376,7 @@ async function chk(confirmIt) {
   let ph = null; if (rp) { ph = normPhone(rp); if (!ph) return toast(PHONE_MSG) }
   rbusy = true; render();
   try {
-    const r = await rpc(sb, 'redeem_code', { p_slug: CFG.slug, p_code: rc, p_phone: ph, p_confirm: !!confirmIt });
+    const r = await rpc(sb, 'redeem_code', { p_slug: biz.slug, p_code: rc, p_phone: ph, p_confirm: !!confirmIt });
     rd = r;
     if (r.ok && r.confirmed) { toast('Coupon redeemed'); haptic(); rc = rp = ''; await load() }
   } catch (e) { rd = null; toast(nice(e)) }
@@ -400,7 +425,7 @@ const BT = () => [
 function bText(u) {
   let t = bmsg.trim().replace(/\{name\}/gi, first(u) || 'there');
   if (/^https:\/\/\S+$/.test(bimg)) t += '\n' + bimg;
-  if (blink) t += '\n' + location.origin + '/app/';
+  if (blink) t += '\n' + custBase();
   if (bstop) t += '\n\nReply STOP if you do not want these messages.';
   return t;
 }
@@ -770,14 +795,13 @@ function supV() {
 }
 // ---------- MORE ----------
 function moreV() {
-  return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${brandKit()}${dbHint()}</div>
-  <div class="a-card"><h2>Links</h2>${fld('ci', 'Instagram', biz.ig, '', 'https://…')}${fld('cf', 'Facebook', biz.fb, '', 'https://…')}${fld('cw', 'WhatsApp', biz.wa, '', 'https://wa.me/…')}${fld('cs', 'Website', biz.web, '', 'https://…')}</div>
-  <div class="a-card"><h2>What's new</h2><p class="sub">A short note shown at the top of every customer's card (an event, new menu item, holiday hours). Leave blank to hide it.</p><textarea id="nw" rows="3" maxlength="280">${esc(biz.news_text || '')}</textarea><p class="hint">Up to 280 characters. Customers who already closed the old note see the new one.</p></div>
-  <div class="a-card"><h2>Refer a friend</h2><p class="sub">Each customer gets a personal code. A friend who enters it when joining gets this offer, and the customer gets it too after the friend's next stamp.</p>
+  return `<div class="a-card"><h2>1. Brand and appearance</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${brandKit()}${dbHint()}</div>
+  <div class="a-card"><h2>2. Loyalty rules and offers</h2><label class="lb">First stamp when a customer joins</label><select id="js"><option value="1"${biz.join_stamp ? ' selected' : ''}>Yes, give a free first stamp</option><option value="0"${biz.join_stamp ? '' : ' selected'}>No</option></select>${stp('cm', 'Each card lasts (months)', biz.card_months, 0, 60, 'Counted from the first stamp. 0 means never. An unfinished card past its end restarts at zero; a full card never expires.')}${fld('nd', 'Stamps needed for a free reward', biz.need, 'type=number min=1 max=50')}${fld('rw', 'Reward text', biz.reward, '', 'e.g. Free coffee')}${fld('exp', 'Default coupon validity (days)', biz.exp_days, 'type=number min=1 max=365')}${fld('cool', 'Cooldown between stamps (minutes)', biz.cooldown_min, 'type=number min=0 max=720')}${fld('sur', 'Surprise offers (comma-separated stamp numbers on the card)', biz.sur_stamps || '', '')}${fld('suro', 'Surprise offer text', biz.sur_offer || '', '')}${fld('bday', 'Birthday offer', biz.bday_offer || '', '')}${fld('wel', 'Welcome offer', biz.welcome_offer || '', '')}</div>
+  <div class="a-card"><h2>3. Referrals and scratch cards</h2><h3 style="margin:6px 0 10px;font:600 16px var(--f-s)">Refer a friend</h3><p class="sub">Each customer gets a personal code. A friend who enters it when joining gets this offer, and the customer gets it too after the friend's next stamp.</p>
     <label class="lb">Referrals</label><select id="rfon"><option value="1"${biz.ref_on ? ' selected' : ''}>On</option><option value="0"${biz.ref_on ? '' : ' selected'}>Off</option></select>
-    ${fld('rfo', 'Offer for both', biz.ref_offer, '', 'e.g. 20% off your next bill')}${fld('rfc', 'Most referral rewards per customer in 30 days', biz.ref_cap, 'type=number min=1 max=100')}</div>
-  <div class="a-card"><h2>Daily scratch card</h2>
-    <p class="sub">A game your customers can play once a day. Everyone scratches every day, but a prize only drops on the days you choose, with the chances you set, and never more than your weekly limit. This is how you bring people back on your quiet days.</p>
+    ${fld('rfo', 'Offer for both', biz.ref_offer, '', 'e.g. 20% off your next bill')}${fld('rfc', 'Most referral rewards per customer in 30 days', biz.ref_cap, 'type=number min=1 max=100')}
+    <h3 style="margin:18px 0 10px;font:600 16px var(--f-s)">Daily scratch card</h3>
+    <p class="sub">A game your customers can play once a day. Everyone scratches every day, but a prize only drops on the days you choose, with the chances you set, and never more than your weekly limit.</p>
     <label class="lb">Daily scratch</label><select id="dailon" onchange="dailyWarn()"><option value="1"${biz.daily_on ? ' selected' : ''}>On</option><option value="0"${biz.daily_on ? '' : ' selected'}>Off</option></select>
     <label class="lb">1. Prizes and their chance</label>
     <p class="hint" style="margin-top:0">Each scratch on a prize day picks at random. Example: "5% off" at 60% and "20% off" at 10% means 60 in every 100 scratches win 5% off, 10 win 20% off, and the other 30 win nothing.</p>
@@ -792,25 +816,26 @@ function moreV() {
     ${fld('dwc', '3. Most prizes one customer can win per week (Monday to Sunday)', biz.daily_week_cap == null ? 2 : biz.daily_week_cap, 'type=number min=0 max=7 oninput=dgSum()')}
     ${fld('dvd', '4. Days a won prize stays valid', biz.daily_valid_days || 7, 'type=number min=1 max=90')}
     <label class="lb">5. Messages for scratches that win nothing, one per line (optional)</label><textarea id="dno" rows="3" maxlength="500">${esc(biz.daily_notes || '')}</textarea>
-    <p class="hint">Won prizes appear in the customer's Offers with a code your staff redeem like any other coupon. Changes apply to the next scratch; nothing is paid or promised until a customer wins.</p></div>
-  <div class="a-card"><h2>Win-back</h2><p class="sub">Bring back customers who stopped visiting. Leave the offer blank to switch it off.</p>
+    <p class="hint">Won prizes appear in the customer's Offers with a code your staff redeem like any other coupon.</p></div>
+  <div class="a-card"><h2>4. Win-back</h2><p class="sub">Bring back customers who stopped visiting. Leave the offer blank to switch it off.</p>
     ${fld('wl', 'Count a customer as lapsed after (days)', biz.lapsed_days || 10, 'type=number min=1 max=365')}
     ${fld('wb', 'Win-back offer (e.g. 15% off your next visit)', biz.winback_offer || '', '')}
     ${fld('wv', 'Offer is valid for (days, 0 = never expires)', biz.winback_valid_days == null ? 7 : biz.winback_valid_days, 'type=number min=0 max=90')}
   </div>
-  <button class="btn" data-go onclick="svBrand(this)">Save settings</button>
-  <div class="a-card" style="margin-top:16px"><h2>Stamp tag</h2><p class="sub">The tap-only link behind your NFC tag — staff collect stamps after the first one by tapping the customer's phone on it.</p>
+  <div class="a-card"><h2>5. Messaging and campaigns</h2>${fld('ci', 'Instagram', biz.ig, '', 'https://…')}${fld('cf', 'Facebook', biz.fb, '', 'https://…')}${fld('cw', 'WhatsApp', biz.wa, '', 'https://wa.me/…')}${fld('cs', 'Website', biz.web, '', 'https://…')}
+    <p class="sub">Use the Message tab for group/send actions.</p></div>
+  <div class="a-card"><h2>6. Menu management</h2><p class="sub">Manage categories and items in the Menu tab.</p><button class="btn sm alt" type="button" onclick="go('p')">Open Menu</button></div>
+  <div class="a-card"><h2>7. QR/NFC setup and migration</h2><h3 style="margin:6px 0 10px;font:600 16px var(--f-s)">Sign-up QR</h3><p class="sub">Print for counter/door — lets new customer join and get first stamp (no later stamps).</p>
+    <label class="lb">Sign-up link</label><input readonly class="ro" value="${esc(joinUrl())}" onclick="this.select()">
+    <div class="row" style="margin-top:8px"><button class="btn sm" onclick="dlQR()">Download</button><button class="btn sm alt" onclick="cpL('j')">Copy link</button><button class="btn sm alt" onclick="regen('join_token')">Regenerate</button></div>
+    <h3 style="margin:18px 0 10px;font:600 16px var(--f-s)">NFC tag</h3><p class="sub">Tap-only link behind NFC tag — collects subsequent stamps.</p>
     <label class="lb">Link for the NFC tag</label><input readonly class="ro" value="${esc(scanUrl())}" onclick="this.select()">
-    <div class="row" style="margin-top:12px"><button class="btn sm alt" onclick="cpL('s')">Copy link</button><button class="btn sm alt" onclick="regen('scan_token')">Regenerate code</button></div>
-    <details class="a-det2"><summary>How to write an NFC tag</summary><p class="sub" style="margin-top:8px">Buy NTAG213 or NTAG215 stickers. In a free app such as NFC Tools, write the link above as a URL record. Staff then tap the customer's phone on the tag. Do not print it as a QR — one stamp per customer per cooldown period either way. If the link ever leaks, regenerate the code and rewrite the tags.</p></details>
-    <p class="hint">If you printed the old QR with the stamp link, press Regenerate code and rewrite your tags: the old QR then stops adding stamps.</p></div>
-  <div class="a-card" style="margin-top:16px"><h2>Moving to a new address</h2><p class="sub">Innondu has a new web address. Your sign-up QR and NFC stamp tag are built from the address you opened this dashboard on, so the links below are already the new ones.</p>
-    <div class="row" style="margin-top:12px"><button class="btn sm" onclick="dlQR()">Download the new QR</button><button class="btn sm alt" onclick="cpL('s')">Copy the stamp link</button></div>
-    <p class="hint">Current address: ${esc(location.origin)}</p>
-    <details class="a-det2"><summary>Rewrite each NFC tag</summary><ol class="sub" style="margin-top:8px"><li>Install a free NFC app such as NFC Tools.</li><li>Tap Write, then Add a record and choose URL / URI.</li><li>Paste the stamp link copied above.</li><li>Hold the phone on the tag and tap Write.</li><li>Lock the tag so it cannot be overwritten.</li><li>Test the tag on one iPhone and one Android phone.</li></ol></details>
-    <p class="hint">Keep any old printed QR in place until the new one replaces it: download the new QR above and print it at the counter.</p></div>
-${supV()}
-  <div class="a-card"><h2>Account</h2><div class="row"><a class="btn sm alt" href="/app/">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
+    <div class="row" style="margin-top:8px"><button class="btn sm alt" onclick="cpL('s')">Copy link</button><button class="btn sm alt" onclick="regen('scan_token')">Regenerate code</button></div>
+    <details class="a-det2"><summary>How to write an NFC tag</summary><p class="sub" style="margin-top:8px">Buy NTAG213 or NTAG215 stickers. In a free app such as NFC Tools, write the link above as a URL record. If link leaks, regenerate and rewrite tags.</p></details>
+    <h3 style="margin:18px 0 10px;font:600 16px var(--f-s)">Moving to a new address</h3><p class="sub">Links below reflect current address ${esc(location.origin)}.</p>
+    <div class="row" style="margin-top:8px"><button class="btn sm" onclick="dlQR()">Download new QR</button><button class="btn sm alt" onclick="cpL('s')">Copy stamp link</button></div></div>
+  <button class="btn" data-go onclick="svBrand(this)">Save settings</button>
+  <div class="a-card" style="margin-top:16px"><h2>8. Account and security</h2><h3 style="margin:6px 0 10px;font:600 16px var(--f-s)">What's new</h3><p class="sub">Short note shown at top of every customer's card (leave blank to hide).</p><textarea id="nw" rows="3" maxlength="280">${esc(biz.news_text || '')}</textarea><p class="hint">Up to 280 characters.</p>${supV()}<div class="row" style="margin-top:12px"><a class="btn sm alt" href="${esc(custBase())}">Open customer page</a><button class="btn sm alt" onclick="out()">Sign out</button></div></div>`;
 }
 async function regen(col) {
   if (!confirm(col == 'join_token' ? 'The old sign-up QR will stop working and you will need to print the new one. Continue?' : 'Old NFC tags and any printed stamp QR will stop adding stamps. Continue?')) return;
@@ -886,7 +911,7 @@ function impPick(inp) {
 async function impGo(btn) {
   btn.disabled = true; let added = 0;
   try {
-    for (let i = 0; i < impRows.length; i += 500) { const r = await rpc(sb, 'import_members', { p_slug: CFG.slug, p_rows: impRows.slice(i, i + 500) }); added += r.added }
+    for (let i = 0; i < impRows.length; i += 500) { const r = await rpc(sb, 'import_members', { p_slug: biz.slug, p_rows: impRows.slice(i, i + 500) }); added += r.added }
     $('#imp').innerHTML = ''; impRows = null; toast(added + ' customers imported. They join with their phone number.'); burst();
   } catch (e) { btn.disabled = false; toast(/function|schema cache/i.test(String(e && e.message || e)) ? 'Run the latest supabase/schema.sql first' : nice(e)) }
 }
@@ -950,13 +975,13 @@ function catsV() {
 }
 async function addCat() {
   const i = $('#cnew'), name = i ? i.value.trim() : ''; if (!name) return toast('Type a category name');
-  try { await rpc(sb, 'save_menu_category', { p_slug: CFG.slug, p_id: null, p_name: name }); await loadCats(); render(); toast('Category added'); const j = $('#cnew'); if (j) j.focus() }
+  try { await rpc(sb, 'save_menu_category', { p_slug: biz.slug, p_id: null, p_name: name }); await loadCats(); render(); toast('Category added'); const j = $('#cnew'); if (j) j.focus() }
   catch (e) { toast(catErr(e)) }
 }
 async function moveCat(id, d) {
   const a = CATS.map(c => c.id), i = a.indexOf(id), j = i + d; if (i < 0 || j < 0 || j >= a.length) return;
   [a[i], a[j]] = [a[j], a[i]]; CATS = a.map(x => CATS.find(c => c.id == x)); render();
-  try { await rpc(sb, 'reorder_menu_categories', { p_slug: CFG.slug, p_ids: a }) } catch (e) { toast(catErr(e)); await loadCats(); render() }
+  try { await rpc(sb, 'reorder_menu_categories', { p_slug: biz.slug, p_ids: a }) } catch (e) { toast(catErr(e)); await loadCats(); render() }
 }
 function catEditV() {
   const id = String(ov).slice(4), c = catOk() && CATS.find(x => x.id == id);
@@ -976,8 +1001,8 @@ async function saveCat(btn, id) {
   const ids = [...document.querySelectorAll('.cpick:checked')].map(x => x.value);
   btn.disabled = true;
   try {
-    await rpc(sb, 'save_menu_category', { p_slug: CFG.slug, p_id: id, p_name: name });
-    await rpc(sb, 'set_category_items', { p_slug: CFG.slug, p_category: id, p_items: ids });
+    await rpc(sb, 'save_menu_category', { p_slug: biz.slug, p_id: id, p_name: name });
+    await rpc(sb, 'set_category_items', { p_slug: biz.slug, p_category: id, p_items: ids });
     await loadMenuAdm(); toast('Saved'); go('p', 'cats');
   } catch (e) { btn.disabled = false; toast(catErr(e)) }
 }
@@ -1014,13 +1039,13 @@ async function svMenu(btn) {
     let img = v('mx') == '1' ? '' : (cur && cur.image_url) || '';
     const f = $('#mfile').files[0];
     if (f) img = await readImg(f, 'menu');
-    const args = { p_slug: CFG.slug, p_id: isNew ? null : ov, p_title: title, p_description: v('md').trim(), p_price: v('mp').trim(), p_image: img, p_available: v('mav') != '0' };
+    const args = { p_slug: biz.slug, p_id: isNew ? null : ov, p_title: title, p_description: v('md').trim(), p_price: v('mp').trim(), p_image: img, p_available: v('mav') != '0' };
     if (catOk()) {
       let cat = v('mcat') || null;
       if (cat == '__new') {
         const nm = v('mcatn').trim();
         if (!nm) { btn.disabled = false; return toast('Type the new category name') }
-        cat = await rpc(sb, 'save_menu_category', { p_slug: CFG.slug, p_id: null, p_name: nm });
+        cat = await rpc(sb, 'save_menu_category', { p_slug: biz.slug, p_id: null, p_name: nm });
       }
       args.p_category = cat;
     }
@@ -1042,7 +1067,7 @@ function openIns() { go('h', 'ins'); loadIns() }
 async function loadIns(days) {
   if (days) insDays = days;
   insBusy = true; insErr = ''; render();
-  try { INS = await rpc(sb, 'analytics', { p_slug: CFG.slug, p_days: insDays }) }
+  try { INS = await rpc(sb, 'analytics', { p_slug: biz.slug, p_days: insDays }) }
   catch (e) { INS = null; insErr = /function|schema cache/i.test(String(e && e.message || e)) ? 'Run supabase/2026-10-12-analytics.sql in Supabase first.' : nice(e) }
   insBusy = false; if (tab == 'h' && ov == 'ins') render();
 }
@@ -1133,9 +1158,31 @@ function view() {
 function render() {
   const y = window.scrollY;
   const sg = signed && !recover && biz;
-  $('#top').innerHTML = sg ? hero() + nav() : '';
+  const top = $('#top'); top.innerHTML = sg ? hero() + nav() : '';
   const m = $('#app'); m.className = sg ? 'a' : '';
-  m.innerHTML = recover ? recoverV() : !signed ? loginV() : !biz ? deniedV() : view();
+  m.innerHTML = recover ? recoverV() : !signed ? loginV() : shops && shops.length > 1 ? pickerV() : !biz ? deniedV() : view();
+  document.body.classList.toggle('a-body', sg);
+  document.body.classList.toggle('signed', sg);
+  if (sg) {
+    let shell = document.querySelector('.a-shell');
+    if (!shell) {
+      shell = document.createElement('div');
+      shell.className = 'a-shell';
+      const appEl = document.querySelector('#app');
+      const topEl = document.querySelector('#top');
+      if (topEl && topEl.nextSibling) topEl.parentNode.insertBefore(shell, topEl.nextSibling);
+      else topEl.parentNode.appendChild(shell);
+      shell.appendChild(topEl);
+      shell.appendChild(appEl);
+    }
+  } else {
+    const shell = document.querySelector('.a-shell');
+    if (shell) {
+      shell.parentNode.appendChild(document.querySelector('#top'));
+      shell.parentNode.appendChild(document.querySelector('#app'));
+      shell.remove();
+    }
+  }
   if (sg && tab == 'h') drawQR();
   if (sg && tab == 'm') { dgSum(); brPv() }
   if (sg && tab == 'o' && ov == 'stamp') pvStamps();
@@ -1144,7 +1191,6 @@ function render() {
 
 (async () => {
   if (notReady()) { $('#app').innerHTML = setupMsg; return }
-  if (!(await resolveShop())) { $('#app').innerHTML = noShopMsg; return }
   sb.auth.onAuthStateChange(ev => { if (ev == 'PASSWORD_RECOVERY') { recover = true; signed = true; render() } });
   const { data: { session } } = await sb.auth.getSession();
   if (session) await enter(); else render();

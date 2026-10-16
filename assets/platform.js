@@ -12,8 +12,9 @@ const dAgo = t => t ? Math.floor((Date.now() - new Date(t)) / 864e5) : null;
 const ago = t => { const d = dAgo(t); return d === null ? 'never' : d <= 0 ? 'today' : d == 1 ? 'yesterday' : d + ' days ago' };
 const baseDom = () => String(CFG.baseDomain || '').replace(/^\./, '');
 const shopHost = r => (r.domains && r.domains[0]) || (baseDom() ? r.slug + '.' + baseDom() : null);
-// Link for a shop. A single-shop deployment (config slug set) only serves its own shop on this address.
-const shopUrl = (r, path) => { const h = shopHost(r); if (h) return 'https://' + h + path; return CFG.slug == r.slug ? location.origin + path : null };
+// Customer page for a shop: its own domain if it has one, otherwise this address with ?shop=<slug>
+// (that is the shared-domain routing; see resolveShop in common.js). Never null.
+const custUrl = r => (shopHost(r) ? 'https://' + shopHost(r) : location.origin) + '/app/?shop=' + encodeURIComponent(r.slug);
 const missingSql = e => /function|schema cache|does not exist|relation/i.test(String(e && e.message || e)) ? 'Run the latest supabase/schema.sql in Supabase first.' : null;
 const bad = e => toast(missingSql(e) || nice(e));
 const R = slug => rows.find(r => r.slug == slug);
@@ -264,15 +265,15 @@ function auditV() {
 
 function shopV() {
   const r = R(sel); if (!r) return topV();
-  const cu = shopUrl(r, '/app/'), ad = '/admin/?as=' + encodeURIComponent(r.slug);
+  const cu = custUrl(r), ad = '/admin/?as=' + encodeURIComponent(r.slug);
   const doneBox = created && created.slug == r.slug ? `<div class="card"><h2>${esc(r.name)} is ready</h2><p class="sub">Send the owner these details (this box disappears when you leave the page).</p>
-    <p style="margin:6px 0"><b>Dashboard:</b> ${esc((shopUrl(r, '/admin/')) || '(add a domain first)')}<br><b>Email:</b> ${esc(created.email)}<br><b>Password:</b> ${created.pw ? esc(created.pw) : '(their existing password)'}</p><button class="btn sm alt" onclick="created=null;render()">Dismiss</button></div>` : '';
+    <p style="margin:6px 0"><b>Admin:</b> ${esc(location.origin + '/admin/')}<br><b>Email:</b> ${esc(created.email)}<br><b>Password:</b> ${esc(created.pw ? created.pw : '(their existing password)')}</p><p class="hint">The owner signs in at /admin/ with this email and password — no shop link needed.</p><button class="btn sm alt" onclick="created=null;render()">Dismiss</button></div>` : '';
   const tabs = [['overview', 'Overview'], ['customers', 'Customers'], ['access', 'Access and notes']].map(t => `<button class="${ptab == t[0] ? 'on' : ''}" onclick="setTab('${t[0]}')">${t[1]}</button>`).join('');
   return topV() + doneBox + `<div class="card"><button class="lnk" onclick="go('#')">← All shops</button>
     <div class="pf-head"><i class="pf-dot big" style="background:${esc(HEX6.test(r.color) ? r.color : '#8a4b2a')}"></i><div><h2 style="margin:0">${esc(r.name)}</h2><div class="mut sm">${esc(r.slug)}${shopHost(r) ? ' · ' + esc(shopHost(r)) : ''}</div></div></div>
     <div class="pf-chips" style="margin:8px 0 12px">${chips(r)}</div>
-    <div class="row"><a class="btn sm" href="${ad}" target="_blank" rel="noopener">Open dashboard as owner</a><a class="btn sm alt" href="${ad}&tab=ins" target="_blank" rel="noopener">Insights</a>${cu ? `<a class="btn sm alt" href="${esc(cu)}" target="_blank" rel="noopener">Customer app</a>` : ''}</div>
-    <p class="hint">Opening the dashboard lets you change anything the owner can (offers, brand, menu, customers). It is logged and the owner sees it in their dashboard.</p></div>
+    <div class="row"><a class="btn sm" href="${ad}" target="_blank" rel="noopener">Open dashboard as owner</a><a class="btn sm alt" href="${ad}&tab=ins" target="_blank" rel="noopener">Insights</a><a class="btn sm alt" href="/admin/" target="_blank" rel="noopener">Open admin</a><a class="btn sm alt" href="${esc(cu)}" target="_blank" rel="noopener">Customer app</a></div>
+    <p class="hint">Open admin goes to /admin/ — sign in with this shop's owner email (${esc(r.owner_email || 'not set')}). Opening the dashboard as owner lets you change anything the owner can (offers, brand, menu, customers) and is logged. The owner sees it in their dashboard.</p></div>
     <div class="tabs">${tabs}</div>` + (ptab == 'customers' ? custV(r) : ptab == 'access' ? accessV(r) : overviewV(r));
 }
 function overviewV(r) {

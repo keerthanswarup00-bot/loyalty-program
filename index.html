@@ -10,7 +10,7 @@
 <meta property="og:description" content="Stamp cards, a daily scratch card and offers for neighbourhood shops. No new POS, nothing to install.">
 <script>
 // Printed NFC/QR links (#scan=, #join=) and already-installed home-screen apps still open the customer app.
-(function(){try{var h=location.hash;if(/(^|[#&])(scan|join)=/.test(h)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true){location.replace('/app/'+h)}}catch(e){}})();
+  (function(){try{var h=location.hash,q=location.search,s=/[?&]shop=/.test(q);if(/(^|[#&])(scan|join)=/.test(h)||s||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true){location.replace('/app/'+q+h)}}catch(e){}})();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
