@@ -61,6 +61,12 @@ function row(href, icon, label, sub, pri, ext) {
   return `<a class="cn-act${pri ? ' pri' : ''}" href="${esc(href)}"${e}><span class="cn-ai">${icon}</span><span class="cn-at"><b>${esc(label)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span><span class="cn-ar">${I.arrow}</span></a>`;
 }
 
+// A big square-ish tile for the main actions (loyalty, directions, WhatsApp, call, review, socials).
+function tile(href, icon, label, sub, cls, ext) {
+  const e = ext ? ' target="_blank" rel="noopener"' : '';
+  return `<a class="cn-tile${cls ? ' ' + cls : ''}" href="${esc(href)}"${e}><span class="cn-ti">${icon}</span><span class="cn-tt"><b>${esc(label)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span><span class="cn-tg">${I.arrow}</span></a>`;
+}
+
 function socialList(b) {
   const out = [];
   const push = (label, url, icon) => { const u = httpsOnly(url); if (u) out.push({ label, url: u, icon }) };
@@ -93,23 +99,21 @@ function gallerySection() {
 function view() {
   const b = B;
   const wd = waDigits(b);
-  const q = [
-    mapsHref(b) ? quick(mapsHref(b), I.pin, 'Directions', true) : '',
-    telHref(b) ? quick(telHref(b), I.call, 'Call', false) : '',
-    wd ? quick(waHref(wd, 'Hi ' + b.name + '!'), I.wa, 'WhatsApp', true) : ''
-  ].filter(Boolean).join('');
   const soc = socialList(b);
   const rev = httpsOnly(b.review_url);
+  const tiles = [
+    tile(appBase(), I.gift, 'Join the loyalty card', 'Collect stamps, earn rewards', 'pri', false),
+    mapsHref(b) ? tile(mapsHref(b), I.pin, 'Find us', 'Get directions', '', true) : '',
+    rev ? tile(rev, I.star, 'Review us on Google', 'Takes a minute', '', true) : '',
+    wd ? tile(waHref(wd, 'Hi ' + b.name + '!'), I.wa, 'WhatsApp', 'Message the shop', '', true) : '',
+    telHref(b) ? tile(telHref(b), I.call, 'Call', 'Speak to the shop', '', false) : '',
+    ...soc.map(x => tile(x.url, x.icon, x.label, x.label == 'Website' ? 'Visit our site' : 'Follow us', '', true))
+  ].filter(Boolean).join('');
   return `<header class="cn-hero"><div class="logo">${mark(b)}</div><h1>${esc(b.name)}</h1>${b.tagline ? `<p>${esc(b.tagline)}</p>` : ''}</header>
-  ${q ? `<nav class="cn-quick" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
-  <nav class="cn-acts" aria-label="More from ${esc(b.name)}">
-    ${row(appBase(), I.gift, 'Join the loyalty card', 'Collect stamps, earn rewards', true, false)}
-    ${rev ? row(rev, I.star, 'Leave a review', 'Takes a minute', false, true) : ''}
-  </nav>
+  <nav class="cn-tiles" aria-label="Contact and links for ${esc(b.name)}">${tiles}</nav>
   ${rev ? `<p class="cn-note">Honest reviews only — we don't offer rewards in exchange for them.</p>` : ''}
   ${menuSection()}
   ${gallerySection()}
-  ${soc.length ? `<section class="cn-sec"><h2>Find us online</h2><div class="cn-soc">${soc.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${x.icon}<span>${esc(x.label)}</span></a>`).join('')}</div></section>` : ''}
   <section class="cn-sec"><h2>Share</h2>
     <div class="cn-share">
       <button type="button" class="cn-act" onclick="sharePage()"><span class="cn-ai">${I.share}</span><span class="cn-at"><b>Share this page</b><small>WhatsApp, or anywhere</small></span></button>

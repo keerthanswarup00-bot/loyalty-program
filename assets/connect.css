@@ -52,3 +52,22 @@ main.cn{max-width:520px;margin:0 auto;padding:16px 16px 48px}
 .cn-foot a{color:var(--mut)}
 .cn.sk .card i{margin-inline:auto}
 @media (prefers-reduced-motion:reduce){.cn-act,.cn-quick-a{transition:none}}
+
+/* Big action tiles: loyalty (full width), then two per row on phones. */
+.cn-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 0}
+.cn-tile{position:relative;display:flex;flex-direction:column;justify-content:space-between;gap:22px;min-height:150px;padding:16px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-card,22px);color:var(--tx);text-decoration:none;transition:transform .15s,border-color .15s,box-shadow .15s}
+.cn-tile:hover,.cn-tile:focus-visible{transform:translateY(-2px);border-color:var(--brand);outline:0;box-shadow:0 14px 28px -22px color-mix(in srgb,var(--brand) 70%,transparent)}
+.cn-tile.pri{grid-column:1/-1;min-height:120px;background:var(--brand);border-color:var(--brand);color:var(--on-brand,#fff)}
+.cn-tile:last-child:nth-child(even){grid-column:1/-1;min-height:120px}
+.cn-ti{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand-t-l,var(--brand))}
+.cn-ti svg{width:26px;height:26px}
+.cn-tile.pri .cn-ti{background:color-mix(in srgb,var(--on-brand,#fff) 18%,transparent);color:var(--on-brand,#fff)}
+.cn-tt b{display:block;font-size:17px;font-weight:650;line-height:1.2}
+.cn-tt small{display:block;margin-top:4px;color:var(--mut);font-size:13px;line-height:1.35}
+.cn-tile.pri .cn-tt b{font-size:19px}
+.cn-tile.pri .cn-tt small{color:inherit;opacity:.88}
+.cn-tg{position:absolute;top:16px;right:16px}
+.cn-tg svg{width:18px;height:18px;display:block;opacity:.5}
+.cn-tile.pri .cn-tg svg{opacity:.8}
+@media(max-width:340px){.cn-tiles{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.cn-tile{transition:none}}
