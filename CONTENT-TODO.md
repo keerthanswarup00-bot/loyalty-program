@@ -6,7 +6,7 @@ Nothing on the live site shows a placeholder. Anything unset is hidden until you
 ## Done (17 Oct)
 Phone and WhatsApp (+91 63642 24230), free pilot = 1 month, setup within a day, NFC stamp and poster
 included, founder story and the meaning of the name, refund policy (Terms, "Cancelling and refunds"),
-interactive Connect page.
+interactive Connect page, favicon set and link-preview image, rebuilt About page, 404 page.
 
 ## Still needed
 | # | What | Where | Notes |
@@ -15,7 +15,6 @@ interactive Connect page.
 | 2 | **Photo** of you (square, 600px+) saved as `/assets/aryan.jpg` | `founder.photo` | A face builds more trust with a local shop owner than any copy. |
 | 3 | **Role and city** (e.g. "Founder", "Bengaluru") | `founder.role`, `founder.city` | Hidden until set. |
 | 4 | **What you do** (1 to 2 sentences) | `founder.work` | Optional. |
-| 5 | **Link-preview image** 1200x630 | `defaultOgImage` | Without it, shared links on WhatsApp show no picture. |
 | 6 | **A real shop with written permission** (name, area, one quote) | `proof` | Section stays hidden until you have one. Cheesora Bliss is the obvious first: ask them. |
 | 7 | **Prefilled WhatsApp messages** (hero, contact, connect, floating button) | `whatsapp.messages` | Right now all use "Hi, I would like to know more about Innondu." |
 | 8 | **DTS demo page**: real WhatsApp number and hours from the shop, or remove the "contact details to be confirmed" note | `/dts/index.html` | |

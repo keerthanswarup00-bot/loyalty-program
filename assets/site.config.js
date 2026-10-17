@@ -9,7 +9,7 @@
 window.SITE = {
   siteUrl: 'https://www.innondu.com',
   siteName: 'Innondu',
-  defaultOgImage: 'TODO_DEFAULT_OG_IMAGE',      // path to a 1200x630 image, e.g. '/assets/og.png'
+  defaultOgImage: 'https://www.innondu.com/assets/og.png',   // 1200x630 share image
 
   founder: {
     name: 'Aryan Swaroop',

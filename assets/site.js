@@ -217,7 +217,7 @@
   var sub = document.getElementById('founder-sub');
   if (sub) {
     var bits = [real(f.role), real(f.city)].filter(Boolean).map(esc);
-    if (bits.length) sub.innerHTML = bits.join(' &middot; '); else sub.remove();
+    if (bits.length) sub.innerHTML = ' &middot; ' + bits.join(' &middot; '); else sub.remove();
   }
 
   // Homepage strip: "Who is behind this".
