@@ -5,6 +5,7 @@
     var plans = ((window.SITE || {}).pricing || {}).plans || [];
     var pm = new URLSearchParams(location.search).get('plan'), box = document.getElementById('cm');
     var hit = plans.filter(function (p) { return p.id === pm; })[0];
+    if (box && pm === 'pilot' && !box.value) box.value = 'I would like to start a free pilot for my shop.';
     if (box && hit && !box.value) box.value = 'I would like the ' + hit.name + ' plan (\u20b9' + hit.perMonth + ' a month).';
   } catch (e) {}
   var cfg = window.LK || {}, f = document.getElementById('cf'), msg = document.getElementById('cmsg'), btn = document.getElementById('cb');

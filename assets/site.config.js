@@ -30,28 +30,21 @@ window.SITE = {
     messages: {
       hero: 'TODO_WA_MSG_HERO',                  // hero call to action
       contact: 'TODO_WA_MSG_CONTACT',            // contact page
-      pilot: 'TODO_WA_MSG_PILOT',                // pilot block
       connect: 'TODO_WA_MSG_CONNECT',            // connect page
       float: 'TODO_WA_MSG_FLOAT'                 // floating button
     }
   },
 
   pricing: {
-    // The three plans on the homepage. perMonth is in rupees; months is the commitment. Totals and
-    // "save X%" are calculated from these two numbers, so the page cannot disagree with itself.
+    // perMonth is in rupees; months is the term, paid upfront. Totals and savings are calculated
+    // from these two numbers, so the page cannot disagree with itself. First plan = month-to-month.
     plans: [
-      { id: 'monthly', name: 'Monthly',  tagline: 'No commitment',               perMonth: 699, months: 1 },
-      { id: '1y',      name: '1 Year',   tagline: 'Best for most shops',         perMonth: 499, months: 12, recommended: true },
-      { id: '2y',      name: '2 Years',  tagline: 'Lowest price per month',      perMonth: 449, months: 24 }
+      { id: 'monthly', name: 'Monthly', tagline: 'Pay month to month',     perMonth: 699, months: 1 },
+      { id: '1y',      name: '1 Year',  tagline: 'Best for most shops',    perMonth: 499, months: 12, recommended: true },
+      { id: '2y',      name: '2 Years', tagline: 'Lowest price per month', perMonth: 449, months: 24 }
     ],
-    software: 'TODO_PRICING_SOFTWARE',            // Is the app itself free to use?
-    subscription: 'TODO_PRICING_SUBSCRIPTION',    // Monthly / yearly subscription, or none?
-    perRedemption: 'TODO_PRICING_PER_REDEMPTION', // Any fee when a reward is redeemed?
-    hardware: 'TODO_PRICING_HARDWARE',            // What the NFC stamp and the poster cost
-    pilot: 'TODO_PRICING_PILOT',                  // Free pilot: how long, what it includes
-    afterPilot: 'TODO_PRICING_AFTER_PILOT',       // What happens when the pilot ends
-    included: 'TODO_PRICING_INCLUDED',            // What the price includes
-    notIncluded: 'TODO_PRICING_NOT_INCLUDED'      // What it does not
+    // Optional: how long the free pilot runs, e.g. '30 days'. Leave '' until decided; never guess.
+    pilotLength: ''
   },
 
   // Real shops only, with written consent. While empty (or without any consent:true entry) the
@@ -79,6 +72,13 @@ window.SITE = {
     lastUpdated: 'TODO_LEGAL_LAST_UPDATED'      // e.g. '16 October 2026'
   },
 };
+
+// The cost FAQ answer is built from the plans above, so it can never quote a different price.
+(function (S) {
+  var p = S.pricing.plans, r = function (n) { return '\u20b9' + n; };
+  S.faq.cost = 'Start with a free pilot. After that: ' + r(p[0].perMonth) + ' a month, or ' + r(p[1].perMonth) +
+    ' a month paid once a year, or ' + r(p[2].perMonth) + ' a month paid once every two years. No GST is charged.';
+})(window.SITE);
 
 // Dev-only warning: list every placeholder still set, but only when the page is not served
 // from siteUrl (localhost, 127.0.0.1 and preview deploys count as dev).

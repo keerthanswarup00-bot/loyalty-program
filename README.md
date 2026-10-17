@@ -35,15 +35,13 @@ holds everything the Home, About and Contact pages say or link to. It is the onl
 - `whatsapp.number` / `whatsapp.message` — every "WhatsApp us" button becomes
   `https://wa.me/<number>?text=<message>`. Digits only, country code first (`919876543210`).
   Until a real number is set the buttons fall back to `/contact/`.
-- `pricing.*` — one entry per question the owner asks: `software` (is the app itself free),
-  `subscription`, `perRedemption`, `hardware` (NFC stamp and poster), `pilot` and `afterPilot`
-  (what the free pilot includes and what follows), plus `included` and `notIncluded`. Left as
-  placeholders until you decide. Do not guess. Any value still set to `TODO_...` renders on the
-  home page as a labelled "Placeholder" mark plus a draft note, so it cannot ship unnoticed.
+- `pricing.plans` — the three homepage plans: `{ id, name, tagline, perMonth, months, recommended }`.
+  Longer plans are paid upfront; totals and "You save" are calculated from `perMonth` and `months`.
+  `pricing.pilotLength` is optional (e.g. `'30 days'`); leave it empty until decided. The cost FAQ
+  answer (`faq.cost`) is built from the same plans. No GST is shown or charged (not registered).
 - `proof` — real shops only: `{ name, area, quote, metric, photo, consent }`. Only entries with
-  `consent: true` are shown. Empty by default, and while it is empty the proof section renders the
-  "run a free pilot" block instead (pilot terms from `pricing.*` and a WhatsApp/contact CTA) — a
-  page never shows an empty or invented grid. Never add a shop without consent, or a metric you
+  `consent: true` are shown. Empty by default, and while it is empty the proof section is hidden
+  (the free pilot lives in the pricing section) — a page never shows an empty or invented grid. Never add a shop without consent, or a metric you
   cannot stand behind.
 - `siteUrl`, `siteName`, `defaultOgImage` — canonical URL, site name, link-preview image
   (1200x630). Crawlers do not run JavaScript, so once the image exists copy the `og:image` tag

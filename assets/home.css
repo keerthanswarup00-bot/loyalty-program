@@ -251,28 +251,28 @@
 
 /* pricing plans */
 .plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:stretch}
-.plan{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:28px 28px 8px;position:relative}
+.plan{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:26px 28px 28px;position:relative}
 .plan.rec{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 24px 60px -24px rgba(139,123,255,.45)}
-.plan-top{display:flex;justify-content:space-between;align-items:flex-start;min-height:56px}
-.plan-ic{width:56px;height:56px;color:var(--fg)}
-.plan-ic svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.plan-top{display:flex;justify-content:space-between;align-items:center;min-height:34px}
+.plan-name{font:600 1.5rem/1 var(--display);letter-spacing:-.02em}
 .plan-badge,.plan-save{font:600 .78rem/1 var(--body);padding:8px 12px;border-radius:999px;white-space:nowrap}
 .plan-badge{background:var(--accent);color:var(--accent-fg)}
-.plan-save{background:#0e1116;border:1px solid var(--line);color:var(--accent)}
-.plan h3{font-size:1.6rem;font-weight:600;margin-top:22px;letter-spacing:-.02em}
-.plan-tag{color:var(--mut);margin-top:4px}
-.plan-price{margin:26px 0 22px}
-.plan-price b{font:600 2.8rem/1 var(--display);letter-spacing:-.03em}
-.plan-price span{color:var(--mut);font-size:.95rem}
-.plan-price small{display:block;margin-top:8px;color:var(--mut);font-size:.86rem}
-.plan-cta{width:100%;white-space:normal;text-align:center}
-.plan-note{text-align:center;color:var(--mut);font-size:.86rem;margin:14px 0 24px;min-height:1.3em}
-.plan.rec .plan-note{color:var(--accent)}
-.plan-list{margin-top:auto;border-top:1px solid var(--line);margin-inline:-28px;padding:22px 28px 26px}
-.plan-list p{color:var(--mut);font-weight:500;margin-bottom:12px;font-size:.95rem}
-.plan-list ul{list-style:none;margin:0;padding:0;display:grid;gap:11px}
-.plan-list li{display:flex;gap:12px;align-items:flex-start;font-size:.95rem;line-height:1.4}
-.pl-tick{width:18px;height:18px;flex:none;margin-top:2px;fill:none;stroke:var(--mut);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.plan.rec .pl-tick{stroke:var(--accent)}
+.plan-save{background:var(--bg);border:1px solid var(--line);color:var(--accent)}
+.plan-tag{color:var(--mut);margin-top:8px}
+.plan-price{margin:26px 0 10px}
+.plan-price b{font:600 3rem/1 var(--display);letter-spacing:-.035em}
+.plan-price span{color:var(--mut);font-size:1rem}
+.plan-bill{color:var(--mut);font-size:.92rem}
+.plan-saving{font-weight:600;font-size:.95rem;margin:6px 0 24px;min-height:1.4em;color:var(--fg)}
+.plan.rec .plan-saving{color:var(--accent)}
+.plan-cta{width:100%;margin-top:auto;white-space:normal;text-align:center}
+.inc{margin-top:20px;border:1px solid var(--line);border-radius:20px;padding:22px 28px;display:flex;gap:14px 36px;align-items:center;flex-wrap:wrap}
+.inc b{font-weight:600;white-space:nowrap}
+.inc ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:10px 28px}
+.inc li{display:flex;gap:9px;align-items:center;font-size:.95rem;color:var(--mut)}
+.pl-tick{width:18px;height:18px;flex:none;fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pilot{margin-top:20px;display:flex;justify-content:space-between;align-items:center;gap:20px 32px;flex-wrap:wrap;background:var(--soft);border:1px dashed color-mix(in srgb,var(--accent) 55%,transparent);border-radius:20px;padding:26px 28px}
+.pilot h3{font-size:1.35rem;margin:10px 0 6px}
+.pilot p{color:var(--mut);max-width:52ch}
 .plans-foot{text-align:center;color:var(--mut);font-size:.88rem;margin-top:26px}
-@media (max-width:900px){.plans{grid-template-columns:1fr;max-width:480px;margin-inline:auto}.plan.rec{order:-1}}
+@media (max-width:900px){.plans{grid-template-columns:1fr;max-width:480px;margin-inline:auto}.plan.rec{order:-1}.inc,.pilot{max-width:480px;margin-inline:auto;margin-top:20px}.pilot .btn{width:100%}}

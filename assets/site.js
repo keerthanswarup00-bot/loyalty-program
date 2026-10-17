@@ -63,13 +63,13 @@
   };
   var TICK = '<svg class="pl-tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   function rupees(n) { return '\u20b9' + Math.round(n).toLocaleString('en-IN'); }
-  function termLabel(m) { return m === 1 ? tr('pricing.billedMonthly', 'billed monthly') : tr('pricing.billedEvery', 'billed every') + ' ' + (m === 12 ? tr('pricing.year', 'year') : (m / 12) + ' ' + tr('pricing.years', 'years')); }
   function renderPricing() {
     var pBody = document.getElementById('pricing-body');
     if (!pBody) return;
-    var plans = ((cfg.pricing || {}).plans || []).filter(function (p) { return p && p.perMonth > 0 && p.months > 0; });
+    var pr = cfg.pricing || {};
+    var plans = (pr.plans || []).filter(function (p) { return p && p.perMonth > 0 && p.months > 0; });
     if (!plans.length) { pBody.innerHTML = ''; return; }
-    var base = plans[0].perMonth * 1; // first plan is the month-to-month reference
+    var base = plans[0].perMonth;
     var features = [
       tr('pricing.f1', 'Digital stamp card, in your customers\u2019 browser'),
       tr('pricing.f2', 'Daily scratch card'),
@@ -77,23 +77,31 @@
       tr('pricing.f4', 'Your own Connect page with QR code'),
       tr('pricing.f5', 'Owner dashboard on your phone')
     ];
-    pBody.innerHTML = '<div class="plans">' + plans.map(function (p, i) {
-      var total = p.perMonth * p.months, full = base * p.months, saved = full - total, pct = Math.round((1 - p.perMonth / base) * 100);
-      var isBase = i === 0;
-      var perks = features;
-      var head = tr('pricing.everything', 'Everything you need:');
-      var note = isBase ? tr('pricing.noCommit', 'No commitment') : tr('pricing.save', 'Save') + ' ' + rupees(saved) + ' ' + tr('pricing.vsMonthly', 'compared with paying monthly');
-      var cta = p.recommended ? 'btn accent' : 'btn ghost';
+    var cards = plans.map(function (p, i) {
+      var total = p.perMonth * p.months, saved = base * p.months - total, pct = Math.round((1 - p.perMonth / base) * 100);
+      var bill = i === 0 ? tr('pricing.payMonthly', 'Paid every month')
+        : rupees(total) + ' ' + (p.months === 12 ? tr('pricing.paidYear', 'paid upfront for the year') : tr('pricing.paidTerm', 'paid upfront for') + ' ' + (p.months / 12) + ' ' + tr('pricing.years', 'years'));
+      var save = i === 0 ? '' : tr('pricing.youSave', 'You save') + ' ' + rupees(saved);
       return '<article class="plan' + (p.recommended ? ' rec' : '') + '">' +
-        '<div class="plan-top">' + '<div class="plan-ic">' + (PLAN_ICONS[p.id] || '') + '</div>' +
+        '<div class="plan-top"><span class="plan-name">' + esc(p.name) + '</span>' +
           (p.recommended ? '<span class="plan-badge">' + esc(tr('pricing.recommended', 'Recommended')) + '</span>' : (pct > 0 ? '<span class="plan-save">' + esc(tr('pricing.save', 'Save')) + ' ' + pct + '%</span>' : '')) + '</div>' +
-        '<h3>' + esc(p.name) + '</h3><p class="plan-tag">' + esc(p.tagline) + '</p>' +
-        '<div class="plan-price"><div><b>' + rupees(p.perMonth) + '</b><span> / ' + esc(tr('pricing.perMonth', 'month')) + '</span></div><small>' + esc(termLabel(p.months)) + (p.months > 1 ? ' \u00b7 ' + rupees(total) : '') + '</small></div>' +
-        '<a class="' + cta + ' plan-cta" href="/contact/?plan=' + encodeURIComponent(p.id) + '">' + esc(tr('pricing.cta', 'Get started')) + ' \u2014 ' + esc(p.name) + '</a>' +
-        '<p class="plan-note">' + esc(note) + '</p>' +
-        '<div class="plan-list"><p>' + esc(head) + '</p><ul>' + perks.map(function (f) { return '<li>' + TICK + '<span>' + esc(f) + '</span></li>'; }).join('') + '</ul></div>' +
+        '<p class="plan-tag">' + esc(p.tagline) + '</p>' +
+        '<div class="plan-price"><b>' + rupees(p.perMonth) + '</b><span> / ' + esc(tr('pricing.perMonth', 'month')) + '</span></div>' +
+        '<p class="plan-bill">' + esc(bill) + '</p>' +
+        '<p class="plan-saving">' + (save ? esc(save) : '&nbsp;') + '</p>' +
+        '<a class="btn ' + (p.recommended ? 'accent' : 'ghost') + ' plan-cta" href="/contact/?plan=' + encodeURIComponent(p.id) + '">' + esc(tr('pricing.cta', 'Choose')) + ' ' + esc(p.name) + '</a>' +
         '</article>';
-    }).join('') + '</div><p class="plans-foot">' + esc(tr('pricing.foot', 'Prices are per shop, in Indian rupees. Every plan has the same features; a longer term only lowers the monthly price.')) + '</p>';
+    }).join('');
+    var len = pr.pilotLength && !isTodo(pr.pilotLength) ? ' ' + esc(tr('pricing.pilotFor', 'for')) + ' ' + esc(pr.pilotLength) : '';
+    pBody.innerHTML =
+      '<div class="plans">' + cards + '</div>' +
+      '<div class="inc"><b>' + esc(tr('pricing.inEvery', 'Included in every plan')) + '</b><ul>' +
+        features.map(function (f) { return '<li>' + TICK + '<span>' + esc(f) + '</span></li>'; }).join('') + '</ul></div>' +
+      '<div class="pilot"><div><div class="eyebrow">' + esc(tr('pricing.pilotEyebrow', 'Not sure yet?')) + '</div>' +
+        '<h3>' + esc(tr('pricing.pilotH', 'Start with a free pilot')) + len + '</h3>' +
+        '<p>' + esc(tr('pricing.pilotP', 'Run Innondu with your own regulars, see who comes back, then decide. Nothing to pay to start.')) + '</p></div>' +
+        '<a class="btn" href="/contact/?plan=pilot">' + esc(tr('pricing.pilotCta', 'Start a free pilot')) + '</a></div>' +
+      '<p class="plans-foot">' + esc(tr('pricing.foot', 'Prices are per shop, in rupees. No GST is charged. Longer plans are paid upfront.')) + '</p>';
   }
   renderPricing();
   document.addEventListener('i18n:change', renderPricing);
@@ -115,16 +123,7 @@
             '</figcaption></figure>';
         }).join('') + '</div>';
     } else {
-      var pilot = cfg.pricing || {};
-      sBody.innerHTML =
-        '<div class="sec-head"><div class="eyebrow">Free pilot</div><h2>Run a free pilot with your shop.</h2>' +
-        '<p class="lead">No shops are listed here yet &mdash; we are running pilots first. Try Innondu with your regulars for a fixed period, see who comes back, then decide.</p></div>' +
-        '<dl class="price-list">' +
-        '<div class="price-row"><dt>The pilot</dt><dd>' + val(pilot.pilot, 'pilot') + '</dd></div>' +
-        '<div class="price-row"><dt>After the pilot</dt><dd>' + val(pilot.afterPilot, 'afterPilot') + '</dd></div>' +
-        '</dl>' +
-        '<div class="pilot-cta"><a class="btn accent" data-site-wa="whatsapp.number" data-wa-msg="pilot" data-fallback="/contact/" href="/contact/" target="_blank" rel="noopener">WhatsApp us</a>' +
-        '<a class="linkbtn" href="/contact/">Or set up my shop</a></div>';
+      var sec = document.getElementById('proof'); if (sec) sec.hidden = true;
     }
   }
 })();
