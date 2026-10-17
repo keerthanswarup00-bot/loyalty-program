@@ -143,10 +143,7 @@
   }
   function isTodo(v) { return typeof v === 'string' && /TODO_/.test(v); }
   function real(v) { return typeof v === 'string' && !isTodo(v) && v.trim() ? v.trim() : ''; }
-  function phMark(path) {
-    var key = path.split('.').pop();
-    return '<span class="tbd-ph" title="Set ' + esc(path) + ' in assets/site.config.js">[' + esc(key) + ']</span>';
-  }
+  function phMark() { return ''; }  // unset values never render on the page; the console lists them
   function textOf(path) {
     var v = readPath(path);
     return real(v) ? esc(v) : phMark(path);
@@ -171,12 +168,12 @@
   [].forEach.call(document.querySelectorAll('[data-site-tel]'), function (a) {
     var path = a.getAttribute('data-site-tel'), v = readPath(path), d = digits(v);
     if (real(v)) { a.textContent = v; a.href = d.length >= 4 ? 'tel:' + d : (a.getAttribute('data-fallback') || '/contact/'); }
-    else { a.innerHTML = phMark(path); a.href = a.getAttribute('data-fallback') || '/contact/'; }
+    else { if (!a.textContent.replace(/\u00a0/g, '').trim()) a.textContent = 'our contact page'; a.href = a.getAttribute('data-fallback') || '/contact/'; }
   });
   [].forEach.call(document.querySelectorAll('[data-site-mail]'), function (a) {
     var path = a.getAttribute('data-site-mail'), v = readPath(path);
     if (real(v)) { a.textContent = v; a.href = 'mailto:' + v; }
-    else { a.innerHTML = phMark(path); a.href = a.getAttribute('data-fallback') || '/contact/'; }
+    else { if (!a.textContent.replace(/\u00a0/g, '').trim()) a.textContent = 'our contact page'; a.href = a.getAttribute('data-fallback') || '/contact/'; }
   });
 
   // A WhatsApp link for a chosen number (defaults to the site-wide one).
@@ -195,12 +192,16 @@
   var photoBox = document.getElementById('founder-photo-box');
   if (photoBox) {
     var photo = readPath('founder.photo'), nm = real(readPath('founder.name')) || 'Founder';
-    photoBox.innerHTML = real(photo)
-      ? '<img src="' + esc(photo) + '" alt="' + esc(nm) + '" loading="lazy" decoding="async">'
-      : '<span class="founder-photo-ph">' + phMark('founder.photo') + '</span>';
+    if (real(photo)) photoBox.innerHTML = '<img src="' + esc(photo) + '" alt="' + esc(nm) + '" loading="lazy" decoding="async">';
+    else photoBox.remove();
   }
 
   var f = cfg.founder || {};
+  var sub = document.getElementById('founder-sub');
+  if (sub) {
+    var bits = [real(f.role), real(f.city)].filter(Boolean).map(esc);
+    if (bits.length) sub.innerHTML = bits.join(' &middot; '); else sub.remove();
+  }
 
   // Homepage strip: "Who is behind this".
   var strip = document.getElementById('founder-strip');
@@ -237,10 +238,6 @@
     ld.textContent = JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 2);
   }
 
-  // Legal pages carry a visible draft note; it should always show (placeholder values still
-  // render inline as [brackets] via the data-site-text fillers above).
-  var draft = document.querySelector('[data-draft-note]');
-  if (draft) draft.hidden = false;
 
   // Floating WhatsApp button on mobile only; small, dismissible, and not shown over forms/inputs.
   try {

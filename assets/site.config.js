@@ -52,24 +52,17 @@ window.SITE = {
   proof: [],
 
   faq: {
-    identity: 'TODO_FAQ_IDENTITY',
-    abuse: 'TODO_FAQ_ABUSE',
     ownership: 'Your shop owns its customer list. You can export it as a spreadsheet at any time and ask us to delete it. We do not sell or rent customer data.',
     setup: 'You tell us your shop name, your colour and the reward you want to give. We create your shop and send you the link, a QR code to print and your owner login. You do not install or connect anything.',
-    cost: 'TODO_FAQ_COST',
-    compat: 'TODO_FAQ_COMPAT',
+    cost: '',   // built from pricing.plans below
     install: 'No. Customers tap an NFC tag or scan your QR code and the card opens in their phone browser. They can add it to their home screen if they like, but they do not have to.',
-    exit: 'TODO_FAQ_EXIT',
-    connect: 'TODO_FAQ_CONNECT',              // What is the Connect page, and how is it different from the stamp card?
-    connectEdit: 'TODO_FAQ_CONNECT_EDIT',      // Who edits the Connect page, and how?
-    connectNfc: 'TODO_FAQ_CONNECT_NFC'         // Does the NFC keychain cost extra, and is it included?
   },
 
   legal: {
-    entity: 'TODO_LEGAL_ENTITY',                // business / legal entity name
+    entity: 'Aryan Swaroop',                // business / legal entity name
     grievanceEmail: 'TODO_GRIEVANCE_EMAIL',     // grievance / data-deletion contact
-    jurisdiction: 'TODO_LEGAL_JURISDICTION',    // e.g. Karnataka, India
-    lastUpdated: 'TODO_LEGAL_LAST_UPDATED'      // e.g. '16 October 2026'
+    jurisdiction: 'India',                      // governing law; add the courts city once a lawyer confirms
+    lastUpdated: '17 October 2026'              // update whenever the privacy notice or terms change
   },
 };
 

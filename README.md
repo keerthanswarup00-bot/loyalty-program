@@ -38,7 +38,7 @@ holds everything the Home, About and Contact pages say or link to. It is the onl
 - `pricing.plans` — the three homepage plans: `{ id, name, tagline, perMonth, months, recommended }`.
   Longer plans are paid upfront; totals and "You save" are calculated from `perMonth` and `months`.
   `pricing.pilotLength` is optional (e.g. `'30 days'`); leave it empty until decided. The cost FAQ
-  answer (`faq.cost`) is built from the same plans. No GST is shown or charged (not registered).
+  answer on the homepage (`faq.cost`) is built from the same plans. There is no separate /faq page. No GST is shown or charged (not registered).
 - `proof` — real shops only: `{ name, area, quote, metric, photo, consent }`. Only entries with
   `consent: true` are shown. Empty by default, and while it is empty the proof section is hidden
   (the free pilot lives in the pricing section) — a page never shows an empty or invented grid. Never add a shop without consent, or a metric you

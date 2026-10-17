@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e1116">
-<title>About. Innondu</title>
+<title>About | Innondu</title>
 <meta name="description" content="Innondu is built by one person. Here is who I am, why it exists, and exactly what you are trusting us with.">
 <meta property="og:title" content="About. Innondu">
 <meta property="og:description" content="Innondu is built by one person. Here is who I am, why it exists, and exactly what you are trusting us with.">
@@ -37,13 +37,13 @@
       <div>
         <div class="eyebrow rise" style="--d:0s">About</div>
         <h1 class="rise" style="--d:.08s" data-site-text="founder.name"></h1>
-        <p class="lead rise" style="--d:.16s"><span data-site-text="founder.role"></span> &middot; <span data-site-text="founder.city"></span></p>
+        <p class="lead rise" style="--d:.16s" id="founder-sub"></p>
       </div>
     </div>
   </div>
 </section>
 
-<section class="line">
+<section class="line" data-site-opt="founder.why">
   <div class="wrap narrow">
     <div class="sec-head reveal">
       <div class="eyebrow">Why Innondu exists</div>
@@ -59,7 +59,7 @@
       <div class="eyebrow">What I do</div>
       <h2>Design and creative strategy.</h2>
     </div>
-    <p class="reveal" data-site-text="founder.work"></p>
+    <p class="reveal" data-site-opt="founder.work" data-site-text="founder.work"></p>
     <p class="reveal" style="margin-top:18px"><a class="linkbtn" data-site-href="founder.portfolio" data-fallback="/contact/" href="https://aryanswaroop.com" target="_blank" rel="noopener">See my work at aryanswaroop.com &rarr;</a></p>
   </div>
 </section>
@@ -72,9 +72,9 @@
       <p class="lead">No support desk, no form queue. The message reaches the person who builds it.</p>
     </div>
     <ul class="contact-list reveal">
-      <li><b>Phone</b><a data-site-tel="founder.phone" data-fallback="/contact/" href="/contact/">&nbsp;</a></li>
+      <li data-site-opt="founder.phone"><b>Phone</b><a data-site-tel="founder.phone" data-fallback="/contact/" href="/contact/">&nbsp;</a></li>
         <li><b>WhatsApp</b><a data-site-wa="whatsapp.number" data-wa-msg="contact" data-fallback="/contact/" href="/contact/" target="_blank" rel="noopener">Message on WhatsApp</a></li>
-      <li><b>Email</b><a data-site-mail="founder.email" data-fallback="/contact/" href="/contact/">&nbsp;</a></li>
+      <li data-site-opt="founder.email"><b>Email</b><a data-site-mail="founder.email" data-fallback="/contact/" href="/contact/">&nbsp;</a></li>
     </ul>
   </div>
 </section>
@@ -133,7 +133,7 @@
     <nav aria-label="Footer"><a href="/about/">About</a><a href="/connect/">Connect</a><a href="/contact/">Contact</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/admin/">Owner login</a></nav>
   </div>
 </footer>
-<script src="/assets/site.config.js?v=2"></script>
-<script src="/assets/site.js?v=2"></script>
+<script src="/assets/site.config.js?v=4"></script>
+<script src="/assets/site.js?v=4"></script>
 </body>
 </html>

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /platform/
+Disallow: /connect-admin/
+Sitemap: https://www.innondu.com/sitemap.xml
