@@ -159,6 +159,10 @@
   }
 
   // Inline text from config (footer, founder's paragraphs).
+  // Optional wrapper: removed entirely while its value is still a placeholder, so no [brackets] ship.
+  [].forEach.call(document.querySelectorAll('[data-site-opt]'), function (el) {
+    if (!real(readPath(el.getAttribute('data-site-opt')))) el.remove();
+  });
   [].forEach.call(document.querySelectorAll('[data-site-text]'), function (el) {
     el.innerHTML = textOf(el.getAttribute('data-site-text'));
   });
@@ -201,15 +205,15 @@
   // Homepage strip: "Who is behind this".
   var strip = document.getElementById('founder-strip');
   if (strip) {
-    var line = real(f.name) ? esc(f.name) : phMark('founder.name');
-    line += ' &middot; ' + (real(f.role) ? esc(f.role) : phMark('founder.role'));
-    line += ' &middot; ' + (real(f.city) ? esc(f.city) : phMark('founder.city'));
+    var parts = [real(f.name) || 'Innondu', real(f.role), real(f.city)].filter(Boolean).map(esc);
+    // Until a founder story is written, use the honest one-liner from the About page.
+    var why = real(f.why) ? esc(f.why) : 'Tell me about your shop and I will set up a free pilot. You see who comes back before you decide anything.';
     strip.innerHTML =
       '<div class="founder-strip-in">' +
         (real(f.photo) ? '<img src="' + esc(f.photo) + '" alt="' + esc(real(f.name) || 'Founder') + '" loading="lazy" decoding="async" width="168" height="168">' : '') +
         '<div><div class="eyebrow">Who is behind this</div>' +
-        '<p class="founder-line">' + line + '</p>' +
-        '<p class="lead">' + textOf('founder.why') + '</p>' +
+        '<p class="founder-line">' + parts.join(' &middot; ') + '</p>' +
+        '<p class="lead">' + why + '</p>' +
         '<a class="linkbtn" href="/about/">More about ' + esc(real(f.name) || 'Innondu') + '</a></div>' +
       '</div>';
   }
