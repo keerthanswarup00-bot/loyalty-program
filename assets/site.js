@@ -75,7 +75,8 @@
       tr('pricing.f2', 'Daily scratch card'),
       tr('pricing.f3', 'One-tap WhatsApp win-backs'),
       tr('pricing.f4', 'Your own Connect page with QR code'),
-      tr('pricing.f5', 'Owner dashboard on your phone')
+      tr('pricing.f5', 'Owner dashboard on your phone'),
+      tr('pricing.f6', 'NFC stamp and QR poster for your counter')
     ];
     var cards = plans.map(function (p, i) {
       var total = p.perMonth * p.months, saved = base * p.months - total, pct = Math.round((1 - p.perMonth / base) * 100);
@@ -101,10 +102,26 @@
         '<h3>' + esc(tr('pricing.pilotH', 'Start with a free pilot')) + len + '</h3>' +
         '<p>' + esc(tr('pricing.pilotP', 'Run Innondu with your own regulars, see who comes back, then decide. Nothing to pay to start.')) + '</p></div>' +
         '<a class="btn" href="/contact/?plan=pilot">' + esc(tr('pricing.pilotCta', 'Start a free pilot')) + '</a></div>' +
-      '<p class="plans-foot">' + esc(tr('pricing.foot', 'Prices are per shop, in rupees. No GST is charged. Longer plans are paid upfront.')) + '</p>';
+      '<p class="plans-foot">' + esc(tr('pricing.foot', 'Prices are per shop, in rupees. No GST is charged. Longer plans are paid upfront; leave early and the unused months are refunded.')) + ' <a href="/terms/#refunds">' + esc(tr('pricing.refundLink', 'Refund policy')) + '</a></p>';
   }
   renderPricing();
   document.addEventListener('i18n:change', renderPricing);
+
+  // Terms page: refund numbers are filled from the same plans, so they cannot disagree with pricing.
+  (function () {
+    var plans = ((cfg.pricing || {}).plans || []);
+    if (!plans.length) return;
+    var m = plans[0].perMonth;
+    [].forEach.call(document.querySelectorAll('[data-plan-price]'), function (el) {
+      var p = plans.filter(function (x) { return x.id === el.getAttribute('data-plan-price'); })[0];
+      if (p) el.textContent = rupees(p.perMonth);
+    });
+    var ex = document.getElementById('refund-example'), y = plans.filter(function (x) { return x.months === 12; })[0];
+    if (ex && y) {
+      var total = y.perMonth * y.months, used = 3 * m;
+      ex.textContent = 'Example: you pay ' + rupees(total) + ' for the 1 Year plan and leave after 3 months. We keep 3 \u00d7 ' + rupees(m) + ' = ' + rupees(used) + ' and refund ' + rupees(total - used) + '.';
+    }
+  })();
 
   // Proof: consented shops only.
   var sBody = document.getElementById('proof-body');
@@ -208,7 +225,7 @@
   if (strip) {
     var parts = [real(f.name) || 'Innondu', real(f.role), real(f.city)].filter(Boolean).map(esc);
     // Until a founder story is written, use the honest one-liner from the About page.
-    var why = real(f.why) ? esc(f.why) : 'Tell me about your shop and I will set up a free pilot. You see who comes back before you decide anything.';
+    var why = real(f.whyShort) ? esc(f.whyShort) : real(f.why) ? esc(f.why) : 'Tell me about your shop and I will set up a free pilot. You see who comes back before you decide anything.';
     strip.innerHTML =
       '<div class="founder-strip-in">' +
         (real(f.photo) ? '<img src="' + esc(f.photo) + '" alt="' + esc(real(f.name) || 'Founder') + '" loading="lazy" decoding="async" width="168" height="168">' : '') +

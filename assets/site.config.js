@@ -16,16 +16,17 @@ window.SITE = {
     role: 'TODO_FOUNDER_ROLE',                  // e.g. Founder
     city: 'TODO_FOUNDER_CITY',
     photo: 'TODO_FOUNDER_PHOTO',                // path to the photo, e.g. '/assets/aryan.jpg'
-    why: 'TODO_FOUNDER_WHY',                    // one short, honest paragraph: why Innondu exists
+    why: 'There were already a few apps that did this, but not simply. Some tried to take over the whole business and its setup. Others did far more than a shop asked for: a new app, a new billing system and a lot of extras. What shops wanted was something small that sits beside their billing software, not instead of it. So Innondu only does rewards and customer management, and gives each shop a page of its own to show off the business.',
+    whyShort: 'There were already a few loyalty apps, but not simple ones. Innondu only does rewards and customer management, and sits beside your billing software.',
     work: 'TODO_FOUNDER_WORK',                  // what you do, e.g. design and creative strategy
-    phone: 'TODO_FOUNDER_PHONE',                // display number, any format
+    phone: '+91 63642 24230',                   // display number, any format
     email: 'TODO_FOUNDER_EMAIL',
-    whatsapp: 'TODO_FOUNDER_WHATSAPP',          // international, digits only: 919876543210
+    whatsapp: '916364224230',                   // international, digits only
     portfolio: 'https://aryanswaroop.com'
   },
 
   whatsapp: {
-    number: 'TODO_WHATSAPP_NUMBER',             // international, digits only: 919876543210
+    number: '916364224230',                      // international, digits only
     message: 'Hi, I would like to know more about Innondu.',
     messages: {
       hero: 'TODO_WA_MSG_HERO',                  // hero call to action
@@ -44,7 +45,7 @@ window.SITE = {
       { id: '2y',      name: '2 Years', tagline: 'Lowest price per month', perMonth: 449, months: 24 }
     ],
     // Optional: how long the free pilot runs, e.g. '30 days'. Leave '' until decided; never guess.
-    pilotLength: ''
+    pilotLength: '1 month'
   },
 
   // Real shops only, with written consent. While empty (or without any consent:true entry) the
@@ -53,7 +54,7 @@ window.SITE = {
 
   faq: {
     ownership: 'Your shop owns its customer list. You can export it as a spreadsheet at any time and ask us to delete it. We do not sell or rent customer data.',
-    setup: 'You tell us your shop name, your colour and the reward you want to give. We create your shop and send you the link, a QR code to print and your owner login. You do not install or connect anything.',
+    setup: 'You tell us your shop name, your colour and the reward you want to give. We create your shop and send you the link, your QR poster, an NFC stamp and your owner login. Setup is done within a day, and you do not install or connect anything.',
     cost: '',   // built from pricing.plans below
     install: 'No. Customers tap an NFC tag or scan your QR code and the card opens in their phone browser. They can add it to their home screen if they like, but they do not have to.',
   },
@@ -70,7 +71,7 @@ window.SITE = {
 (function (S) {
   var p = S.pricing.plans, r = function (n) { return '\u20b9' + n; };
   S.faq.cost = 'Start with a free pilot. After that: ' + r(p[0].perMonth) + ' a month, or ' + r(p[1].perMonth) +
-    ' a month paid once a year, or ' + r(p[2].perMonth) + ' a month paid once every two years. No GST is charged.';
+    ' a month paid once a year, or ' + r(p[2].perMonth) + ' a month paid once every two years. The NFC stamp and poster are included. No GST is charged.';
 })(window.SITE);
 
 // Dev-only warning: list every placeholder still set, but only when the page is not served
