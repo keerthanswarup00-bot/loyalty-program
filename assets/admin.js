@@ -946,28 +946,36 @@ async function loadCats() {
 let aromaSeedBusy = false;
 async function seedAromaProductsIfMissing() {
   if (aromaSeedBusy || !Array.isArray(MENU) || String(CFG.slug || '').toLowerCase() !== 'aroma-scripts') return;
+  const base = 'https://www.innondu.com/assets/';
   const defaults = [
-    { title: 'Vanilla Cloud', description: 'A soft, inviting fragrance for those who enjoy a warm, comforting scent.' },
-    { title: "Madhu's Essence", description: 'A distinctive personal fragrance created to make everyday moments memorable.' },
-    { title: 'His Muse', description: 'A signature fragrance designed for expressing individuality and personal style.' }
+    { title: 'Vanilla Cloud', description: 'A soft, inviting fragrance for those who enjoy a warm, comforting scent.', image: base + 'aroma-vanilla-cloud.svg' },
+    { title: "Madhu's Essence", description: 'A distinctive personal fragrance created to make everyday moments memorable.', image: base + 'aroma-madhus-essence.svg' },
+    { title: 'His Muse', description: 'A signature fragrance designed for expressing individuality and personal style.', image: base + 'aroma-his-muse.svg' }
   ];
-  const missing = defaults.filter(d => !MENU.some(x => String(x.title || '').trim().toLowerCase() === d.title.toLowerCase()));
-  if (!missing.length) return;
+  const tasks = defaults.filter(d => {
+    const found = MENU.find(x => String(x.title || '').trim().toLowerCase() === d.title.toLowerCase());
+    return !found || !found.image_url;
+  });
+  if (!tasks.length) return;
   aromaSeedBusy = true;
   try {
-    for (const item of missing) {
+    for (const item of tasks) {
+      const found = MENU.find(x => String(x.title || '').trim().toLowerCase() === item.title.toLowerCase());
       await rpc(sb, 'save_menu_item', {
-        p_slug: CFG.slug, p_id: null, p_title: item.title,
-        p_description: item.description, p_price: '', p_image: '', p_available: true
+        p_slug: CFG.slug, p_id: found ? found.id : null, p_title: item.title,
+        p_description: found && found.description ? found.description : item.description,
+        p_price: found && found.price ? found.price : '',
+        p_image: found && found.image_url ? found.image_url : item.image,
+        p_available: found ? found.available !== false : true
       });
     }
     const q = cols => sb.from('menu_items').select(cols).eq('business_id', biz.id).order('sort').order('created_at');
     const refreshed = await q(MCOLS + ',category_id');
     if (!refreshed.error) MENU = refreshed.data.map(x => ({ category_id: null, ...x }));
-    toast('Added the missing Aroma Scripts products. Add prices and photos in Menu.');
+    toast('Aroma Scripts products and artwork are ready. Add confirmed prices in Menu.');
   } catch (e) {
     console.error('Aroma Scripts product setup:', e);
-    toast('Products could not be added automatically. Check the Menu database setup.');
+    toast('Product setup failed. Check that the latest menu SQL migration is installed.');
   } finally {
     aromaSeedBusy = false;
     if (tab == 'p') render();

@@ -73,15 +73,21 @@ function socialList(b) {
 // Hero: a full-width photo with the shop name over it when the owner uploaded one, otherwise the colour hero.
 function heroSection(b) {
   const logo = `<div class="logo">${mark(b)}</div>`;
-  const tag = b.tagline ? `<p>${esc(b.tagline)}</p>` : '';
-  if (imgOk(b.hero_url)) {
-    return `<header class="cn-hero cn-hero-img"><img class="cn-hero-bg" src="${esc(b.hero_url)}" alt="" decoding="async" fetchpriority="high" onerror="this.parentNode.classList.remove('cn-hero-img');this.remove()"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
+  const isAroma = String(b.slug || '').toLowerCase() === 'aroma-scripts';
+  const tagText = b.tagline || (isAroma ? 'Every Scent Has a Story.' : '');
+  const tag = tagText ? `<p>${esc(tagText)}</p>` : '';
+  const heroUrl = imgOk(b.hero_url) ? b.hero_url : (isAroma ? 'https://www.innondu.com/assets/aroma-scripts-hero.svg' : '');
+  if (imgOk(heroUrl)) {
+    return `<header class="cn-hero cn-hero-img"><img class="cn-hero-bg" src="${esc(heroUrl)}" alt="" decoding="async" fetchpriority="high" onerror="this.parentNode.classList.remove('cn-hero-img');this.remove()"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
   }
   return `<header class="cn-hero${b.about ? ' cn-art' : ''}"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
 }
 // About: the owner's short description, shown right under the hero. Blank line = new paragraph.
 function aboutSection(b) {
-  const t = String(b.about || '').trim();
+  const fallback = String(b.slug || '').toLowerCase() === 'aroma-scripts'
+    ? 'At Aroma Scripts, we believe every fragrance tells a story, evokes an emotion, and creates a memory worth remembering. Our perfumes are handcrafted in small batches with carefully selected fragrance oils and a 30% fragrance concentration. From fresh notes to deep, indulgent compositions, each scent celebrates individuality. We also create bespoke fragrances tailored to your preferences.'
+    : '';
+  const t = String(b.about || fallback).trim();
   if (!t) return '';
   const paras = t.split(/\n{2,}/).map(x => `<p>${esc(x.trim()).replace(/\n/g, '<br>')}</p>`).join('');
   return `<section class="cn-about" aria-label="About ${esc(b.name)}"><div class="cn-eyebrow">About</div>${paras}</section>`;
