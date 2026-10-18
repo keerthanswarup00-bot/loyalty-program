@@ -624,13 +624,23 @@ const imgErr = e => toast(e == 'too big' ? 'Image too big (max 2 MB)' : e == 'no
 async function save(patch, btn, after) {
   if (btn) btn.disabled = true;
   const oldLogo = biz.logo_url, oldStamp = biz.stamp_url;
-  const { error } = await sb.from('businesses').update(patch).eq('id', biz.id);
+  let payload = patch;
+  let { error } = await sb.from('businesses').update(payload).eq('id', biz.id);
+  // Older production databases may not have the optional brand-story column yet.
+  // Save other settings instead of rejecting the entire form; show a clear migration hint.
+  let aboutNotReady = false;
+  if (error && Object.prototype.hasOwnProperty.call(payload, 'about') && /about.*schema cache|column.*about.*does not exist/i.test(String(error.message || error))) {
+    payload = { ...payload };
+    delete payload.about;
+    aboutNotReady = true;
+    ({ error } = await sb.from('businesses').update(payload).eq('id', biz.id));
+  }
   if (btn) btn.disabled = false;
   if (error) return toast(nice(error));
-  Object.assign(biz, patch); brand(biz);
-  if ('logo_url' in patch && patch.logo_url != oldLogo) await dropOld(oldLogo);
-  if ('stamp_url' in patch && patch.stamp_url != oldStamp) await dropOld(oldStamp);
-  toast('Saved');
+  Object.assign(biz, payload); brand(biz);
+  if ('logo_url' in payload && payload.logo_url != oldLogo) await dropOld(oldLogo);
+  if ('stamp_url' in payload && payload.stamp_url != oldStamp) await dropOld(oldStamp);
+  toast(aboutNotReady ? 'Other changes saved. Run the Aroma Scripts about-column SQL migration to save the description.' : 'Saved');
   if (after) after(); else render();
 }
 async function svStamp(btn) {
