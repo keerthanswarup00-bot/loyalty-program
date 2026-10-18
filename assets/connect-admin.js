@@ -89,19 +89,65 @@ async function load() {
     }
   } catch (e) { toast(nice(e)) }
 }
+let aromaSeedBusy = false;
+async function seedAromaProductsIfMissing() {
+  if (aromaSeedBusy || String(CFG.slug || '').toLowerCase() !== 'aroma-scripts') return;
+  const base = pubOrigin() + '/assets/';
+  const defaults = [
+    { title: 'Vanilla Cloud', description: 'A soft, inviting fragrance for those who enjoy a warm, comforting scent.', image: base + 'aroma-vanilla-cloud.svg' },
+    { title: "Madhu's Essence", description: 'A distinctive personal fragrance created to make everyday moments memorable.', image: base + 'aroma-madhus-essence.svg' },
+    { title: 'His Muse', description: 'A signature fragrance designed for expressing individuality and personal style.', image: base + 'aroma-his-muse.svg' }
+  ];
+  const tasks = defaults.filter(d => {
+    const found = ITEMS.find(x => String(x.title || '').trim().toLowerCase() === d.title.toLowerCase());
+    return !found || !String(found.image_url || '').trim();
+  });
+  if (!tasks.length) return;
+  aromaSeedBusy = true;
+  try {
+    for (const item of tasks) {
+      const found = ITEMS.find(x => String(x.title || '').trim().toLowerCase() === item.title.toLowerCase());
+      await rpc(sb, 'save_menu_item', {
+        p_slug: CFG.slug, p_id: found ? found.id : null, p_title: item.title,
+        p_description: found && found.description ? found.description : item.description,
+        p_price: found && found.price ? found.price : '',
+        p_image: found && found.image_url ? found.image_url : item.image,
+        p_available: found ? found.available !== false : true,
+        p_category: found ? (found.category_id || null) : null
+      });
+    }
+    toast('Aroma Scripts products and artwork added. Add confirmed prices in Products.');
+  } catch (e) {
+    console.error('Aroma Scripts product setup:', e);
+    toast('Could not finish product setup. Check the latest menu SQL migration.');
+  } finally { aromaSeedBusy = false }
+}
 async function loadMenu() {
   const it = await sb.from('menu_items').select('*').eq('business_id', bz.id).order('sort', { ascending: true }).order('created_at', { ascending: true });
   ITEMS = it.error ? [] : it.data;
   const ct = await sb.from('menu_categories').select('*').eq('business_id', bz.id).order('sort', { ascending: true }).order('created_at', { ascending: true });
   CATS = ct.error ? [] : ct.data;
+  if (!it.error) {
+    await seedAromaProductsIfMissing();
+    if (String(CFG.slug || '').toLowerCase() === 'aroma-scripts') {
+      const refreshed = await sb.from('menu_items').select('*').eq('business_id', bz.id).order('sort', { ascending: true }).order('created_at', { ascending: true });
+      if (!refreshed.error) ITEMS = refreshed.data;
+    }
+  }
 }
 async function savePatch(patch, btn, msg) {
   if (btn) btn.disabled = true;
-  const { error } = await sb.from('businesses').update(patch).eq('id', bz.id);
+  let payload = patch, aboutMissing = false;
+  let { error } = await sb.from('businesses').update(payload).eq('id', bz.id);
+  if (error && Object.prototype.hasOwnProperty.call(payload, 'about') && /about.*schema cache|column.*about.*does not exist/i.test(String(error.message || error))) {
+    payload = { ...payload }; delete payload.about; aboutMissing = true;
+    ({ error } = await sb.from('businesses').update(payload).eq('id', bz.id));
+  }
   if (btn) btn.disabled = false;
   if (error) { toast(nice(error)); return false }
-  Object.assign(bz, patch); brand(bz); document.title = bz.name + ' · Connect editor';
-  if (msg) toast(msg);
+  Object.assign(bz, payload); brand(bz); document.title = bz.name + ' · Connect editor';
+  if (aboutMissing) toast('Other changes saved. Run the about-column SQL migration to save the description.');
+  else if (msg) toast(msg);
   return true;
 }
 const go = t => { tab = t; form = null; heroDraft = undefined; render(); window.scrollTo(0, 0) };
@@ -353,7 +399,7 @@ function tabV() {
 }
 
 function tabStory() {
-  const hero = bz.hero_url && /^(https:|data:image)/.test(bz.hero_url) ? bz.hero_url : '';
+  const hero = bz.hero_url && /^(https:|data:image)/.test(bz.hero_url) ? bz.hero_url : (String(CFG.slug || '').toLowerCase() === 'aroma-scripts' ? pubOrigin() + '/assets/aroma-scripts-hero.svg' : '');
   return `<div class="a-card ce-card"><div class="a-h"><h2>Hero &amp; story</h2></div>
   <p class="sub">The first thing visitors see: a big photo with your shop name on it, and a few lines about you right below.</p>
   <label class="lb">Hero photo <span>(wide photo works best)</span></label>
@@ -363,7 +409,7 @@ function tabStory() {
     <button type="button" class="ce-hero-rm" onclick="rmHero()">Remove</button></div>
   <input type="hidden" id="hrrm" value="0">
   <label class="lb">Description <span>(a few lines about your shop)</span></label>
-  <textarea id="ab" rows="5" maxlength="600" placeholder="Tell visitors what makes your shop special: what you make, your story, what to try first." oninput="cnt()">${esc(bz.about || '')}</textarea>
+  <textarea id="ab" rows="5" maxlength="600" placeholder="Tell visitors what makes your shop special: what you make, your story, what to try first." oninput="cnt()">${esc(bz.about || (CFG.slug === "aroma-scripts" ? "At Aroma Scripts, we believe every fragrance tells a story, evokes an emotion, and creates a memory worth remembering. Our perfumes are handcrafted in small batches with carefully selected fragrance oils and a 30% fragrance concentration. From fresh notes to deep, indulgent compositions, each scent celebrates individuality. We also create bespoke fragrances tailored to your preferences." : ""))}</textarea>
   <div class="ce-count" id="abc">${(bz.about || '').length} / 600</div>
   <p class="note" style="text-align:left;margin:6px 0 0">Leave a blank line to start a new paragraph.</p>
   <label class="ce-sw"><input id="ly" type="checkbox"${bz.connect_loyalty !== false ? ' checked' : ''} onchange="pv()"><span class="ce-sw-t"><b>Show “Join the loyalty card”</b><small>Switch off while you are not running a loyalty card. You can turn it back on any time.</small></span><i aria-hidden="true"></i></label>
@@ -376,7 +422,7 @@ function tabBrand() {
   return `<div class="a-card"><div class="a-h"><h2>Branding</h2></div>
   <p class="sub">The name, tagline, colour and logo at the top of your Connect page.</p>
   <label class="lb">Shop name</label><input id="nm" value="${esc(bz.name)}" maxlength="60" oninput="pv()">
-  <label class="lb">Tagline <span>(one line)</span></label><input id="tg" value="${esc(bz.tagline)}" maxlength="90" placeholder="e.g. Coffee, bakes and good times." oninput="pv()">
+  <label class="lb">Tagline <span>(one line)</span></label><input id="tg" value="${esc(bz.tagline || (CFG.slug === "aroma-scripts" ? "Every Scent Has a Story." : ""))}" maxlength="90" placeholder="e.g. Coffee, bakes and good times." oninput="pv()">
   <label class="lb">Shop type</label><select id="vt" onchange="pv()">${Object.values(window.VERTICALS).map(v => `<option value="${esc(v.key)}"${v.key == bz.vertical ? ' selected' : ''}>${esc(v.label)}</option>`).join('')}</select>
   <p class="note">Sets the words on your page (${esc(V.section.toLowerCase())}) and the sample content you can add.</p>
   <label class="lb">Brand colour</label>
