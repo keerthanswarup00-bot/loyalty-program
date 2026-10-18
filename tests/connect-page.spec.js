@@ -107,6 +107,7 @@ test('Aroma Scripts Connect: shows saved featured products, offer and gallery', 
       { id: 'draft-item', title: 'Draft item', image_url: 'https://images.example/draft.jpg', available: false }
     ] }
   };
+  await page.route('https://images.example/**', route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="#ddd"/></svg>' }));
   await mock(page, aroma);
   await page.goto('/connect/aroma-scripts/');
   await expect(page.getByRole('heading', { name: 'Featured fragrances' })).toBeVisible();
