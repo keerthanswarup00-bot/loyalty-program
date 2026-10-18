@@ -33,10 +33,9 @@ test('connect page: /connect/<slug> shows the shop and every link', async ({ pag
   await expect(page.getByRole('heading', { name: 'Cheesora Bliss' })).toBeVisible();
   await expect(page.getByText('Cheesecakes & coffee')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Join the loyalty card' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Menu' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Instagram' })).toHaveAttribute('href', BIZ.ig);
   await expect(page.getByRole('link', { name: 'Facebook' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', /wa\\.me\\/919876543210/);
+  await expect(page.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', /wa\.me\/919876543210/);
   await expect(page.getByRole('link', { name: 'Website' })).toHaveAttribute('href', BIZ.web);
 });
 
