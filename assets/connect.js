@@ -175,7 +175,31 @@ function productCollectionSection() {
 function gallerySection() {
   const g = (Array.isArray(B.gallery) ? B.gallery : []).map(httpsOnly).filter(Boolean);
   if (!g.length) return '';
-  return `<section class="cn-sec"><h2>Photos</h2><div class="cn-gal">${g.map(u => `<img src="${esc(u)}" alt="${esc(B.name)}" loading="lazy" decoding="async" onerror="this.remove()">`).join('')}</div></section>`;
+  const isAroma = String(B.slug || '').toLowerCase() === 'aroma-scripts';
+  return `<section class="cn-sec${isAroma ? ' cn-gallery-aroma' : ''}"><h2>${isAroma ? 'A closer look' : 'Photos'}</h2>${isAroma ? '<p class="cn-section-intro">A little more of the world behind our fragrances.</p>' : ''}<div class="cn-gal${isAroma ? ' cn-gal-aroma' : ''}">${g.slice(0, isAroma ? 6 : 12).map((u, i) => `<img src="${esc(u)}" alt="${esc(B.name)} photo ${i + 1}" loading="lazy" decoding="async" onerror="this.remove()">`).join('')}</div></section>`;
+}
+
+function featuredProductsSection() {
+  if (String(B.slug || '').toLowerCase() !== 'aroma-scripts' || !MENU || !Array.isArray(MENU.items)) return '';
+  const items = MENU.items.filter(x => x && x.available !== false && imgOk(x.image_url)).slice(0, 3);
+  if (!items.length) return '';
+  const wd = waDigits(B);
+  return `<section class="cn-sec cn-featured-aroma"><div class="cn-featured-head"><div><span class="cn-eyebrow">Discover your scent</span><h2>Featured fragrances</h2><p class="cn-section-intro">Explore a few favourites, then find the scent that feels like you.</p></div><a class="cn-featured-all" href="${esc(collectionUrl())}">View all ${I.arrow}</a></div><div class="cn-featured-grid">${items.map(x => {
+    const category = (MENU.categories || []).find(c => c.id == x.category_id);
+    return `<article class="cn-featured-card"><button type="button" class="cn-featured-open" onclick="openProduct('${esc(x.id || slugifyText(x.title))}')" aria-label="View ${esc(x.title)}"><img src="${esc(x.image_url)}" alt="${esc(x.title)}" loading="lazy" decoding="async" onerror="this.closest('.cn-featured-card').remove()"><span class="cn-featured-meta">${category ? `<small>${esc(category.name)}</small>` : ''}<b>${esc(x.title)}</b>${x.price ? `<span>${esc(x.price)}</span>` : ''}</span><span class="cn-featured-plus" aria-hidden="true">↗</span></button>${wd ? `<a class="cn-featured-ask" href="${esc(waHref(wd, 'Hi ' + B.name + ', I would love to know more about ' + x.title + '.'))}" target="_blank" rel="noopener">Enquire on WhatsApp ${I.arrow}</a>` : ''}</article>`;
+  }).join('')}</div><a class="cn-featured-mobile-all" href="${esc(collectionUrl())}">Explore the full collection ${I.arrow}</a></section>${productSheetMarkup()}`;
+}
+
+function offerSection(b) {
+  if (String(b.slug || '').toLowerCase() !== 'aroma-scripts') return '';
+  const offer = b.connect_offer && typeof b.connect_offer === 'object' ? b.connect_offer : {};
+  const title = String(offer.title || '').trim(), text = String(offer.text || '').trim();
+  if (!title && !text) return '';
+  const url = httpsOnly(offer.url);
+  const wd = waDigits(b);
+  const href = url || (wd ? waHref(wd, 'Hi ' + b.name + ', I would like to know more about: ' + (title || 'your current offer') + '.') : '');
+  const label = String(offer.label || (wd ? 'Enquire on WhatsApp' : 'Learn more')).trim();
+  return `<section class="cn-offer-aroma"><span class="cn-offer-kicker">A little something special</span><div class="cn-offer-copy"><h2>${esc(title || 'A special offer')}</h2>${text ? `<p>${esc(text)}</p>` : ''}</div>${href ? `<a class="cn-offer-button" href="${esc(href)}" target="_blank" rel="noopener">${esc(label)} ${I.arrow}</a>` : ''}</section>`;
 }
 
 function view() {
@@ -203,6 +227,8 @@ function view() {
   ${q ? `<nav class="cn-quick${isAroma ? ' cn-quick-aroma' : ''}" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
   ${acts ? `<nav class="cn-acts" aria-label="More from ${esc(b.name)}">${acts}</nav>` : ''}
   ${rev ? `<p class="cn-note">Honest reviews only — we don't offer rewards in exchange for them.</p>` : ''}
+  ${featuredProductsSection()}
+  ${offerSection(b)}
   ${collectionLink()}
   ${gallerySection()}
   ${socialMarkup}
