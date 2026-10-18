@@ -32,26 +32,26 @@ test('connect page: /connect/<slug> shows the shop and every link', async ({ pag
   await expect(page).toHaveTitle('Cheesora Bliss · Connect');
   await expect(page.getByRole('heading', { name: 'Cheesora Bliss' })).toBeVisible();
   await expect(page.getByText('Cheesecakes & coffee')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Join rewards' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Join the loyalty card' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Menu' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Instagram' })).toHaveAttribute('href', BIZ.ig);
   await expect(page.getByRole('link', { name: 'Facebook' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', BIZ.wa);
+  await expect(page.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', /wa\\.me\\/919876543210/);
   await expect(page.getByRole('link', { name: 'Website' })).toHaveAttribute('href', BIZ.web);
 });
 
-test('connect page: Join rewards and Menu point at this shop', async ({ page }) => {
-  await mock(page);
+test('connect page: loyalty link and collection route point at this shop', async ({ page }) => {
+  await mock(page, { ...BIZ, menu: { categories: [], items: [{ id: 'cake', title: 'Cake', price: '₹100', image_url: '', available: true }] } });
   await page.goto('/connect/cheesora-bliss/');
-  await expect(page.getByRole('link', { name: 'Join rewards' })).toHaveAttribute('href', '/app/cheesora-bliss/');
-  await expect(page.getByRole('link', { name: 'Menu' })).toHaveAttribute('href', '/app/cheesora-bliss/#menu');
+  await expect(page.getByRole('link', { name: 'Join the loyalty card' })).toHaveAttribute('href', '/app/cheesora-bliss/');
+  await expect(page.getByRole('link', { name: 'View collection' })).toHaveAttribute('href', '/connect/cheesora-bliss/collection/');
 });
 
 test('connect page: works with ?shop= fallback', async ({ page }) => {
   await mock(page);
   await page.goto('/connect/?shop=cheesora-bliss');
   await expect(page).toHaveTitle('Cheesora Bliss · Connect');
-  await expect(page.getByRole('link', { name: 'Join rewards' })).toHaveAttribute('href', '/app/cheesora-bliss/');
+  await expect(page.getByRole('link', { name: 'Join the loyalty card' })).toHaveAttribute('href', '/app/cheesora-bliss/');
 });
 
 test('connect page: buttons with no link are hidden', async ({ page }) => {
