@@ -409,7 +409,7 @@ function tabStory() {
     <button type="button" class="ce-hero-rm" onclick="rmHero()">Remove</button></div>
   <input type="hidden" id="hrrm" value="0">
   <label class="lb">Description <span>(a few lines about your shop)</span></label>
-  <textarea id="ab" rows="5" maxlength="600" placeholder="Tell visitors what makes your shop special: what you make, your story, what to try first." oninput="cnt()">${esc(bz.about || '')}</textarea>
+  <textarea id="ab" rows="5" maxlength="600" placeholder="Tell visitors what makes your shop special: what you make, your story, what to try first." oninput="cnt()">${esc(bz.about || (CFG.slug === "aroma-scripts" ? "At Aroma Scripts, we believe every fragrance tells a story, evokes an emotion, and creates a memory worth remembering. Our perfumes are handcrafted in small batches with carefully selected fragrance oils and a 30% fragrance concentration. From fresh notes to deep, indulgent compositions, each scent celebrates individuality. We also create bespoke fragrances tailored to your preferences." : ""))}</textarea>
   <div class="ce-count" id="abc">${(bz.about || '').length} / 600</div>
   <p class="note" style="text-align:left;margin:6px 0 0">Leave a blank line to start a new paragraph.</p>
   <label class="ce-sw"><input id="ly" type="checkbox"${bz.connect_loyalty !== false ? ' checked' : ''} onchange="pv()"><span class="ce-sw-t"><b>Show “Join the loyalty card”</b><small>Switch off while you are not running a loyalty card. You can turn it back on any time.</small></span><i aria-hidden="true"></i></label>
@@ -422,7 +422,7 @@ function tabBrand() {
   return `<div class="a-card"><div class="a-h"><h2>Branding</h2></div>
   <p class="sub">The name, tagline, colour and logo at the top of your Connect page.</p>
   <label class="lb">Shop name</label><input id="nm" value="${esc(bz.name)}" maxlength="60" oninput="pv()">
-  <label class="lb">Tagline <span>(one line)</span></label><input id="tg" value="${esc(bz.tagline)}" maxlength="90" placeholder="e.g. Coffee, bakes and good times." oninput="pv()">
+  <label class="lb">Tagline <span>(one line)</span></label><input id="tg" value="${esc(bz.tagline || (CFG.slug === "aroma-scripts" ? "Every Scent Has a Story." : ""))}" maxlength="90" placeholder="e.g. Coffee, bakes and good times." oninput="pv()">
   <label class="lb">Shop type</label><select id="vt" onchange="pv()">${Object.values(window.VERTICALS).map(v => `<option value="${esc(v.key)}"${v.key == bz.vertical ? ' selected' : ''}>${esc(v.label)}</option>`).join('')}</select>
   <p class="note">Sets the words on your page (${esc(V.section.toLowerCase())}) and the sample content you can add.</p>
   <label class="lb">Brand colour</label>
