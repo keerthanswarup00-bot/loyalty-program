@@ -933,6 +933,36 @@ async function loadCats() {
   const r = await sb.from('menu_categories').select('id,name,sort').eq('business_id', biz.id).order('sort').order('created_at');
   CATS = r.error ? 'err' : r.data;
 }
+let aromaSeedBusy = false;
+async function seedAromaProductsIfMissing() {
+  if (aromaSeedBusy || !Array.isArray(MENU) || String(CFG.slug || '').toLowerCase() !== 'aroma-scripts') return;
+  const defaults = [
+    { title: 'Vanilla Cloud', description: 'A soft, inviting fragrance for those who enjoy a warm, comforting scent.' },
+    { title: "Madhu's Essence", description: 'A distinctive personal fragrance created to make everyday moments memorable.' },
+    { title: 'His Muse', description: 'A signature fragrance designed for expressing individuality and personal style.' }
+  ];
+  const missing = defaults.filter(d => !MENU.some(x => String(x.title || '').trim().toLowerCase() === d.title.toLowerCase()));
+  if (!missing.length) return;
+  aromaSeedBusy = true;
+  try {
+    for (const item of missing) {
+      await rpc(sb, 'save_menu_item', {
+        p_slug: CFG.slug, p_id: null, p_title: item.title,
+        p_description: item.description, p_price: '', p_image: '', p_available: true
+      });
+    }
+    const q = cols => sb.from('menu_items').select(cols).eq('business_id', biz.id).order('sort').order('created_at');
+    const refreshed = await q(MCOLS + ',category_id');
+    if (!refreshed.error) MENU = refreshed.data.map(x => ({ category_id: null, ...x }));
+    toast('Added the missing Aroma Scripts products. Add prices and photos in Menu.');
+  } catch (e) {
+    console.error('Aroma Scripts product setup:', e);
+    toast('Products could not be added automatically. Check the Menu database setup.');
+  } finally {
+    aromaSeedBusy = false;
+    if (tab == 'p') render();
+  }
+}
 async function loadMenuAdm() {
   const q = cols => sb.from('menu_items').select(cols).eq('business_id', biz.id).order('sort').order('created_at');
   const [it, ct] = await Promise.all([q(MCOLS + ',category_id'), sb.from('menu_categories').select('id,name,sort').eq('business_id', biz.id).order('sort').order('created_at')]);
@@ -940,6 +970,7 @@ async function loadMenuAdm() {
   if (it.error) items = await q(MCOLS);                       // database not updated yet: items still work, just without categories
   MENU = items.error ? 'err' : items.data.map(x => ({ category_id: null, ...x }));
   CATS = ct.error ? 'err' : ct.data;
+  if (Array.isArray(MENU)) await seedAromaProductsIfMissing();
   if (tab == 'p') render();
 }
 function setMf(id) { mfilt = id; render() }
