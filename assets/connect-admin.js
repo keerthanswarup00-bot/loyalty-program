@@ -272,7 +272,8 @@ function draft() {
     hero_url: heroDraft !== undefined ? heroDraft : bz.hero_url,
     about: $('#ab') ? $('#ab').value.trim() : bz.about,
     connect_loyalty: $('#ly') ? $('#ly').checked : bz.connect_loyalty !== false,
-    ig: bz.ig, fb: bz.fb, yt: bz.yt, web: bz.web, links: bz.links
+    connect_offer: $('#of-title') ? { title: v('of-title').trim(), text: v('of-text').trim(), label: v('of-label').trim(), url: v('of-url').trim() } : (bz.connect_offer || {}),
+    gallery: bz.gallery || [], ig: bz.ig, fb: bz.fb, yt: bz.yt, web: bz.web, links: bz.links
   };
 }
 function pvHTML(d) {
@@ -288,6 +289,8 @@ function pvHTML(d) {
     ? `<header class="cn-hero cn-hero-img"><img class="cn-hero-bg" src="${esc(d.hero_url)}" alt=""><div class="cn-hero-in">${lg}<h1>${nm}</h1>${tg}</div></header>`
     : `<header class="cn-hero${d.about ? ' cn-art' : ''}"><div class="cn-hero-in">${lg}<h1>${nm}</h1>${tg}</div></header>`;
   const about = d.about ? `<section class="cn-about"><div class="cn-eyebrow">About</div>${d.about.split(/\n{2,}/).map(x => `<p>${esc(x.trim()).replace(/\n/g, '<br>')}</p>`).join('')}</section>` : '';
+  const offer = d.connect_offer && typeof d.connect_offer === 'object' ? d.connect_offer : {};
+  const offerPreview = String(CFG.slug || '').toLowerCase() === 'aroma-scripts' && (offer.title || offer.text) ? '<section class="cn-offer-aroma"><span class="cn-offer-kicker">A little something special</span><div class="cn-offer-copy"><h2>' + esc(offer.title || 'A special offer') + '</h2>' + (offer.text ? '<p>' + esc(offer.text) + '</p>' : '') + '</div></section>' : '';
   const acts = (d.connect_loyalty ? `<a class="cn-act pri"><span class="cn-ai">${ico('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2 0-4-1-4-3s3-2.5 4 3c1-5.5 4-5 4-3s-2 3-4 3"/>')}</span><span class="cn-at"><b>Join the loyalty card</b><small>Collect stamps, earn rewards</small></span></a>` : '')
     + (/^https:\/\//i.test(d.review_url || '') ? `<a class="cn-act"><span class="cn-ai">${ico('<path d="M12 3.5l2.9 5.9 6.1.9-4.5 4.4 1.1 6.1L12 18l-5.6 3 1.1-6.1L3 10.3l6.1-.9z"/>')}</span><span class="cn-at"><b>Leave a review</b></span></a>` : '');
   return `<div class="cn">
@@ -295,6 +298,7 @@ function pvHTML(d) {
     ${q ? `<nav class="cn-quick">${q}</nav>` : ''}
     ${acts ? `<nav class="cn-acts">${acts}</nav>` : ''}
     ${ITEMS.length ? `<section class="cn-sec"><h2>${esc(V.section)}</h2><ul class="cn-list">${items}</ul></section>` : ''}
+    ${offerPreview}
     ${soc.length ? `<section class="cn-sec"><h2>Find us online</h2><div class="cn-soc">${soc.map(x => `<span>${x[2]}<span>${esc(x[0])}</span></span>`).join('')}</div></section>` : ''}
     <footer class="cn-foot">${esc(d.name || 'Your shop')} · Powered by Innondu</footer></div>`;
 }
@@ -360,11 +364,12 @@ const NAV = [
   ['links', 'Links', ico('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>')],
   ['products', 'Products', ico('<path d="M5 8h14l-1 12H6zM9 8a3 3 0 0 1 6 0"/>')],
   ['photos', 'Photos', ico('<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/>')],
+  ['offer', 'Offer', ico('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1"/>')],
   ['share', 'Share', ico('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v0M21 21h-4v-4"/>')]
 ];
 function shell() {
   const S = strength(), r = 26, C = 2 * Math.PI * r, missing = S.L.filter(x => !x[2]);
-  const todo = { story: S.L[0][2] && S.L[1][2], contact: S.L[2][2] && S.L[3][2], products: S.L[4][2], photos: S.L[5][2], links: S.L[6][2] };
+  const todo = { story: S.L[0][2] && S.L[1][2], contact: S.L[2][2] && S.L[3][2], products: S.L[4][2], photos: S.L[5][2], offer: true, links: S.L[6][2] };
   return `<header class="ce-top"><div class="ce-top-in">
     <div class="ce-id"><div class="ce-logo">${mark(bz)}</div><div class="ce-name"><b>${esc(bz.name)}</b><span>Connect editor</span></div>
       <a class="a-ib" href="${esc(shareUrl())}" target="_blank" rel="noopener" title="View my page">${I.eye}</a>
@@ -378,7 +383,7 @@ function shell() {
   </div></header>
   ${support ? `<div class="a-support" style="margin:12px auto;max-width:1180px">Support mode · managing for the owner. Changes are logged.</div>` : ''}
   <div class="ce-layout">
-    <nav class="ce-nav" aria-label="Sections">${NAV.map(n => `<button class="${tab == n[0] ? 'on' : ''}" onclick="go('${n[0]}')"><i>${n[2]}</i><span>${n[1]}</span>${todo[n[0]] === false ? '<em title="Not finished"></em>' : ''}</button>`).join('')}</nav>
+    <nav class="ce-nav" aria-label="Sections">${NAV.filter(n => n[0] !== 'offer' || String(CFG.slug || '').toLowerCase() === 'aroma-scripts').map(n => `<button class="${tab == n[0] ? 'on' : ''}" onclick="go('${n[0]}')"><i>${n[2]}</i><span>${n[1]}</span>${todo[n[0]] === false ? '<em title="Not finished"></em>' : ''}</button>`).join('')}</nav>
     <div class="ce-form">${tabV()}</div>
     <aside class="ce-pv">
       <div class="ce-pv-h"><b>Live preview</b><a href="${esc(shareUrl())}" target="_blank" rel="noopener">Open full page</a></div>
@@ -394,6 +399,7 @@ function tabV() {
   if (tab == 'links') return tabLinks();
   if (tab == 'products') return tabProducts();
   if (tab == 'photos') return tabPhotos();
+  if (tab == 'offer' && String(CFG.slug || '').toLowerCase() === 'aroma-scripts') return tabOffer();
   if (tab == 'share') return tabShare();
   return tabBrand();
 }
@@ -494,6 +500,33 @@ function itemForm(V) {
   <div class="ca-acts"><button class="btn" data-go onclick="saveItem(this)">Save ${esc(V.item)}</button><button class="btn alt" onclick="form=null;render()">Cancel</button></div></div>`;
 }
 
+function tabOffer() {
+  const offer = bz.connect_offer && typeof bz.connect_offer === 'object' ? bz.connect_offer : {};
+  return '<div class="a-card"><div class="a-h"><h2>Featured offer</h2><span class="pill">' + (offer.title || offer.text ? 'Published' : 'Optional') + '</span></div>' +
+    '<p class="sub">Add one real offer or featured message to the Aroma Scripts Connect page. Leave the headline empty to hide it. Only publish terms you can honour.</p>' +
+    '<label class="lb">Offer headline <span>(required to display)</span></label><input id="of-title" maxlength="70" placeholder="e.g. Find your signature scent" oninput="pv()" value="' + esc(offer.title || '') + '">' +
+    '<label class="lb">Short description</label><textarea id="of-text" rows="3" maxlength="220" placeholder="Describe the offer, launch, bundle or limited-time detail." oninput="pv()">' + esc(offer.text || '') + '</textarea>' +
+    '<label class="lb">Button label</label><input id="of-label" maxlength="32" placeholder="Enquire on WhatsApp" oninput="pv()" value="' + esc(offer.label || '') + '">' +
+    '<label class="lb">Destination link <span>(optional, https:// only)</span></label><input id="of-url" maxlength="500" placeholder="https://..." value="' + esc(offer.url || '') + '">' +
+    '<p class="note">If no destination is entered, the button opens WhatsApp when your shop has a WhatsApp number.</p>' +
+    '<div class="ca-acts"><button class="btn" onclick="saveOffer(this)">Save offer</button><button class="btn alt" onclick="clearOffer()">Remove offer</button></div></div>';
+}
+async function saveOffer(btn) {
+  const title = v('of-title').trim(), text = v('of-text').trim(), label = v('of-label').trim(), url = v('of-url').trim();
+  if (url && !/^https:\/\//i.test(url)) return toast('Offer destination must start with https://');
+  if ((title || text || label || url) && !title) return toast('Add an offer headline, or clear the fields to hide the offer.');
+  if (title && !text) return toast('Add a short description so visitors understand the offer.');
+  btn.disabled = true;
+  const offer = title ? { title: title.slice(0, 70), text: text.slice(0, 220), label: label.slice(0, 32), url } : {};
+  const { error } = await sb.from('businesses').update({ connect_offer: offer }).eq('id', bz.id);
+  btn.disabled = false;
+  if (error) { if (/connect_offer|schema cache|column/i.test(String(error.message || error))) return toast('Offer storage is not set up yet. Run supabase/2026-10-19-connect-offer.sql, then try again.'); return toast(nice(error)); }
+  bz.connect_offer = offer; render(); toast(title ? 'Offer saved' : 'Offer hidden');
+}
+function clearOffer() {
+  ['of-title','of-text','of-label','of-url'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const btn = document.querySelector('[onclick="saveOffer(this)"]'); if (btn) saveOffer(btn);
+}
 function tabPhotos() {
   return `<div class="a-card"><div class="a-h"><h2>Photos</h2></div>
   <p class="sub">A few pictures of your shop, food or work. Shown as a gallery on your page.</p>
