@@ -3,4 +3,6 @@ Allow: /
 Disallow: /admin/
 Disallow: /platform/
 Disallow: /connect-admin/
+Disallow: /connect/*/admin
+Disallow: /app/
 Sitemap: https://www.innondu.com/sitemap.xml
