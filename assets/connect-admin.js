@@ -352,7 +352,7 @@ function strength() {
   const L = [
     ['story', 'Hero photo', !!bz.hero_url], ['story', 'Description', !!String(bz.about || '').trim()],
     ['contact', 'Phone', !!(bz.phone || bz.wa_phone)], ['contact', 'Address', !!(bz.address || bz.maps_url || bz.lat != null)],
-    ['products', V.section, ITEMS.length > 0], ['photos', 'Photos', (bz.gallery || []).length > 0], ['offer', 'Offer', !!(bz.connect_offer && (bz.connect_offer.title || bz.connect_offer.text))],
+    ['products', V.section, ITEMS.length > 0], ['photos', 'Photos', (bz.gallery || []).length > 0],
     ['links', 'Social links', !!(bz.ig || bz.fb || bz.yt || bz.web || (bz.links || []).length)]
   ];
   return { L, done: L.filter(x => x[2]).length, pct: Math.round(L.filter(x => x[2]).length / L.length * 100) };
@@ -369,7 +369,7 @@ const NAV = [
 ];
 function shell() {
   const S = strength(), r = 26, C = 2 * Math.PI * r, missing = S.L.filter(x => !x[2]);
-  const todo = { story: S.L[0][2] && S.L[1][2], contact: S.L[2][2] && S.L[3][2], products: S.L[4][2], photos: S.L[5][2], offer: S.L[6] ? S.L[6][2] : true, links: S.L[7][2] };
+  const todo = { story: S.L[0][2] && S.L[1][2], contact: S.L[2][2] && S.L[3][2], products: S.L[4][2], photos: S.L[5][2], offer: true, links: S.L[6][2] };
   return `<header class="ce-top"><div class="ce-top-in">
     <div class="ce-id"><div class="ce-logo">${mark(bz)}</div><div class="ce-name"><b>${esc(bz.name)}</b><span>Connect editor</span></div>
       <a class="a-ib" href="${esc(shareUrl())}" target="_blank" rel="noopener" title="View my page">${I.eye}</a>
