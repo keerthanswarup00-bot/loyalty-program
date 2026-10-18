@@ -84,13 +84,31 @@ function heroSection(b) {
 }
 // About: the owner's short description, shown right under the hero. Blank line = new paragraph.
 function aboutSection(b) {
-  const fallback = String(b.slug || '').toLowerCase() === 'aroma-scripts'
+  const isAroma = String(b.slug || '').toLowerCase() === 'aroma-scripts';
+  const fallback = isAroma
     ? 'At Aroma Scripts, we believe every fragrance tells a story, evokes an emotion, and creates a memory worth remembering. Our perfumes are handcrafted in small batches with carefully selected fragrance oils and a 30% fragrance concentration. From fresh notes to deep, indulgent compositions, each scent celebrates individuality. We also create bespoke fragrances tailored to your preferences.'
     : '';
   const t = String(b.about || fallback).trim();
   if (!t) return '';
   const paras = t.split(/\n{2,}/).map(x => `<p>${esc(x.trim()).replace(/\n/g, '<br>')}</p>`).join('');
+  if (isAroma) {
+    const plain = t.replace(/\s+/g, ' ').trim();
+    const preview = plain.length > 145 ? plain.slice(0, 145).replace(/\s+\S*$/, '') + '…' : plain;
+    return `<section class="cn-about cn-about-aroma" aria-label="About ${esc(b.name)}"><div class="cn-eyebrow">Our story</div><div class="cn-about-copy" data-about-copy><p>${esc(preview)}</p></div>${plain.length > 145 ? `<button class="cn-read-more" type="button" aria-expanded="false" onclick="toggleAbout(this)">Read our story <span aria-hidden="true">＋</span></button><div class="cn-about-full" hidden>${paras}</div>` : ''}</section>`;
+  }
   return `<section class="cn-about" aria-label="About ${esc(b.name)}"><div class="cn-eyebrow">About</div>${paras}</section>`;
+}
+function toggleAbout(button) {
+  const section = button.closest('.cn-about-aroma');
+  if (!section) return;
+  const expanded = button.getAttribute('aria-expanded') === 'true';
+  const preview = section.querySelector('[data-about-copy]');
+  const full = section.querySelector('.cn-about-full');
+  if (!full || !preview) return;
+  full.hidden = expanded;
+  preview.hidden = !expanded;
+  button.setAttribute('aria-expanded', String(!expanded));
+  button.innerHTML = expanded ? 'Read our story <span aria-hidden="true">＋</span>' : 'Show less <span aria-hidden="true">−</span>';
 }
 
 function menuSection() {
@@ -162,6 +180,7 @@ function gallerySection() {
 
 function view() {
   const b = B;
+  const isAroma = String(b.slug || '').toLowerCase() === 'aroma-scripts';
   const wd = waDigits(b);
   const q = [
     mapsHref(b) ? quick(mapsHref(b), I.pin, 'Directions', true) : '',
@@ -170,26 +189,24 @@ function view() {
   ].filter(Boolean).join('');
   const soc = socialList(b);
   const rev = httpsOnly(b.review_url);
-  const loyalty = b.connect_loyalty !== false;      // false = the shop has switched the loyalty button off
+  const loyalty = b.connect_loyalty !== false;
   const acts = (loyalty ? row(appBase(), I.gift, 'Join the loyalty card', 'Collect stamps, earn rewards', true, false) : '')
     + (rev ? row(rev, I.star, 'Leave a review', 'Takes a minute', false, true) : '');
   if (collectionRoute) return `${productCollectionSection()}<footer class="cn-foot">${esc(b.name)} · <a href="https://www.innondu.com/" target="_blank" rel="noopener">Powered by Innondu</a></footer>`;
+  const socials = isAroma ? [soc.find(x => x.label === 'Instagram'), soc.find(x => x.label === 'Website')].filter(Boolean) : soc;
+  const socialMarkup = socials.length ? `<section class="cn-sec${isAroma ? ' cn-social-aroma' : ''}"><h2>${isAroma ? 'Follow the fragrance' : 'Find us online'}</h2><div class="cn-soc${isAroma ? ' cn-soc-pair' : ''}">${socials.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${x.icon}<span>${esc(x.label)}</span></a>`).join('')}</div></section>` : '';
+  const shareMarkup = isAroma
+    ? `<section class="cn-sec cn-share-aroma"><div class="cn-share-head"><div><span class="cn-eyebrow">Take us with you</span><h2>Share Aroma Scripts</h2><p>Send our scents to someone who’d love them.</p></div><button type="button" class="cn-share-primary" onclick="sharePage()">${I.share}<span>Share</span></button></div><div class="cn-share-tools"><button type="button" class="cn-share-tool" onclick="copyText(shareUrl(),'Link copied')">${I.copy}<span>Copy link</span></button><button type="button" class="cn-share-tool" onclick="toggleQr()">${I.qr}<span>Show QR</span></button></div><div id="cn-qr" class="cn-qr" hidden></div></section>`
+    : `<section class="cn-sec"><h2>Share</h2><div class="cn-share"><button type="button" class="cn-act" onclick="sharePage()"><span class="cn-ai">${I.share}</span><span class="cn-at"><b>Share this page</b><small>WhatsApp, or anywhere</small></span></button><button type="button" class="cn-act" onclick="copyText(shareUrl(),'Link copied')"><span class="cn-ai">${I.copy}</span><span class="cn-at"><b>Copy link</b></span></button><button type="button" class="cn-act" onclick="toggleQr()"><span class="cn-ai">${I.qr}</span><span class="cn-at"><b>Show QR code</b><small>Print it, or write it to a tag</small></span></button></div><div id="cn-qr" class="cn-qr" hidden></div></section>`;
   return `${heroSection(b)}
   ${aboutSection(b)}
-  ${q ? `<nav class="cn-quick" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
+  ${q ? `<nav class="cn-quick${isAroma ? ' cn-quick-aroma' : ''}" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
   ${acts ? `<nav class="cn-acts" aria-label="More from ${esc(b.name)}">${acts}</nav>` : ''}
   ${rev ? `<p class="cn-note">Honest reviews only — we don't offer rewards in exchange for them.</p>` : ''}
   ${collectionLink()}
   ${gallerySection()}
-  ${soc.length ? `<section class="cn-sec"><h2>Find us online</h2><div class="cn-soc">${soc.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${x.icon}<span>${esc(x.label)}</span></a>`).join('')}</div></section>` : ''}
-  <section class="cn-sec"><h2>Share</h2>
-    <div class="cn-share">
-      <button type="button" class="cn-act" onclick="sharePage()"><span class="cn-ai">${I.share}</span><span class="cn-at"><b>Share this page</b><small>WhatsApp, or anywhere</small></span></button>
-      <button type="button" class="cn-act" onclick="copyText(shareUrl(),'Link copied')"><span class="cn-ai">${I.copy}</span><span class="cn-at"><b>Copy link</b></span></button>
-      <button type="button" class="cn-act" onclick="toggleQr()"><span class="cn-ai">${I.qr}</span><span class="cn-at"><b>Show QR code</b><small>Print it, or write it to a tag</small></span></button>
-    </div>
-    <div id="cn-qr" class="cn-qr" hidden></div>
-  </section>
+  ${socialMarkup}
+  ${shareMarkup}
   <footer class="cn-foot">${esc(b.name)} · <a href="https://www.innondu.com/" target="_blank" rel="noopener">Powered by Innondu</a></footer>`;
 }
 
