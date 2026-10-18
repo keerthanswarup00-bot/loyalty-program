@@ -136,3 +136,25 @@ body.cn-product-sheet-open{overflow:hidden}
 @media(min-width:681px){.cn-product-sheet-panel{margin:0 0 24px;border-radius:26px;max-height:calc(100dvh - 48px)}.cn-product-sheet-image{max-height:42dvh}.cn-product-sheet-info{padding:24px 30px 18px}}
 @media(max-width:420px){.cn-product-sheet-info{padding:20px 20px 8px}.cn-product-sheet-heading{gap:10px}.cn-product-sheet-price{font-size:22px}.cn-product-sheet-close{top:16px;left:14px}}
 @media(prefers-reduced-motion:reduce){.cn-product-sheet-panel{animation:none}}
+
+/* Opening hours badge + weekly list */
+.cn-hours{margin:12px 0 4px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-in,14px);overflow:hidden}
+.cn-hours summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;cursor:pointer;list-style:none;font-size:14px}
+.cn-hours summary::-webkit-details-marker{display:none}
+.cn-hours summary:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+.cn-hs{color:var(--mu,#777);font-size:13px}
+.cn-hs::after{content:" ⌄"}
+.cn-hours[open] .cn-hs::after{content:" ⌃"}
+.cn-hb{display:inline-flex;align-items:center;gap:8px;font-weight:600}
+.cn-hb i{width:9px;height:9px;border-radius:50%;background:#9a9a9a;flex:none}
+.cn-hb.open i{background:#1f9d55}.cn-hb.open{color:#17784a}
+.cn-hb.soon i{background:#d98a00}.cn-hb.soon{color:#a86800}
+.cn-hb.closed i{background:#c0392b}.cn-hb.closed{color:#a5311f}
+@media (prefers-color-scheme:dark){.cn-hb.open{color:#5ad28c}.cn-hb.soon{color:#f0b84a}.cn-hb.closed{color:#ee8c7d}}
+.cn-hours ul{list-style:none;margin:0;padding:2px 14px 12px;display:grid;gap:6px;font-size:14px}
+.cn-hours li{display:flex;justify-content:space-between;gap:12px}
+.cn-hours li.today{font-weight:700}
+/* Failed load, with a retry */
+.cn-retry{margin-top:16px;padding:22px 16px;border:1px dashed var(--line);border-radius:var(--r-card,22px)}
+.cn-retry h2{margin:0 0 6px;font-size:18px}
+.cn-retry .btn{margin-top:12px}

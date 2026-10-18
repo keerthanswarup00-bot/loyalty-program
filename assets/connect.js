@@ -17,7 +17,7 @@ const slugFromQuery = (() => {
 if (slugFromPath || slugFromQuery) { CFG.slug = slugFromPath || slugFromQuery; linkSlug = slugFromPath || slugFromQuery }
 
 const sb = notReady() ? null : mkClient('lk-connect');
-let B = null, MENU = null, V = null;
+let B = null, MENU = null, V = null, MENU_ERR = false;
 
 const httpsOnly = u => /^https:\/\//i.test(String(u || '')) ? String(u) : '';
 const imgOk = u => /^(https:\/\/|data:image\/)/i.test(String(u || ''));
@@ -100,7 +100,7 @@ function menuSection() {
   const wd = waDigits(B);
   const item = x => {
     const im = imgOk(x.image_url) ? `<span class="mn-ph"><img src="${esc(x.image_url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>` : '';
-    const ask = wd ? `<a class="mn-ask" href="${esc(waHref(wd, V.orderText(B.name, x.title)))}" target="_blank" rel="noopener" aria-label="${esc(V.ask + ': ' + x.title)}">${I.wa}</a>` : '';
+    const ask = wd ? `<a class="mn-ask" href="${esc(waHref(wd, productText(x)))}" target="_blank" rel="noopener" aria-label="${esc(V.ask + ': ' + x.title)}">${I.wa}</a>` : '';
     return `<li class="cn-item"><div class="mn-tx"><b>${esc(x.title)}</b>${x.description ? `<small>${esc(x.description)}</small>` : ''}</div>${im}${x.price ? `<span class="mn-pr">${esc(x.price)}</span>` : ''}${ask}</li>`;
   };
   const group = (name, items) => `<div class="cn-grp">${name ? `<h3>${esc(name)}</h3>` : ''}<ul class="cn-list">${items.map(item).join('')}</ul></div>`;
@@ -113,9 +113,21 @@ function slugifyText(value) {
 }
 
 function collectionUrl() { return connectBase() + 'collection/'; }
+// What the customer's WhatsApp message starts with for one product: wording by shop type (order / book / enquire),
+// the product name and price, and the collection link, so the shop knows exactly which item it is about.
+const productText = x => V.orderText(B.name, x.title + (x.price ? ' (' + x.price + ')' : '')) + ' ' + collectionUrl();
 
+// A failed load is not an empty shop: say what happened and let the visitor try again.
+const loadFailed = what => `<div class="cn-empty cn-retry" role="alert"><h2>Couldn't load ${esc(what)}</h2><p class="sub">Check your connection and try again.</p><button type="button" class="btn" onclick="retryMenu(this)">Try again</button></div>`;
+async function retryMenu(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Trying again…' }
+  await loadMenu();
+  if (!MENU_ERR) share(B);
+  $('#app').innerHTML = view();
+}
 function collectionLink() {
-  if (!MENU || !MENU.items || !MENU.items.length) return '';
+  if (MENU_ERR) return `<section class="cn-sec">${loadFailed(V.section.toLowerCase())}</section>`;
+  if (!MENU || !MENU.items || !MENU.items.length || ConnectCore.primary(V.primary, avail(B)) == 'col') return '';
   return `<section class="cn-collection-cta"><div><span class="cn-eyebrow">Explore</span><h2>Our collection</h2><p>Browse everything we make and ask us about the pieces you love.</p></div><a class="cn-collection-btn" href="${esc(collectionUrl())}">View collection <span aria-hidden="true">${I.arrow}</span></a></section>`;
 }
 
@@ -128,7 +140,7 @@ function openProduct(id) {
   const image = imgOk(product.image_url) ? `<img class="cn-product-sheet-image" src="${esc(product.image_url)}" alt="${esc(product.title)}" decoding="async">` : '<div class="cn-product-sheet-image cn-product-sheet-image-empty" aria-hidden="true">✦</div>';
   const desc = product.description ? `<p class="cn-product-sheet-description">${esc(product.description).replace(/\n/g, '<br>')}</p>` : '<p class="cn-product-sheet-description">Contact us for more information about this product.</p>';
   const price = product.price ? `<div class="cn-product-sheet-price">${esc(product.price)}</div>` : '';
-  const ask = wd ? `<a class="cn-product-sheet-ask" href="${esc(waHref(wd, 'Hi ' + B.name + ', I want more details about ' + product.title + '.'))}" target="_blank" rel="noopener">${I.wa}<span>Ask for more details</span>${I.arrow}</a>` : '<p class="cn-product-contact-note">WhatsApp enquiry is not available yet. Please use the contact details on the main page.</p>';
+  const ask = wd ? `<a class="cn-product-sheet-ask" href="${esc(waHref(wd, productText(product)))}" target="_blank" rel="noopener">${I.wa}<span>${esc(V.ask)}</span>${I.arrow}</a>` : '<p class="cn-product-contact-note">WhatsApp enquiry is not available yet. Please use the contact details on the main page.</p>';
   const category = (MENU.categories || []).find(c => c.id == product.category_id);
   content.innerHTML = `${image}<div class="cn-product-sheet-info"><div class="cn-product-sheet-heading"><div><span class="cn-eyebrow">${esc(category ? category.name : 'Product')}</span><h2>${esc(product.title)}</h2></div>${price}</div>${desc}${ask}</div>`;
   modal.hidden = false; document.body.classList.add('cn-product-sheet-open'); modal.setAttribute('aria-hidden', 'false');
@@ -142,6 +154,7 @@ function productSheetMarkup() {
   return `<div class="cn-product-sheet-backdrop" id="cn-product-sheet" hidden aria-hidden="true" onclick="if(event.target===this)closeProduct()"><section class="cn-product-sheet-panel" role="dialog" aria-modal="true" aria-label="Product details"><button class="cn-product-sheet-close" type="button" aria-label="Close product details" onclick="closeProduct()">×</button><div id="cn-product-sheet-content"></div></section></div>`;
 }
 function productCollectionSection() {
+  if (MENU_ERR) return `<div class="cn-collection-intro"><a class="cn-back-link" href="${esc(connectBase())}">← Back to ${esc(B.name)}</a></div><section class="cn-sec">${loadFailed('the collection')}</section>`;
   if (!MENU || !Array.isArray(MENU.items) || !MENU.items.length) return '<section class="cn-sec"><div class="cn-empty"><h2>Collection coming soon</h2><p class="sub">Products will appear here when this shop adds them.</p></div></section>';
   const cats = (MENU.categories || []).map(c => ({ ...c, items: MENU.items.filter(i => i.category_id == c.id) })).filter(c => c.items.length);
   const loose = MENU.items.filter(i => !i.category_id || !(MENU.categories || []).some(c => c.id == i.category_id));
@@ -160,24 +173,46 @@ function gallerySection() {
   return `<section class="cn-sec"><h2>Photos</h2><div class="cn-gal">${g.map(u => `<img src="${esc(u)}" alt="${esc(B.name)}" loading="lazy" decoding="async" onerror="this.remove()">`).join('')}</div></section>`;
 }
 
+// Which of the shop's actions exist. The primary button is chosen from these.
+const avail = b => ({ wa: !!waDigits(b), call: !!telHref(b), dir: !!mapsHref(b), col: !!(MENU && MENU.items && MENU.items.length) });
+
+// Opening hours: a live Open / Closing soon / Closed badge that expands to the week.
+function hoursSection(b) {
+  const st = ConnectCore.status(b.hours, b.tz); if (!st) return '';
+  const rows = ConnectCore.week(b.hours, b.tz).map(r => `<li${r.today ? ' class="today"' : ''}><span>${esc(r.label)}</span><span>${esc(r.text)}</span></li>`).join('');
+  return `<details class="cn-hours"><summary><span class="cn-hb ${st.state}"><i aria-hidden="true"></i>${esc(st.text)}</span><span class="cn-hs">Hours</span></summary><ul>${rows}</ul></details>`;
+}
+
 function view() {
   const b = B;
-  const wd = waDigits(b);
-  const q = [
-    mapsHref(b) ? quick(mapsHref(b), I.pin, 'Directions', true) : '',
-    telHref(b) ? quick(telHref(b), I.call, 'Call', false) : '',
-    wd ? quick(waHref(wd, 'Hi ' + b.name + '!'), I.wa, 'WhatsApp', true) : ''
-  ].filter(Boolean).join('');
+  const wd = waDigits(b), a = avail(b), main = ConnectCore.primary(V.primary, a);
+  // One primary button, chosen by shop type (falls back to what the shop has filled in). The others stay as small shortcuts.
+  const quickAll = {
+    dir: mapsHref(b) ? quick(mapsHref(b), I.pin, 'Directions', true) : '',
+    call: telHref(b) ? quick(telHref(b), I.call, 'Call', false) : '',
+    wa: wd ? quick(waHref(wd, V.intro(b.name)), I.wa, 'WhatsApp', true) : ''
+  };
+  const q = ['dir', 'call', 'wa'].filter(k => k != main).map(k => quickAll[k]).filter(Boolean).join('');
+  const n = MENU && MENU.items ? MENU.items.length : 0;
+  const lead = {
+    wa: () => row(waHref(wd, V.intro(b.name)), I.wa, V.ask, 'Usually quick to reply', true, true),
+    call: () => row(telHref(b), I.call, 'Call now', b.phone || '', true, false),
+    dir: () => row(mapsHref(b), I.pin, 'Get directions', b.address || '', true, true),
+    col: () => row(collectionUrl(), I.arrow, V.browse, n + (n == 1 ? ' ' + V.item : ' ' + V.items), true, false)
+  };
   const soc = socialList(b);
   const rev = httpsOnly(b.review_url);
   const loyalty = b.connect_loyalty !== false;      // false = the shop has switched the loyalty button off
-  const acts = (loyalty ? row(appBase(), I.gift, 'Join the loyalty card', 'Collect stamps, earn rewards', true, false) : '')
+  // Loyalty is the lead only when the shop has nothing else to lead with.
+  const acts = (main ? lead[main]() : '')
+    + (loyalty ? row(appBase(), I.gift, 'Join the loyalty card', 'Collect stamps, earn rewards', !main, false) : '')
     + (rev ? row(rev, I.star, 'Leave a review', 'Takes a minute', false, true) : '');
   if (collectionRoute) return `${productCollectionSection()}<footer class="cn-foot">${esc(b.name)} · <a href="https://www.innondu.com/" target="_blank" rel="noopener">Powered by Innondu</a></footer>`;
   return `${heroSection(b)}
+  ${hoursSection(b)}
   ${aboutSection(b)}
-  ${q ? `<nav class="cn-quick" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
   ${acts ? `<nav class="cn-acts" aria-label="More from ${esc(b.name)}">${acts}</nav>` : ''}
+  ${q ? `<nav class="cn-quick" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
   ${rev ? `<p class="cn-note">Honest reviews only — we don't offer rewards in exchange for them.</p>` : ''}
   ${collectionLink()}
   ${gallerySection()}
@@ -260,8 +295,11 @@ function share(b) {
 }
 
 async function loadMenu() {
-  try { const raw = await rpc(sb, 'get_menu', { p_slug: CFG.slug }); MENU = Array.isArray(raw) ? { categories: [], items: raw } : { categories: (raw && raw.categories) || [], items: (raw && raw.items) || [] } }
-  catch (e) { MENU = { categories: [], items: [] } }
+  try {
+    const raw = await rpc(sb, 'get_menu', { p_slug: CFG.slug });
+    MENU = Array.isArray(raw) ? { categories: [], items: raw } : { categories: (raw && raw.categories) || [], items: (raw && raw.items) || [] };
+    MENU_ERR = false;
+  } catch (e) { MENU = { categories: [], items: [] }; MENU_ERR = true }
 }
 
 (async () => {

@@ -8,6 +8,8 @@ window.VERTICALS = {
     key: 'cafe', label: 'Cafe or restaurant', schemaType: 'Restaurant',
     section: 'Menu', item: 'item', items: 'items', browse: 'Explore the Menu',
     ask: 'Ask on WhatsApp',
+    primary: 'dir',   // the one big button this type leads with: wa | call | dir | col (falls back to what is filled in)
+    intro: shop => 'Hi ' + shop + '!',
     orderText: (shop, item) => 'Hi ' + shop + ", I'd like to order: " + item + '.',
     sample: {
       tagline: 'Coffee, bakes and good times.',
@@ -26,6 +28,8 @@ window.VERTICALS = {
     key: 'bakery', label: 'Bakery', schemaType: 'Bakery',
     section: 'Menu', item: 'item', items: 'items', browse: 'See the Menu',
     ask: 'Ask on WhatsApp',
+    primary: 'wa',   // the one big button this type leads with: wa | call | dir | col (falls back to what is filled in)
+    intro: shop => 'Hi ' + shop + ', I would like to place an order.',
     orderText: (shop, item) => 'Hi ' + shop + ", I'd like to order: " + item + '.',
     sample: {
       tagline: 'Freshly baked, every day.',
@@ -42,6 +46,8 @@ window.VERTICALS = {
     key: 'salon', label: 'Salon or spa', schemaType: 'HairSalon',
     section: 'Services', item: 'service', items: 'services', browse: 'See the Services',
     ask: 'Book on WhatsApp',
+    primary: 'wa',   // the one big button this type leads with: wa | call | dir | col (falls back to what is filled in)
+    intro: shop => 'Hi ' + shop + ', I would like to book an appointment.',
     orderText: (shop, item) => 'Hi ' + shop + ', I would like to book: ' + item + '.',
     sample: {
       tagline: 'Look good, feel great.',
@@ -58,6 +64,8 @@ window.VERTICALS = {
     key: 'boutique', label: 'Boutique or store', schemaType: 'ClothingStore',
     section: 'Collection', item: 'product', items: 'products', browse: 'See the Collection',
     ask: 'Ask on WhatsApp',
+    primary: 'col',   // the one big button this type leads with: wa | call | dir | col (falls back to what is filled in)
+    intro: shop => 'Hi ' + shop + ', I have a question about your collection.',
     orderText: (shop, item) => 'Hi ' + shop + ', I am interested in: ' + item + '.',
     sample: {
       tagline: 'Clothes and things you will love.',
@@ -73,6 +81,8 @@ window.VERTICALS = {
     key: 'repair', label: 'Repair or service shop', schemaType: 'LocalBusiness',
     section: 'Repairs & services', item: 'service', items: 'services', browse: 'See what we fix',
     ask: 'Ask on WhatsApp',
+    primary: 'call',   // the one big button this type leads with: wa | call | dir | col (falls back to what is filled in)
+    intro: shop => 'Hi ' + shop + ', I need a repair. Can you help?',
     orderText: (shop, item) => 'Hi ' + shop + ', I need help with: ' + item + '.',
     sample: {
       tagline: 'Fixed fast, done right.',
@@ -88,6 +98,8 @@ window.VERTICALS = {
     key: 'generic', label: 'Something else', schemaType: 'LocalBusiness',
     section: 'Products & services', item: 'product', items: 'products', browse: 'See what we offer',
     ask: 'Ask on WhatsApp',
+    primary: 'wa',   // the one big button this type leads with: wa | call | dir | col (falls back to what is filled in)
+    intro: shop => 'Hi ' + shop + '!',
     orderText: (shop, item) => 'Hi ' + shop + ', I am interested in: ' + item + '.',
     sample: {
       tagline: 'Everything we do, in one place.',

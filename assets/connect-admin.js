@@ -131,14 +131,14 @@ async function loadMenu() {
 // form is refused, each field is tried on its own so the owner is told exactly which ones did not save and why.
 const FIELDS = { name: 'Shop name', tagline: 'Tagline', color: 'Brand colour', vertical: 'Shop type', logo_url: 'Logo', hero_url: 'Hero photo', about: 'Description', connect_loyalty: 'Loyalty button',
   phone: 'Phone number', wa_phone: 'WhatsApp number', address: 'Address', maps_url: 'Google Maps link', lat: 'Latitude', lng: 'Longitude', review_url: 'Review link',
-  ig: 'Instagram link', fb: 'Facebook link', yt: 'YouTube link', web: 'Website link', links: 'Other links', gallery: 'Photos' };
+  ig: 'Instagram link', fb: 'Facebook link', yt: 'YouTube link', web: 'Website link', links: 'Other links', gallery: 'Photos', hours: 'Opening hours' };
 const FIELD_INPUT = { name: 'nm', tagline: 'tg', color: 'col', vertical: 'vt', logo_url: 'lgf', hero_url: 'hrf', about: 'ab', connect_loyalty: 'ly', phone: 'ph', wa_phone: 'wap', address: 'ad',
-  maps_url: 'map', lat: 'lat', lng: 'lng', review_url: 'rv', ig: 'ig', fb: 'fb', yt: 'yt', web: 'web' };
+  maps_url: 'map', lat: 'lat', lng: 'lng', review_url: 'rv', ig: 'ig', fb: 'fb', yt: 'yt', web: 'web', hours: 'hr-mon-on' };
 const FILE_INPUT = { logo_url: ['lgf', 'lgrm'], hero_url: ['hrf', 'hrrm'] };
 // Which SQL file adds a column (and the right to edit it). Anything else: the full schema.sql, which is safe to re-run.
 const SQL_FOR = { about: '2026-10-18-connect-hero.sql', hero_url: '2026-10-18-connect-hero.sql', connect_loyalty: '2026-10-18-connect-hero.sql',
   phone: '2026-10-16-connect.sql', wa_phone: '2026-10-16-connect.sql', address: '2026-10-16-connect.sql', maps_url: '2026-10-16-connect.sql', lat: '2026-10-16-connect.sql', lng: '2026-10-16-connect.sql',
-  review_url: '2026-10-16-connect.sql', yt: '2026-10-16-connect.sql', links: '2026-10-16-connect.sql', gallery: '2026-10-16-connect.sql', vertical: '2026-10-16-connect.sql' };
+  review_url: '2026-10-16-connect.sql', yt: '2026-10-16-connect.sql', links: '2026-10-16-connect.sql', gallery: '2026-10-16-connect.sql', vertical: '2026-10-16-connect.sql', hours: '2026-10-19-business-hours.sql' };
 const sqlFile = k => 'supabase/' + (SQL_FOR[k] || 'schema.sql');
 
 // Deep equality that ignores object key order (Postgres jsonb stores keys in its own order).
@@ -203,7 +203,7 @@ async function savePatch(patch, btn, msg) {
 document.addEventListener('input', e => { if (e.target && e.target.removeAttribute) e.target.removeAttribute('aria-invalid') });
 
 // Columns the Connect page needs. If the editor's own read of the shop row lacks one, the migration has not been run.
-const NEEDED = ['about', 'hero_url', 'connect_loyalty', 'phone', 'wa_phone', 'address', 'maps_url', 'lat', 'lng', 'review_url', 'yt', 'links', 'gallery', 'vertical'];
+const NEEDED = ['about', 'hero_url', 'connect_loyalty', 'phone', 'wa_phone', 'address', 'maps_url', 'lat', 'lng', 'review_url', 'yt', 'links', 'gallery', 'vertical', 'hours'];
 const missingCols = () => bz ? NEEDED.filter(k => !(k in bz)) : [];
 const dataImgs = () => bz ? [bz.logo_url, bz.hero_url, ...(Array.isArray(bz.gallery) ? bz.gallery : []), ...ITEMS.map(x => x.image_url)].filter(isDataImg).length : 0;
 
@@ -393,14 +393,22 @@ function draft() {
     hero_url: heroDraft !== undefined ? heroDraft : bz.hero_url,
     about: $('#ab') ? $('#ab').value.trim() : bz.about,
     connect_loyalty: $('#ly') ? $('#ly').checked : bz.connect_loyalty !== false,
+    hours: hoursDraft(),
     ig: bz.ig, fb: bz.fb, yt: bz.yt, web: bz.web, links: bz.links
   };
 }
 function pvHTML(d) {
   const V = vertical(d.vertical), wd = digits(d.wa_phone || '') || (String(bz.wa || '').match(/(\d{10,15})/) || [])[1] || '';
-  const q = [pvMaps(d) ? '<span class="cn-quick-a"><span class="cn-qi">' + ico('<path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>') + '</span><span>Directions</span></span>' : '',
-    digits(d.phone) ? '<span class="cn-quick-a"><span class="cn-qi">' + ico('<path d="M4 5c0 8.3 6.7 15 15 15l2-3.6-4.3-2-1.8 1.8a12 12 0 0 1-4.6-4.6l1.8-1.8-2-4.3z"/>') + '</span><span>Call</span></span>' : '',
-    wd ? '<span class="cn-quick-a"><span class="cn-qi">' + IC.wa + '</span><span>WhatsApp</span></span>' : ''].filter(Boolean).join('');
+  const PIN = ico('<path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>'), CALL = ico('<path d="M4 5c0 8.3 6.7 15 15 15l2-3.6-4.3-2-1.8 1.8a12 12 0 0 1-4.6-4.6l1.8-1.8-2-4.3z"/>');
+  const have = { dir: !!pvMaps(d), call: !!digits(d.phone), wa: !!wd, col: ITEMS.length > 0 };
+  const main = ConnectCore.primary(V.primary, have);
+  const qa = (icon, label) => '<span class="cn-quick-a"><span class="cn-qi">' + icon + '</span><span>' + label + '</span></span>';
+  const q = [['dir', PIN, 'Directions'], ['call', CALL, 'Call'], ['wa', IC.wa, 'WhatsApp']].filter(x => have[x[0]] && x[0] != main).map(x => qa(x[1], x[2])).join('');
+  const act = (icon, label, sub, pri) => `<a class="cn-act${pri ? ' pri' : ''}"><span class="cn-ai">${icon}</span><span class="cn-at"><b>${esc(label)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span></a>`;
+  const lead = { wa: () => act(IC.wa, V.ask, 'Usually quick to reply', true), call: () => act(CALL, 'Call now', d.phone, true), dir: () => act(PIN, 'Get directions', d.address, true),
+    col: () => act(I.up, V.browse, ITEMS.length + ' ' + (ITEMS.length == 1 ? V.item : V.items), true) };
+  const st = ConnectCore.status(d.hours, bz.tz);
+  const hrs = st ? `<details class="cn-hours"><summary><span class="cn-hb ${st.state}"><i></i>${esc(st.text)}</span><span class="cn-hs">Hours</span></summary></details>` : '';
   const items = ITEMS.slice(0, 4).map(x => `<li class="cn-item"><div class="mn-tx"><b>${esc(x.title)}</b>${x.description ? `<small>${esc(x.description)}</small>` : ''}</div>${x.price ? `<span class="mn-pr">${esc(x.price)}</span>` : ''}</li>`).join('');
   const soc = [['Instagram', bz.ig, IC.ig], ['Facebook', bz.fb, IC.fb], ['YouTube', bz.yt, IC.yt]].filter(x => /^https:\/\//i.test(x[1] || ''));
   const logo = bz.logo_url && /^(https:|data:)/.test(bz.logo_url) ? `<img src="${esc(bz.logo_url)}" alt="">` : esc((d.name || '?').trim().slice(0, 1).toUpperCase());
@@ -409,12 +417,12 @@ function pvHTML(d) {
     ? `<header class="cn-hero cn-hero-img"><img class="cn-hero-bg" src="${esc(d.hero_url)}" alt=""><div class="cn-hero-in">${lg}<h1>${nm}</h1>${tg}</div></header>`
     : `<header class="cn-hero${d.about ? ' cn-art' : ''}"><div class="cn-hero-in">${lg}<h1>${nm}</h1>${tg}</div></header>`;
   const about = d.about ? `<section class="cn-about"><div class="cn-eyebrow">About</div>${d.about.split(/\n{2,}/).map(x => `<p>${esc(x.trim()).replace(/\n/g, '<br>')}</p>`).join('')}</section>` : '';
-  const acts = (d.connect_loyalty ? `<a class="cn-act pri"><span class="cn-ai">${ico('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2 0-4-1-4-3s3-2.5 4 3c1-5.5 4-5 4-3s-2 3-4 3"/>')}</span><span class="cn-at"><b>Join the loyalty card</b><small>Collect stamps, earn rewards</small></span></a>` : '')
+  const acts = (main ? lead[main]() : '') + (d.connect_loyalty ? `<a class="cn-act${main ? '' : ' pri'}"><span class="cn-ai">${ico('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2 0-4-1-4-3s3-2.5 4 3c1-5.5 4-5 4-3s-2 3-4 3"/>')}</span><span class="cn-at"><b>Join the loyalty card</b><small>Collect stamps, earn rewards</small></span></a>` : '')
     + (/^https:\/\//i.test(d.review_url || '') ? `<a class="cn-act"><span class="cn-ai">${ico('<path d="M12 3.5l2.9 5.9 6.1.9-4.5 4.4 1.1 6.1L12 18l-5.6 3 1.1-6.1L3 10.3l6.1-.9z"/>')}</span><span class="cn-at"><b>Leave a review</b></span></a>` : '');
   return `<div class="cn">
-    ${hero}${about}
-    ${q ? `<nav class="cn-quick">${q}</nav>` : ''}
+    ${hero}${hrs}${about}
     ${acts ? `<nav class="cn-acts">${acts}</nav>` : ''}
+    ${q ? `<nav class="cn-quick">${q}</nav>` : ''}
     ${ITEMS.length ? `<section class="cn-sec"><h2>${esc(V.section)}</h2><ul class="cn-list">${items}</ul></section>` : ''}
     ${soc.length ? `<section class="cn-sec"><h2>Find us online</h2><div class="cn-soc">${soc.map(x => `<span>${x[2]}<span>${esc(x[0])}</span></span>`).join('')}</div></section>` : ''}
     <footer class="cn-foot">${esc(d.name || 'Your shop')} · Powered by Innondu</footer></div>`;
@@ -555,6 +563,40 @@ function tabBrand() {
   <button class="btn" data-go onclick="saveBrand(this)">Save branding</button></div>`;
 }
 
+// ---------- opening hours ----------
+// One open/close slot per day in the editor. (The page and the database also support several per day.)
+function hoursDraft() {
+  if (!$('#hr-mon-on')) return bz.hours;
+  const h = {};
+  ConnectCore.DAYS.forEach(d => { h[d] = $('#hr-' + d + '-on').checked && v('hr-' + d + '-a') && v('hr-' + d + '-b') ? [[v('hr-' + d + '-a'), v('hr-' + d + '-b')]] : [] });
+  return h;
+}
+function hoursRows() {
+  const h = ConnectCore.clean(bz.hours) || {};
+  return ConnectCore.DAYS.map(d => {
+    const on = !!(h[d] && h[d].length), a = on ? h[d][0][0] : '09:00', b = on ? h[d][0][1] : '21:00';
+    return `<div class="ce-hr"><label class="a-check"><input type="checkbox" id="hr-${d}-on" ${on ? 'checked' : ''} onchange="hrToggle('${d}')"> ${ConnectCore.NAME[d]}</label>
+      <input type="time" id="hr-${d}-a" value="${a}" ${on ? '' : 'disabled'} aria-label="${ConnectCore.NAME[d]} opens" oninput="pv()"><span>to</span>
+      <input type="time" id="hr-${d}-b" value="${b}" ${on ? '' : 'disabled'} aria-label="${ConnectCore.NAME[d]} closes" oninput="pv()"></div>`;
+  }).join('');
+}
+function hrToggle(d) { const on = $('#hr-' + d + '-on').checked; ['a', 'b'].forEach(k => { $('#hr-' + d + '-' + k).disabled = !on }); pv() }
+function hrCopy() {
+  const on = $('#hr-mon-on').checked, a = v('hr-mon-a'), b = v('hr-mon-b');
+  ConnectCore.DAYS.forEach(d => { $('#hr-' + d + '-on').checked = on; $('#hr-' + d + '-a').value = a; $('#hr-' + d + '-b').value = b; hrToggle(d) });
+}
+async function saveHours(btn) {
+  const hours = {};
+  for (const d of ConnectCore.DAYS) {
+    if (!$('#hr-' + d + '-on').checked) { hours[d] = []; continue }
+    const a = v('hr-' + d + '-a'), b = v('hr-' + d + '-b');
+    if (!a || !b) return toast(ConnectCore.NAME[d] + ' needs an opening and a closing time');
+    if (a == b) return toast(ConnectCore.NAME[d] + ': opening and closing time are the same');
+    hours[d] = [[a, b]];
+  }
+  if ((await savePatch({ hours: ConnectCore.clean(hours) || {} }, btn, 'Hours saved')).ok) render();
+}
+
 function tabContact() {
   const map = bz.maps_url || (bz.lat != null && bz.lng != null ? bz.lat + ',' + bz.lng : '');
   return `<div class="a-card"><div class="a-h"><h2>Contact &amp; location</h2></div>
@@ -569,7 +611,13 @@ function tabContact() {
     <div><label class="lb">Longitude <span>(optional)</span></label><input id="lng" value="${bz.lng != null ? esc(bz.lng) : ''}" inputmode="decimal" placeholder="77.5933" oninput="pv()"></div></div>
   <label class="lb">Google review link <span>(optional)</span></label><input id="rv" value="${esc(bz.review_url)}" placeholder="https://g.page/r/.../review" oninput="pv()">
   <p class="note">From your Google Business Profile → "Ask for reviews" → copy the link. We show an honest, no-rewards review button.</p>
-  <button class="btn" data-go onclick="saveContact(this)">Save contact details</button></div>`;
+  <button class="btn" data-go onclick="saveContact(this)">Save contact details</button></div>
+  <div class="a-card"><div class="a-h"><h2>Opening hours</h2></div>
+  <p class="sub">Shows an "Open now / Closed" badge on your page. Times are in your shop's time zone (${esc(bz.tz || 'Asia/Kolkata')}). Leave every day unticked to hide hours.</p>
+  <div class="ce-hours">${hoursRows()}</div>
+  <p class="note">A closing time earlier than the opening time means you stay open past midnight, for example 6 pm to 2 am.</p>
+  <button class="btn alt" type="button" onclick="hrCopy()">Copy Monday to every day</button>
+  <button class="btn" data-go onclick="saveHours(this)">Save hours</button></div>`;
 }
 
 function tabLinks() {

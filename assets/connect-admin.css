@@ -158,3 +158,9 @@ main#app.ce{max-width:none;padding:0 0 60px;background:radial-gradient(900px 420
 .ce-note code{font-size:12.5px;background:var(--bg);padding:1px 6px;border-radius:6px;word-break:break-all}
 .ce-note.err{border-left-color:#b91c1c}.ce-note.warn{border-left-color:#b45309}.ce-note.ok{border-left-color:#15803d}
 .ce-form [aria-invalid=true]{border-color:#b91c1c;box-shadow:0 0 0 3px color-mix(in srgb,#b91c1c 16%,transparent)}
+
+.ce-hours{display:grid;gap:8px;margin:8px 0}
+.ce-hr{display:grid;grid-template-columns:minmax(110px,1fr) auto auto auto;align-items:center;gap:8px}
+.ce-hr input[type=time]{width:auto;min-width:104px}
+.ce-hr input:disabled{opacity:.45}
+@media (max-width:520px){.ce-hr{grid-template-columns:1fr auto auto auto;gap:6px}.ce-hr input[type=time]{min-width:92px}}

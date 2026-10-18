@@ -8,7 +8,9 @@ const vercel = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
 
 assert(source.includes('const collectionRoute ='));
 assert(source.includes('function productCollectionSection()'));
-assert(source.includes('I want more details about '));
+assert(source.includes('const productText ='));
+assert(source.includes('waHref(wd, productText(product))'), 'product sheet uses the per-product prefill');
+assert(source.includes('retryMenu') && source.includes('MENU_ERR'), 'failed load has a retry');
 assert(source.includes('${collectionLink()}'));
 assert.match(common, /admin\|collection/);
 assert(vercel.rewrites.some(r => r.source === '/connect/:slug/collection/'));
@@ -19,9 +21,10 @@ const digits = raw => {
   if (d.length === 10) d = '91' + d;
   return d;
 };
-const href = (number, product) => 'https://wa.me/' + digits(number) + '?text=' + encodeURIComponent('Hi Sample Shop, I want more details about ' + product + '.');
-const url = new URL(href('9876543210', 'Handmade Mug'));
+const text = 'Hi Sample Shop, I am interested in: Handmade Mug (₹499). https://x.test/connect/sample/collection/';
+const href = number => 'https://wa.me/' + digits(number) + '?text=' + encodeURIComponent(text);
+const url = new URL(href('9876543210'));
 assert.equal(url.hostname, 'wa.me');
 assert.equal(url.pathname, '/919876543210');
-assert.equal(new URLSearchParams(url.search).get('text'), 'Hi Sample Shop, I want more details about Handmade Mug.');
+assert.equal(new URLSearchParams(url.search).get('text'), text);
 console.log('Product collection route and WhatsApp enquiry checks passed.');

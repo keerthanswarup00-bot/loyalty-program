@@ -8,7 +8,7 @@ with cols(col, fix) as (values
   ('review_url','2026-10-16-connect.sql'), ('links','2026-10-16-connect.sql'), ('gallery','2026-10-16-connect.sql'),
   ('vertical','2026-10-16-connect.sql'),
   ('hero_url','2026-10-18-connect-hero.sql'), ('about','2026-10-18-business-about-column.sql'),
-  ('connect_loyalty','2026-10-18-connect-hero.sql'))
+  ('connect_loyalty','2026-10-18-connect-hero.sql'), ('hours','2026-10-19-business-hours.sql'))
 select 'column ' || c.col as check_name,
        exists (select 1 from information_schema.columns
                where table_schema = 'public' and table_name = 'businesses' and column_name = c.col) as ok,
@@ -26,6 +26,10 @@ union all
 select 'get_business returns about',
        coalesce((select (get_business(slug)::jsonb -> 'about') is not null from public.businesses limit 1), true),
        '2026-10-18-connect-hero.sql'
+union all
+select 'get_business returns hours',
+       coalesce((select (get_business(slug)::jsonb -> 'hours') is not null from public.businesses limit 1), true),
+       '2026-10-19-business-hours.sql'
 union all
 select 'storage bucket "brand" exists', exists (select 1 from storage.buckets where id = 'brand'), 'schema.sql'
 union all
