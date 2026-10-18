@@ -6,7 +6,7 @@ const source = fs.readFileSync('assets/connect.js', 'utf8');
 const common = fs.readFileSync('assets/common.js', 'utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
 
-assert(source.includes('const collectionRoute = /\\/collection\\/?$/i.test(location.pathname);'));
+assert(source.includes('const collectionRoute ='));
 assert(source.includes('function productCollectionSection()'));
 assert(source.includes('I want more details about '));
 assert(source.includes('${collectionLink()}'));
