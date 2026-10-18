@@ -1,16 +1,15 @@
 // Lightweight checks for the collection route's critical behaviour.
 const fs = require('node:fs');
-const vm = require('node:vm');
 const assert = require('node:assert/strict');
 
 const source = fs.readFileSync('assets/connect.js', 'utf8');
 const common = fs.readFileSync('assets/common.js', 'utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
 
-assert.match(source, /const collectionRoute = \/\\/collection\\\/?\//);
-assert.match(source, /function productCollectionSection\(\)/);
-assert.match(source, /I want more details about /);
-assert.match(source, /collectionLink\(\)/);
+assert(source.includes('const collectionRoute = /\\/collection\\/?$/i.test(location.pathname);'));
+assert(source.includes('function productCollectionSection()'));
+assert(source.includes('I want more details about '));
+assert(source.includes('${collectionLink()}'));
 assert.match(common, /admin\|collection/);
 assert(vercel.rewrites.some(r => r.source === '/connect/:slug/collection/'));
 
