@@ -136,3 +136,41 @@ body.cn-product-sheet-open{overflow:hidden}
 @media(min-width:681px){.cn-product-sheet-panel{margin:0 0 24px;border-radius:26px;max-height:calc(100dvh - 48px)}.cn-product-sheet-image{max-height:42dvh}.cn-product-sheet-info{padding:24px 30px 18px}}
 @media(max-width:420px){.cn-product-sheet-info{padding:20px 20px 8px}.cn-product-sheet-heading{gap:10px}.cn-product-sheet-price{font-size:22px}.cn-product-sheet-close{top:16px;left:14px}}
 @media(prefers-reduced-motion:reduce){.cn-product-sheet-panel{animation:none}}
+
+
+/* Aroma Scripts Phase 1 — scoped refinements; other Connect pages keep the shared design. */
+.cn-quick-aroma{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.cn-quick-aroma .cn-quick-a{min-width:0;padding:10px 6px;gap:5px;border-radius:13px;font-size:12.5px}
+.cn-quick-aroma .cn-qi{width:32px;height:32px;border-radius:10px}
+.cn-quick-aroma .cn-qi svg{width:18px;height:18px}
+.cn-about-aroma{margin:16px 2px 0;padding:15px 16px;background:var(--card);border:1px solid var(--line);border-radius:17px}
+.cn-about-aroma .cn-eyebrow{margin-bottom:7px}
+.cn-about-aroma .cn-about-copy p,.cn-about-aroma .cn-about-full p{margin:0;font-size:14px;line-height:1.6;color:var(--mut)}
+.cn-about-aroma .cn-about-full{margin-top:8px}
+.cn-about-aroma .cn-about-full[hidden],.cn-about-aroma [data-about-copy][hidden]{display:none}
+.cn-read-more{margin-top:11px;padding:0;border:0;background:transparent;color:var(--brand-t-l,var(--brand));font:600 13px Inter,system-ui,sans-serif;cursor:pointer}
+.cn-read-more span{display:inline-block;margin-left:4px}
+.cn-about-aroma+.cn-quick-aroma{margin-top:10px}
+.cn-collection-cta{margin-top:14px;padding:15px 16px;gap:10px;border-radius:17px}
+.cn-collection-cta h2{font-size:22px}
+.cn-collection-cta p{font-size:12.5px;max-width:27ch}
+.cn-collection-btn{padding:11px 12px;font-size:12.5px}
+.cn-social-aroma{margin-top:22px}
+.cn-social-aroma h2{margin-bottom:10px}
+.cn-soc-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.cn-soc-pair a{justify-content:center;gap:8px;padding:12px 10px;border-radius:13px;font-size:13px;min-width:0}
+.cn-soc-pair a svg{width:19px;height:19px;flex:none}
+.cn-share-aroma{margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+.cn-share-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cn-share-head>div{min-width:0;flex:1}
+.cn-share-head .cn-eyebrow{margin-bottom:5px}
+.cn-share-head .cn-eyebrow::after{display:none}
+.cn-share-head h2{font-size:22px;margin:0}
+.cn-share-head p{font-size:12.5px;color:var(--mut);line-height:1.45;margin:5px 0 0}
+.cn-share-primary{display:flex;align-items:center;justify-content:center;gap:7px;flex:none;border:0;border-radius:12px;padding:12px 14px;background:var(--brand);color:var(--on-brand,#fff);font:600 13px Inter,system-ui,sans-serif;cursor:pointer}
+.cn-share-primary svg{width:17px;height:17px}
+.cn-share-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:13px}
+.cn-share-tool{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;padding:11px 10px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--tx);font:500 13px Inter,system-ui,sans-serif;cursor:pointer}
+.cn-share-tool svg{width:17px;height:17px;color:var(--brand-t-l,var(--brand));flex:none}
+.cn-share-aroma .cn-qr-box{padding:14px;border-radius:16px}
+@media(max-width:360px){.cn-about-aroma{padding:13px}.cn-share-head h2{font-size:20px}.cn-share-primary{padding:11px 10px}}
