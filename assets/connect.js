@@ -113,32 +113,39 @@ function collectionLink() {
   return `<section class="cn-collection-cta"><div><span class="cn-eyebrow">Explore</span><h2>Our collection</h2><p>Browse everything we make and ask us about the pieces you love.</p></div><a class="cn-collection-btn" href="${esc(collectionUrl())}">View collection <span aria-hidden="true">${I.arrow}</span></a></section>`;
 }
 
-function toggleProduct(button) {
-  const detail = document.getElementById(button.getAttribute('aria-controls'));
-  if (!detail) return;
-  const open = button.getAttribute('aria-expanded') === 'true';
-  button.setAttribute('aria-expanded', String(!open));
-  detail.hidden = open;
+function openProduct(id) {
+  const product = (MENU && MENU.items || []).find(x => String(x.id || slugifyText(x.title)) === String(id));
+  if (!product) return;
+  const modal = document.getElementById('cn-product-sheet'), content = document.getElementById('cn-product-sheet-content');
+  if (!modal || !content) return;
+  const wd = waDigits(B);
+  const image = imgOk(product.image_url) ? `<img class="cn-product-sheet-image" src="${esc(product.image_url)}" alt="${esc(product.title)}" decoding="async">` : '<div class="cn-product-sheet-image cn-product-sheet-image-empty" aria-hidden="true">✦</div>';
+  const desc = product.description ? `<p class="cn-product-sheet-description">${esc(product.description).replace(/\n/g, '<br>')}</p>` : '<p class="cn-product-sheet-description">Contact us for more information about this product.</p>';
+  const price = product.price ? `<div class="cn-product-sheet-price">${esc(product.price)}</div>` : '';
+  const ask = wd ? `<a class="cn-product-sheet-ask" href="${esc(waHref(wd, 'Hi ' + B.name + ', I want more details about ' + product.title + '.'))}" target="_blank" rel="noopener">${I.wa}<span>Ask for more details</span>${I.arrow}</a>` : '<p class="cn-product-contact-note">WhatsApp enquiry is not available yet. Please use the contact details on the main page.</p>';
+  const category = (MENU.categories || []).find(c => c.id == product.category_id);
+  content.innerHTML = `${image}<div class="cn-product-sheet-info"><div class="cn-product-sheet-heading"><div><span class="cn-eyebrow">${esc(category ? category.name : 'Product')}</span><h2>${esc(product.title)}</h2></div>${price}</div>${desc}${ask}</div>`;
+  modal.hidden = false; document.body.classList.add('cn-product-sheet-open'); modal.setAttribute('aria-hidden', 'false');
+  const close = modal.querySelector('.cn-product-sheet-close'); if (close) close.focus();
 }
-
+function closeProduct() {
+  const modal = document.getElementById('cn-product-sheet'); if (!modal) return;
+  modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); document.body.classList.remove('cn-product-sheet-open');
+}
+function productSheetMarkup() {
+  return `<div class="cn-product-sheet-backdrop" id="cn-product-sheet" hidden aria-hidden="true" onclick="if(event.target===this)closeProduct()"><section class="cn-product-sheet-panel" role="dialog" aria-modal="true" aria-label="Product details"><button class="cn-product-sheet-close" type="button" aria-label="Close product details" onclick="closeProduct()">×</button><div id="cn-product-sheet-content"></div></section></div>`;
+}
 function productCollectionSection() {
   if (!MENU || !Array.isArray(MENU.items) || !MENU.items.length) return '<section class="cn-sec"><div class="cn-empty"><h2>Collection coming soon</h2><p class="sub">Products will appear here when this shop adds them.</p></div></section>';
-  const wd = waDigits(B);
   const cats = (MENU.categories || []).map(c => ({ ...c, items: MENU.items.filter(i => i.category_id == c.id) })).filter(c => c.items.length);
   const loose = MENU.items.filter(i => !i.category_id || !(MENU.categories || []).some(c => c.id == i.category_id));
-  const detail = x => {
-    const image = imgOk(x.image_url) ? `<div class="cn-product-detail-img"><img src="${esc(x.image_url)}" alt="${esc(x.title)}" loading="lazy" decoding="async"></div>` : '';
-    const desc = x.description ? `<p>${esc(x.description).replace(/\n/g, '<br>')}</p>` : '<p>Contact us for more information about this product.</p>';
-    const ask = wd ? `<a class="cn-product-ask" href="${esc(waHref(wd, 'Hi ' + B.name + ', I want more details about ' + x.title + '.'))}" target="_blank" rel="noopener">${I.wa}<span>Ask for more details</span>${I.arrow}</a>` : '<p class="cn-product-contact-note">WhatsApp enquiry is not available yet. Please use the contact details on the main page.</p>';
-    return `<div class="cn-product-detail" id="collection-detail-${esc(x.id || slugifyText(x.title))}" hidden>${image}<div class="cn-product-detail-copy">${desc}</div>${ask}</div>`;
-  };
   const item = x => {
     const id = x.id || slugifyText(x.title);
     const img = imgOk(x.image_url) ? `<span class="cn-product-thumb"><img src="${esc(x.image_url)}" alt="" loading="lazy" decoding="async"></span>` : '<span class="cn-product-thumb cn-product-thumb-empty" aria-hidden="true">✦</span>';
-    return `<article class="cn-product"><button class="cn-product-toggle" type="button" aria-expanded="false" aria-controls="collection-detail-${esc(id)}" onclick="toggleProduct(this)">${img}<span class="cn-product-title"><b>${esc(x.title)}</b>${x.price ? `<small>${esc(x.price)}</small>` : ''}</span><span class="cn-product-chevron" aria-hidden="true">⌄</span></button>${detail(x)}</article>`;
+    return `<article class="cn-product"><button class="cn-product-toggle" type="button" onclick="openProduct('${esc(id)}')" aria-label="View details for ${esc(x.title)}">${img}<span class="cn-product-title"><b>${esc(x.title)}</b>${x.price ? `<small>${esc(x.price)}</small>` : ''}</span><span class="cn-product-chevron" aria-hidden="true">⌄</span></button></article>`;
   };
   const group = (name, items) => `<section class="cn-collection-group">${name ? `<h2>${esc(name)}</h2>` : ''}<div class="cn-product-list">${items.map(item).join('')}</div></section>`;
-  return `<div class="cn-collection-intro"><a class="cn-back-link" href="${esc(connectBase())}">← Back to ${esc(B.name)}</a><span class="cn-eyebrow">The collection</span><h1>${esc(B.name)} <em>Collection</em></h1><p>Explore our products. Select any item to read more and ask us for details.</p><span class="cn-collection-count">${MENU.items.length} ${MENU.items.length === 1 ? 'product' : 'products'}</span></div><div class="cn-collection-groups">${cats.map(c => group(c.name, c.items)).join('')}${loose.length ? group(cats.length ? 'Others' : '', loose) : ''}</div>`;
+  return `<div class="cn-collection-intro"><a class="cn-back-link" href="${esc(connectBase())}">← Back to ${esc(B.name)}</a><span class="cn-eyebrow">The collection</span><h1>${esc(B.name)} <em>Collection</em></h1><p>Explore our products. Select any item to read more and ask us for details.</p><span class="cn-collection-count">${MENU.items.length} ${MENU.items.length === 1 ? 'product' : 'products'}</span></div><div class="cn-collection-groups">${cats.map(c => group(c.name, c.items)).join('')}${loose.length ? group(cats.length ? 'Others' : '', loose) : ''}</div>${productSheetMarkup()}`;
 }
 
 function gallerySection() {
