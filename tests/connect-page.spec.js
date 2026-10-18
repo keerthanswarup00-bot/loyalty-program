@@ -21,6 +21,7 @@ async function mock(page, biz = BIZ) {
     const json = b => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(b) });
     if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
     if (r.request().url().includes('get_business')) return json(biz);
+    if (r.request().url().includes('get_menu')) return json(biz && biz.menu ? biz.menu : null);
     return json(null);
   });
 }
@@ -91,4 +92,38 @@ test('platform: Connect page URL uses the shop domain when it has one', async ({
   expect(r.plain).toBe('https://www.innondu.com/connect/bean-brew/');
   expect(r.own).toBe('https://rewards.beanbrew.example/connect/bean-brew/');
   expect(r.qr).toContain('<svg');
+});
+
+test('Aroma Scripts Connect: shows saved featured products, offer and gallery', async ({ page }) => {
+  const aroma = {
+    slug: 'aroma-scripts', name: 'Aroma Scripts', tagline: 'Every Scent Has a Story.',
+    color: '#48233d', logo_url: '', about: 'A fragrance story.', hero_url: '',
+    wa_phone: '9876543210', ig: 'https://instagram.com/aromascripts',
+    web: 'https://aromascripts.example', gallery: ['https://images.example/gallery-1.jpg'],
+    connect_offer: { title: 'Discover your signature scent', text: 'Ask us about a fragrance pairing.', label: 'Ask us', url: '' },
+    menu: { categories: [{ id: 'perfumes', name: 'Perfumes' }], items: [
+      { id: 'vanilla-cloud', title: 'Vanilla Cloud', price: '₹799', description: 'Warm and soft.', image_url: 'https://images.example/vanilla.jpg', category_id: 'perfumes', available: true },
+      { id: 'his-muse', title: 'His Muse', price: '₹899', description: 'A bold scent.', image_url: 'https://images.example/muse.jpg', category_id: 'perfumes', available: true },
+      { id: 'draft-item', title: 'Draft item', image_url: 'https://images.example/draft.jpg', available: false }
+    ] }
+  };
+  await mock(page, aroma);
+  await page.goto('/connect/aroma-scripts/');
+  await expect(page.getByRole('heading', { name: 'Featured fragrances' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'View Vanilla Cloud' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'View His Muse' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'View Draft item' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Discover your signature scent' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Ask us/ })).toHaveAttribute('href', /wa\.me/);
+  await expect(page.locator('.cn-gal-aroma img')).toHaveCount(1);
+  await page.getByRole('button', { name: 'View Vanilla Cloud' }).click();
+  await expect(page.getByRole('dialog', { name: 'Product details' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Vanilla Cloud' })).toBeVisible();
+});
+
+test('other Connect shops do not show Aroma-only featured sections', async ({ page }) => {
+  await mock(page);
+  await page.goto('/connect/cheesora-bliss/');
+  await expect(page.locator('.cn-featured-aroma')).toHaveCount(0);
+  await expect(page.locator('.cn-offer-aroma')).toHaveCount(0);
 });
