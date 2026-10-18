@@ -664,12 +664,15 @@ async function svBrand(btn) {
   let logoUrl = v('clx') == '1' ? '' : biz.logo_url || '';
   const f = $('#clfile').files[0];
   if (f) { try { logoUrl = await readImg(f, 'logo') } catch (e) { return imgErr(e) } }
+  let heroUrl = v('herox') == '1' ? '' : biz.hero_url || '';
+  const hf = $('#herofile') && $('#herofile').files[0];
+  if (hf) { try { heroUrl = await readImg(hf, 'hero') } catch (e) { return imgErr(e) } }
   const nw = t('nw').slice(0, 280);
   if (!HEX6.test(v('cc') || biz.color)) return toast('Pick the brand colour with the colour box');
   const themeP = 'theme' in biz ? { theme: Object.assign({}, brLook(), { done: true }) } : {};   // only if the 2026-10-12-branding.sql update has been run
   await save({
     ...themeP,
-    name: t('cn') || biz.name, tagline: t('ct'), logo_url: logoUrl, color: v('cc') || biz.color,
+    name: t('cn') || biz.name, tagline: t('ct'), about: t('about'), logo_url: logoUrl, hero_url: heroUrl, color: v('cc') || biz.color,
     ig: t('ci'), fb: t('cf'), wa: t('cw'), web: t('cs'),
     news_text: nw, news_at: nw ? (nw == (biz.news_text || '') && biz.news_at ? biz.news_at : new Date().toISOString()) : null,
     ref_on: v('rfon') == '1', ref_offer: t('rfo') || '20% off your next bill', ref_cap: Math.max(1, Math.min(100, Math.round(+v('rfc')) || 5)),
@@ -783,8 +786,12 @@ function supV() {
 }
 // ---------- MORE ----------
 function moreV() {
-  return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}${brandKit()}${dbHint()}</div>
-  <div class="a-card"><h2>Links</h2>${fld('ci', 'Instagram', biz.ig, '', 'https://…')}${fld('cf', 'Facebook', biz.fb, '', 'https://…')}${fld('cw', 'WhatsApp', biz.wa, '', 'https://wa.me/…')}${fld('cs', 'Website', biz.web, '', 'https://…')}</div>
+  return `<div class="a-card"><h2>Brand</h2>${fld('cn', 'Business name', biz.name)}${fld('ct', 'Tagline', biz.tagline)}${upl('clfile', 'clx', biz.logo_url, 'Logo image')}
+    <label class="lb">Hero image <span>(wide image shown at the top of your Connect page)</span></label>
+    <div class="a-up"><input id="herofile" type="file" accept="image/png,image/jpeg,image/webp"><label class="a-check"><input id="herox" type="checkbox" value="1"> Remove hero image</label>${biz.hero_url ? `<img src="${esc(biz.hero_url)}" alt="Current hero image" style="display:block;width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-top:10px">` : '<p class="hint">No hero image uploaded yet.</p>'}</div>
+    <label class="lb">About the brand <span>(shown under the hero image; editable anytime)</span></label><textarea id="about" rows="7" maxlength="1800" placeholder="Tell customers about your brand…">${esc(biz.about || '')}</textarea>
+    ${brandKit()}${dbHint()}</div>
+  <div class="a-card"><h2>Links</h2>${fld('ci', 'Instagram', biz.ig || 'https://www.instagram.com/aromascripts?dlrf=MTgydmdmZDZpa3FoZg==', '', 'https://…')}${fld('cf', 'Facebook', biz.fb, '', 'https://…')}${fld('cw', 'WhatsApp', biz.wa, '', 'https://wa.me/…')}${fld('cs', 'Website', biz.web, '', 'https://…')}</div>
   <div class="a-card"><h2>Connect page</h2><p class="sub">One public page for your shop with your rewards, menu and social links. Share it in your bio or on WhatsApp, or print the QR for the counter.</p>
     <label class="lb">Connect link</label><input readonly class="ro" value="${esc(connectUrl())}" onclick="this.select()">
     <div class="qr" id="qrc"></div>
