@@ -69,6 +69,23 @@ function socialList(b) {
   return out;
 }
 
+// Hero: a full-width photo with the shop name over it when the owner uploaded one, otherwise the colour hero.
+function heroSection(b) {
+  const logo = `<div class="logo">${mark(b)}</div>`;
+  const tag = b.tagline ? `<p>${esc(b.tagline)}</p>` : '';
+  if (imgOk(b.hero_url)) {
+    return `<header class="cn-hero cn-hero-img"><img class="cn-hero-bg" src="${esc(b.hero_url)}" alt="" decoding="async" fetchpriority="high" onerror="this.parentNode.classList.remove('cn-hero-img');this.remove()"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
+  }
+  return `<header class="cn-hero${b.about ? ' cn-art' : ''}"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
+}
+// About: the owner's short description, shown right under the hero. Blank line = new paragraph.
+function aboutSection(b) {
+  const t = String(b.about || '').trim();
+  if (!t) return '';
+  const paras = t.split(/\n{2,}/).map(x => `<p>${esc(x.trim()).replace(/\n/g, '<br>')}</p>`).join('');
+  return `<section class="cn-about" aria-label="About ${esc(b.name)}"><div class="cn-eyebrow">About</div>${paras}</section>`;
+}
+
 function menuSection() {
   if (!MENU || !MENU.items || !MENU.items.length) return '';
   const cats = (MENU.categories || []).map(c => ({ ...c, items: MENU.items.filter(i => i.category_id == c.id) })).filter(c => c.items.length);
@@ -100,12 +117,13 @@ function view() {
   ].filter(Boolean).join('');
   const soc = socialList(b);
   const rev = httpsOnly(b.review_url);
-  return `<header class="cn-hero"><div class="logo">${mark(b)}</div><h1>${esc(b.name)}</h1>${b.tagline ? `<p>${esc(b.tagline)}</p>` : ''}</header>
+  const loyalty = b.connect_loyalty !== false;      // false = the shop has switched the loyalty button off
+  const acts = (loyalty ? row(appBase(), I.gift, 'Join the loyalty card', 'Collect stamps, earn rewards', true, false) : '')
+    + (rev ? row(rev, I.star, 'Leave a review', 'Takes a minute', false, true) : '');
+  return `${heroSection(b)}
+  ${aboutSection(b)}
   ${q ? `<nav class="cn-quick" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
-  <nav class="cn-acts" aria-label="More from ${esc(b.name)}">
-    ${row(appBase(), I.gift, 'Join the loyalty card', 'Collect stamps, earn rewards', true, false)}
-    ${rev ? row(rev, I.star, 'Leave a review', 'Takes a minute', false, true) : ''}
-  </nav>
+  ${acts ? `<nav class="cn-acts" aria-label="More from ${esc(b.name)}">${acts}</nav>` : ''}
   ${rev ? `<p class="cn-note">Honest reviews only — we don't offer rewards in exchange for them.</p>` : ''}
   ${menuSection()}
   ${gallerySection()}
@@ -171,11 +189,12 @@ function share(b) {
   meta('property', 'og:title', title);
   meta('property', 'og:type', 'website');
   meta('property', 'og:url', shareUrl());
-  const desc = b.tagline || ('Find ' + b.name + ' — contact, menu and links in one place.');
+  const desc = (b.about ? String(b.about).replace(/\s+/g, ' ').trim().slice(0, 160) : '') || b.tagline || ('Find ' + b.name + ' — contact, menu and links in one place.');
   meta('property', 'og:description', desc);
   meta('name', 'description', desc);
   meta('name', 'twitter:card', 'summary_large_image');
-  if (httpsOnly(b.logo_url) || imgOk(b.logo_url)) meta('property', 'og:image', b.logo_url);
+  const ogImg = httpsOnly(b.hero_url) || httpsOnly(b.logo_url);
+  if (ogImg) meta('property', 'og:image', ogImg);
   meta('name', 'theme-color', HEX6.test(b.color || '') ? b.color : '#8a4b2a');
   const link = document.head.querySelector('link[rel="canonical"]') || (() => { const l = document.createElement('link'); l.rel = 'canonical'; document.head.appendChild(l); return l })();
   link.href = shareUrl();

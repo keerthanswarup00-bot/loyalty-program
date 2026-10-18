@@ -52,3 +52,23 @@ main.cn{max-width:520px;margin:0 auto;padding:16px 16px 48px}
 .cn-foot a{color:var(--mut)}
 .cn.sk .card i{margin-inline:auto}
 @media (prefers-reduced-motion:reduce){.cn-act,.cn-quick-a{transition:none}}
+
+/* ---- Hero with a photo, decorative hero, and the About block ---- */
+.cn-hero-in{position:relative;z-index:1}
+.cn-hero.cn-hero-img{display:flex;align-items:flex-end;text-align:left;min-height:340px;padding:0;overflow:hidden;background:var(--brand);color:#fff}
+.cn-hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cn-hero.cn-hero-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.12) 0%,rgba(0,0,0,0) 32%,rgba(0,0,0,.72) 100%),linear-gradient(0deg,color-mix(in srgb,var(--brand) 38%,transparent),transparent 55%)}
+.cn-hero-img .cn-hero-in{width:100%;padding:90px 22px 24px}
+.cn-hero-img .logo{width:56px;height:56px;border-radius:18px;font-size:26px;margin:0 0 14px;background:rgba(255,255,255,.2);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.28)}
+.cn-hero-img h1{font-size:clamp(32px,9vw,42px);line-height:1.05;letter-spacing:-.015em;color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.35)}
+.cn-hero-img p{margin:10px 0 0;max-width:30ch;color:#fff;opacity:.94;font-size:15.5px;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+/* No photo yet but a description: soft rings behind the title instead of a flat gradient. */
+.cn-hero.cn-art{overflow:hidden;padding-top:44px;padding-bottom:36px}
+.cn-hero.cn-art::before{content:"";position:absolute;inset:-40% -20% auto auto;width:130%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,transparent 38%,color-mix(in srgb,var(--on-brand,#fff) 9%,transparent) 39%,transparent 40%,transparent 52%,color-mix(in srgb,var(--on-brand,#fff) 7%,transparent) 53%,transparent 54%,transparent 66%,color-mix(in srgb,var(--on-brand,#fff) 5%,transparent) 67%,transparent 68%);pointer-events:none}
+.cn-hero.cn-art::after{content:"";position:absolute;left:-18%;bottom:-45%;width:70%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--on-brand,#fff) 16%,transparent),transparent 68%);pointer-events:none}
+.cn-about{margin:18px 4px 4px}
+.cn-eyebrow{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--brand-t,var(--brand));margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.cn-eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+.cn-about p{margin:0 0 10px;font-size:16px;line-height:1.65;color:var(--tx)}
+.cn-about p:last-child{margin-bottom:0}
+.cn-about+.cn-quick{margin-top:18px}

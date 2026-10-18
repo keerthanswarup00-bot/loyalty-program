@@ -4,8 +4,8 @@
 // and grab the share link, QR code and NFC instructions.
 const SUPPORT_AS = (new URLSearchParams(location.search).get('as') || '').toLowerCase();
 const sb = notReady() ? null : mkClient(SUPPORT_AS ? 'lk-platform' : 'lk-admin');
-let signed = false, bz = null, tab = 'brand', CATS = [], ITEMS = [], form = null, recover = false, support = null;
-let dlinks = [], dgal = [];
+let signed = false, bz = null, tab = 'story', CATS = [], ITEMS = [], form = null, recover = false, support = null;
+let dlinks = [], dgal = [], heroDraft;   // heroDraft: undefined = saved photo, '' = removed, blob: = just picked
 
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
 const IMG_OK = /^image\/(png|jpe?g|webp|gif)$/;
@@ -14,9 +14,9 @@ const shareUrl = () => pubOrigin() + connectBase();
 const waQrUrl = () => shareUrl();
 
 // ---------- images ----------
-async function shrink(file) {
+async function shrink(file, max) {
   if (file.type == 'image/gif' || file.size < 150000) return file;
-  const bm = await createImageBitmap(file), k = Math.min(1, 900 / Math.max(bm.width, bm.height));
+  const bm = await createImageBitmap(file), k = Math.min(1, (max || 900) / Math.max(bm.width, bm.height));
   const c = document.createElement('canvas'); c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
   c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
   const blob = await new Promise(r => c.toBlob(r, 'image/webp', .85));
@@ -25,7 +25,7 @@ async function shrink(file) {
 const toDataUrl = file => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej('read'); r.readAsDataURL(file) });
 async function uploadImg(file, kind) {
   if (!IMG_OK.test(file.type || '')) throw 'type';
-  file = await shrink(file);
+  file = await shrink(file, kind == 'hero' ? 1400 : 900);
   if (file.size > 2e6) throw 'too big';
   const path = bz.id + '/' + kind + '-' + Date.now().toString(36) + '.' + EXT[file.type.toLowerCase()];
   const { error } = await sb.storage.from('brand').upload(path, file, { contentType: file.type, cacheControl: '31536000' });
@@ -46,7 +46,7 @@ async function login(btn) {
 }
 async function out() {
   await sb.auth.signOut();
-  signed = false; bz = null; CATS = []; ITEMS = []; form = null; dlinks = []; dgal = []; support = null; tab = 'brand';
+  signed = false; bz = null; CATS = []; ITEMS = []; form = null; dlinks = []; dgal = []; support = null; tab = 'story';
   render();
 }
 async function forgot() {
@@ -104,7 +104,7 @@ async function savePatch(patch, btn, msg) {
   if (msg) toast(msg);
   return true;
 }
-const go = t => { tab = t; form = null; render(); window.scrollTo(0, 0) };
+const go = t => { tab = t; form = null; heroDraft = undefined; render(); window.scrollTo(0, 0) };
 
 // ---------- savings ----------
 async function saveBrand(btn) {
@@ -113,6 +113,12 @@ async function saveBrand(btn) {
   if ($('#lgrm').value == '1') patch.logo_url = '';
   else if ($('#lgf').files[0]) { try { patch.logo_url = await uploadImg($('#lgf').files[0], 'logo') } catch (e) { return imgErr(e) } }
   if (await savePatch(patch, btn, 'Branding saved')) { $('#lgrm').value = '0'; $('#lgf').value = ''; render() }
+}
+async function saveStory(btn) {
+  const patch = { about: v('ab').trim().slice(0, 600), connect_loyalty: !!$('#ly').checked };
+  if ($('#hrrm').value == '1') patch.hero_url = '';
+  else if ($('#hrf').files[0]) { try { patch.hero_url = await uploadImg($('#hrf').files[0], 'hero') } catch (e) { return imgErr(e) } }
+  if (await savePatch(patch, btn, 'Story saved')) { heroDraft = undefined; render() }
 }
 async function saveContact(btn) {
   const map = v('map').trim(), rv = v('rv').trim();
@@ -217,22 +223,31 @@ function draft() {
     lat: g('lat') !== undefined ? (isFinite(parseFloat(g('lat'))) ? parseFloat(g('lat')) : null) : bz.lat,
     lng: g('lng') !== undefined ? (isFinite(parseFloat(g('lng'))) ? parseFloat(g('lng')) : null) : bz.lng,
     review_url: g('rv') !== undefined ? g('rv') : bz.review_url,
+    hero_url: heroDraft !== undefined ? heroDraft : bz.hero_url,
+    about: $('#ab') ? $('#ab').value.trim() : bz.about,
+    connect_loyalty: $('#ly') ? $('#ly').checked : bz.connect_loyalty !== false,
     ig: bz.ig, fb: bz.fb, yt: bz.yt, web: bz.web, links: bz.links
   };
 }
 function pvHTML(d) {
   const V = vertical(d.vertical), wd = digits(d.wa_phone || '') || (String(bz.wa || '').match(/(\d{10,15})/) || [])[1] || '';
-  const q = [pvMaps(d) ? '<span class="cn-quick-a">' + ico('<path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>') + '<span>Directions</span></span>' : '',
-    digits(d.phone) ? '<span class="cn-quick-a">' + ico('<path d="M4 5c0 8.3 6.7 15 15 15l2-3.6-4.3-2-1.8 1.8a12 12 0 0 1-4.6-4.6l1.8-1.8-2-4.3z"/>') + '<span>Call</span></span>' : '',
-    wd ? '<span class="cn-quick-a">' + IC.wa + '<span>WhatsApp</span></span>' : ''].filter(Boolean).join('');
+  const q = [pvMaps(d) ? '<span class="cn-quick-a"><span class="cn-qi">' + ico('<path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>') + '</span><span>Directions</span></span>' : '',
+    digits(d.phone) ? '<span class="cn-quick-a"><span class="cn-qi">' + ico('<path d="M4 5c0 8.3 6.7 15 15 15l2-3.6-4.3-2-1.8 1.8a12 12 0 0 1-4.6-4.6l1.8-1.8-2-4.3z"/>') + '</span><span>Call</span></span>' : '',
+    wd ? '<span class="cn-quick-a"><span class="cn-qi">' + IC.wa + '</span><span>WhatsApp</span></span>' : ''].filter(Boolean).join('');
   const items = ITEMS.slice(0, 4).map(x => `<li class="cn-item"><div class="mn-tx"><b>${esc(x.title)}</b>${x.description ? `<small>${esc(x.description)}</small>` : ''}</div>${x.price ? `<span class="mn-pr">${esc(x.price)}</span>` : ''}</li>`).join('');
   const soc = [['Instagram', bz.ig, IC.ig], ['Facebook', bz.fb, IC.fb], ['YouTube', bz.yt, IC.yt]].filter(x => /^https:\/\//i.test(x[1] || ''));
   const logo = bz.logo_url && /^(https:|data:)/.test(bz.logo_url) ? `<img src="${esc(bz.logo_url)}" alt="">` : esc((d.name || '?').trim().slice(0, 1).toUpperCase());
+  const lg = `<div class="logo">${logo}</div>`, nm = esc(d.name || 'Your shop'), tg = d.tagline ? `<p>${esc(d.tagline)}</p>` : '';
+  const hero = /^(https:|blob:|data:image)/.test(d.hero_url || '')
+    ? `<header class="cn-hero cn-hero-img"><img class="cn-hero-bg" src="${esc(d.hero_url)}" alt=""><div class="cn-hero-in">${lg}<h1>${nm}</h1>${tg}</div></header>`
+    : `<header class="cn-hero${d.about ? ' cn-art' : ''}"><div class="cn-hero-in">${lg}<h1>${nm}</h1>${tg}</div></header>`;
+  const about = d.about ? `<section class="cn-about"><div class="cn-eyebrow">About</div>${d.about.split(/\n{2,}/).map(x => `<p>${esc(x.trim()).replace(/\n/g, '<br>')}</p>`).join('')}</section>` : '';
+  const acts = (d.connect_loyalty ? `<a class="cn-act pri"><span class="cn-ai">${ico('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2 0-4-1-4-3s3-2.5 4 3c1-5.5 4-5 4-3s-2 3-4 3"/>')}</span><span class="cn-at"><b>Join the loyalty card</b><small>Collect stamps, earn rewards</small></span></a>` : '')
+    + (/^https:\/\//i.test(d.review_url || '') ? `<a class="cn-act"><span class="cn-ai">${ico('<path d="M12 3.5l2.9 5.9 6.1.9-4.5 4.4 1.1 6.1L12 18l-5.6 3 1.1-6.1L3 10.3l6.1-.9z"/>')}</span><span class="cn-at"><b>Leave a review</b></span></a>` : '');
   return `<div class="cn">
-    <header class="cn-hero"><div class="logo">${logo}</div><h1>${esc(d.name || 'Your shop')}</h1>${d.tagline ? `<p>${esc(d.tagline)}</p>` : ''}</header>
+    ${hero}${about}
     ${q ? `<nav class="cn-quick">${q}</nav>` : ''}
-    <nav class="cn-acts"><a class="cn-act pri"><span class="cn-ai">${ico('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2 0-4-1-4-3s3-2.5 4 3c1-5.5 4-5 4-3s-2 3-4 3"/>')}</span><span class="cn-at"><b>Join the loyalty card</b><small>Collect stamps, earn rewards</small></span></a>
-    ${/^https:\/\//i.test(d.review_url || '') ? `<a class="cn-act"><span class="cn-ai">${ico('<path d="M12 3.5l2.9 5.9 6.1.9-4.5 4.4 1.1 6.1L12 18l-5.6 3 1.1-6.1L3 10.3l6.1-.9z"/>')}</span><span class="cn-at"><b>Leave a review</b></span></a>` : ''}</nav>
+    ${acts ? `<nav class="cn-acts">${acts}</nav>` : ''}
     ${ITEMS.length ? `<section class="cn-sec"><h2>${esc(V.section)}</h2><ul class="cn-list">${items}</ul></section>` : ''}
     ${soc.length ? `<section class="cn-sec"><h2>Find us online</h2><div class="cn-soc">${soc.map(x => `<span>${x[2]}<span>${esc(x[0])}</span></span>`).join('')}</div></section>` : ''}
     <footer class="cn-foot">${esc(d.name || 'Your shop')} · Powered by Innondu</footer></div>`;
@@ -247,6 +262,18 @@ function colFromPick() { const p = $('#colp'); if (p) { $('#col').value = p.valu
 function colFromText() { const t = $('#col'); if (t && HEX6.test(t.value)) $('#colp').value = t.value; pv() }
 function pvLogo(input) { const f = input.files[0]; $('#lgrm').value = '0'; const el = $('#lgpv'); if (f && el) el.innerHTML = `<img src="${esc(URL.createObjectURL(f))}" alt="">`; pv() }
 function rmLogo() { $('#lgrm').value = '1'; const el = $('#lgpv'); if (el) el.innerHTML = ''; $('#lgf').value = ''; pv() }
+function pvHero(input) {
+  const f = input.files[0]; if (!f) return;
+  heroDraft = URL.createObjectURL(f); $('#hrrm').value = '0';
+  const el = $('#hrpv'); if (el) { el.classList.add('has'); el.querySelector('.ce-hero-img').innerHTML = `<img src="${esc(heroDraft)}" alt="">` }
+  pv();
+}
+function rmHero() {
+  heroDraft = ''; $('#hrrm').value = '1'; $('#hrf').value = '';
+  const el = $('#hrpv'); if (el) { el.classList.remove('has'); el.querySelector('.ce-hero-img').innerHTML = '' }
+  pv();
+}
+function cnt() { const t = $('#ab'), c = $('#abc'); if (t && c) c.textContent = t.value.length + ' / 600'; pv() }
 function pvItem(input) { const f = input.files[0], el = $('#it-pv'); if (f && el) el.innerHTML = `<img src="${esc(URL.createObjectURL(f))}" alt="">` }
 
 // ---------- views ----------
@@ -269,26 +296,54 @@ const recoverV = () => `<div class="a-card" style="margin-top:40px;max-width:420
   <button class="btn" data-go onclick="setPw(this)">Save password</button></div>`;
 const forShop = () => `<div class="a-card" style="margin-top:40px"><h2>Shop not found</h2><p class="sub">This address is not linked to a shop. Check the link, or ask the platform for help.</p><button class="btn alt" onclick="out()">Sign out</button></div>`;
 
+// How complete the page is: each item says where to fix it.
+function strength() {
+  const V = vertical(bz.vertical);
+  const L = [
+    ['story', 'Hero photo', !!bz.hero_url], ['story', 'Description', !!String(bz.about || '').trim()],
+    ['contact', 'Phone', !!(bz.phone || bz.wa_phone)], ['contact', 'Address', !!(bz.address || bz.maps_url || bz.lat != null)],
+    ['products', V.section, ITEMS.length > 0], ['photos', 'Photos', (bz.gallery || []).length > 0],
+    ['links', 'Social links', !!(bz.ig || bz.fb || bz.yt || bz.web || (bz.links || []).length)]
+  ];
+  return { L, done: L.filter(x => x[2]).length, pct: Math.round(L.filter(x => x[2]).length / L.length * 100) };
+}
+const NAV = [
+  ['story', 'Story', ico('<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-4.5 4 3.5 3-2.5 4 3.5"/>')],
+  ['brand', 'Branding', ico('<path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-.9 2-1.8 0-1.2-1-1.5-1-2.6 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/>')],
+  ['contact', 'Contact', ico('<path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>')],
+  ['links', 'Links', ico('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>')],
+  ['products', 'Products', ico('<path d="M5 8h14l-1 12H6zM9 8a3 3 0 0 1 6 0"/>')],
+  ['photos', 'Photos', ico('<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/>')],
+  ['share', 'Share', ico('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v0M21 21h-4v-4"/>')]
+];
 function shell() {
-  const T = [['brand', 'Branding'], ['contact', 'Contact'], ['links', 'Links'], ['products', 'Products'], ['photos', 'Photos'], ['share', 'Share']];
-  return `<header class="a-hero slim"><div class="a-in">
-    <div class="a-brand"><div class="a-logo">${mark(bz)}</div><div class="a-bt"><b>${esc(bz.name)}</b><span>Connect editor</span></div>
+  const S = strength(), r = 26, C = 2 * Math.PI * r, missing = S.L.filter(x => !x[2]);
+  const todo = { story: S.L[0][2] && S.L[1][2], contact: S.L[2][2] && S.L[3][2], products: S.L[4][2], photos: S.L[5][2], links: S.L[6][2] };
+  return `<header class="ce-top"><div class="ce-top-in">
+    <div class="ce-id"><div class="ce-logo">${mark(bz)}</div><div class="ce-name"><b>${esc(bz.name)}</b><span>Connect editor</span></div>
       <a class="a-ib" href="${esc(shareUrl())}" target="_blank" rel="noopener" title="View my page">${I.eye}</a>
       <button class="a-ib" title="Sign out" onclick="out()">${I.signout}</button></div>
+    <div class="ce-meter">
+      <svg class="ce-ring" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="${r}" class="bg"/><circle cx="32" cy="32" r="${r}" class="fg" stroke-dasharray="${(C * S.pct / 100).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 32 32)"/></svg>
+      <div class="ce-mt"><b>${S.pct}% ready</b><span>${missing.length ? 'Add these to finish your page' : 'Your page is complete'}</span></div>
+      <div class="ce-chips">${missing.map(x => `<button type="button" onclick="go('${x[0]}')">+ ${esc(x[1])}</button>`).join('')}</div>
+    </div>
+    <button type="button" class="ce-link" onclick="copyShare()" title="Copy link">${I.copy}<span>${esc(shareUrl().replace(/^https?:\/\//, ''))}</span></button>
   </div></header>
-  <nav class="ca-tabs">${T.map(t => `<button class="${tab == t[0] ? 'on' : ''}" onclick="go('${t[0]}')">${t[1]}</button>`).join('')}</nav>
-  ${support ? `<div class="a-support" style="margin:0 0 12px">Support mode · managing for the owner. Changes are logged.</div>` : ''}
-  <div class="ca-wrap">
-    <div class="ca-form">${tabV()}</div>
-    <aside class="ca-pv">
-      <div class="ca-pv-h"><b>Live preview</b><a href="${esc(shareUrl())}" target="_blank" rel="noopener">Open full page</a></div>
-      <div class="ca-pv-frame"><div id="pv" class="cn"></div></div>
-      <p class="note">This is roughly what visitors see. The full page uses your real details.</p>
+  ${support ? `<div class="a-support" style="margin:12px auto;max-width:1180px">Support mode · managing for the owner. Changes are logged.</div>` : ''}
+  <div class="ce-layout">
+    <nav class="ce-nav" aria-label="Sections">${NAV.map(n => `<button class="${tab == n[0] ? 'on' : ''}" onclick="go('${n[0]}')"><i>${n[2]}</i><span>${n[1]}</span>${todo[n[0]] === false ? '<em title="Not finished"></em>' : ''}</button>`).join('')}</nav>
+    <div class="ce-form">${tabV()}</div>
+    <aside class="ce-pv">
+      <div class="ce-pv-h"><b>Live preview</b><a href="${esc(shareUrl())}" target="_blank" rel="noopener">Open full page</a></div>
+      <div class="ce-phone"><i class="ce-notch"></i><div class="ce-screen"><div id="pv" class="cn"></div></div></div>
+      <p class="note">Updates as you type. The real page uses your saved details.</p>
     </aside>
   </div>`;
 }
 
 function tabV() {
+  if (tab == 'story') return tabStory();
   if (tab == 'contact') return tabContact();
   if (tab == 'links') return tabLinks();
   if (tab == 'products') return tabProducts();
@@ -296,6 +351,25 @@ function tabV() {
   if (tab == 'share') return tabShare();
   return tabBrand();
 }
+
+function tabStory() {
+  const hero = bz.hero_url && /^(https:|data:image)/.test(bz.hero_url) ? bz.hero_url : '';
+  return `<div class="a-card ce-card"><div class="a-h"><h2>Hero &amp; story</h2></div>
+  <p class="sub">The first thing visitors see: a big photo with your shop name on it, and a few lines about you right below.</p>
+  <label class="lb">Hero photo <span>(wide photo works best)</span></label>
+  <div id="hrpv" class="ce-hero${hero ? ' has' : ''}"><div class="ce-hero-img">${hero ? `<img src="${esc(hero)}" alt="">` : ''}</div>
+    <div class="ce-hero-empty">${ico('<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-4.5 4 3.5 3-2.5 4 3.5"/>')}<b>Add a hero photo</b><small>Shown behind your name. We darken the bottom so it stays readable.</small></div>
+    <label class="ce-hero-pick">${hero ? 'Change photo' : 'Choose photo'}<input id="hrf" type="file" accept="image/*" onchange="pvHero(this)" hidden></label>
+    <button type="button" class="ce-hero-rm" onclick="rmHero()">Remove</button></div>
+  <input type="hidden" id="hrrm" value="0">
+  <label class="lb">Description <span>(a few lines about your shop)</span></label>
+  <textarea id="ab" rows="5" maxlength="600" placeholder="Tell visitors what makes your shop special: what you make, your story, what to try first." oninput="cnt()">${esc(bz.about || '')}</textarea>
+  <div class="ce-count" id="abc">${(bz.about || '').length} / 600</div>
+  <p class="note" style="text-align:left;margin:6px 0 0">Leave a blank line to start a new paragraph.</p>
+  <label class="ce-sw"><input id="ly" type="checkbox"${bz.connect_loyalty !== false ? ' checked' : ''} onchange="pv()"><span class="ce-sw-t"><b>Show “Join the loyalty card”</b><small>Switch off while you are not running a loyalty card. You can turn it back on any time.</small></span><i aria-hidden="true"></i></label>
+  <button class="btn" data-go onclick="saveStory(this)">Save story</button></div>`;
+}
+
 
 function tabBrand() {
   const V = vertical(bz.vertical), c = HEX6.test(bz.color) ? bz.color : '#8a4b2a';
@@ -409,9 +483,11 @@ const copyShare = () => copyText(shareUrl(), 'Link copied');
 function render() {
   const app = $('#app');
   if (notReady()) { app.innerHTML = setupMsg; return }
+  app.className = '';
   if (recover) { app.innerHTML = recoverV(); return }
   if (!signed) { app.innerHTML = loginV(); return }
   if (!bz) { app.innerHTML = forShop(); return }
+  app.className = 'ce';
   app.innerHTML = shell();
   pv();
 }

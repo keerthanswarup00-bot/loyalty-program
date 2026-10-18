@@ -25,8 +25,8 @@ async function shop(slug) {
 }
 
 function inject(b, url) {
-  const name = b.name, desc = b.tagline || ('Find ' + name + ' — contact, offers and links in one place.');
-  const img = /^https?:\/\//i.test(b.logo_url || '') ? b.logo_url : '';
+  const name = b.name, desc = (b.about ? String(b.about).replace(/\s+/g, ' ').trim().slice(0, 160) : '') || b.tagline || ('Find ' + name + ' — contact, offers and links in one place.');
+  const img = /^https?:\/\//i.test(b.hero_url || '') ? b.hero_url : /^https?:\/\//i.test(b.logo_url || '') ? b.logo_url : '';
   const ld = {
     '@context': 'https://schema.org', '@type': SCHEMA[b.vertical] || 'LocalBusiness',
     name, url, description: desc, image: img || undefined,

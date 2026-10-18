@@ -76,6 +76,9 @@ alter table public.businesses add column if not exists links jsonb not null defa
 alter table public.businesses add column if not exists gallery jsonb not null default '[]'::jsonb;
 -- Shop type: cafe | bakery | salon | boutique | repair | generic. Sets page labels and defaults (assets/verticals.js).
 alter table public.businesses add column if not exists vertical text not null default 'cafe';
+alter table public.businesses add column if not exists hero_url text not null default '';
+alter table public.businesses add column if not exists about text not null default '';
+alter table public.businesses add column if not exists connect_loyalty boolean not null default true;
 
 
 create table if not exists public.members (
@@ -264,7 +267,7 @@ grant update (name, tagline, color, logo_url, stamp_url, ig, fb, wa, web, need, 
               daily_on, daily_offers, daily_win_pct, daily_week_cap, daily_notes,
               daily_prizes, daily_days, daily_valid_days,
               lapsed_days, winback_offer, winback_valid_days, theme,
-              phone, wa_phone, address, maps_url, lat, lng, review_url, yt, links, gallery, vertical)
+              phone, wa_phone, address, maps_url, lat, lng, review_url, yt, links, gallery, vertical, hero_url, about, connect_loyalty)
   on public.businesses to authenticated;
 
 -- ---------- Functions ----------
@@ -284,6 +287,7 @@ language sql stable security definer set search_path = public as $$
     'phone', phone, 'wa_phone', wa_phone, 'address', address, 'maps_url', maps_url,
     'lat', lat, 'lng', lng, 'review_url', review_url,
     'links', links, 'gallery', gallery, 'vertical', vertical,
+    'hero_url', hero_url, 'about', about, 'connect_loyalty', connect_loyalty,
     'need', need, 'reward', reward,
     'cooldown_min', cooldown_min, 'sur_stamps', sur_stamps, 'sur_offer', sur_offer,
     'welcome_offer', welcome_offer, 'bday_offer', bday_offer, 'exp_days', exp_days,
