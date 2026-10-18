@@ -130,3 +130,21 @@ main#app.ce{max-width:none;padding:0 0 60px;background:radial-gradient(900px 420
 @media(max-width:520px){.ca-2{grid-template-columns:1fr}}
 .ce-screen .cn-quick{grid-template-columns:repeat(3,1fr);gap:6px}
 .ce-screen .cn-quick-a{padding:10px 4px;font-size:12px}
+
+/* Mobile overflow fix for the Connect Editor readiness panel */
+.ce-top,.ce-top-in,.ce-meter,.ce-mt,.ce-chips{min-width:0;max-width:100%;box-sizing:border-box}
+.ce-meter{grid-template-columns:58px minmax(0,1fr)}
+.ce-mt{grid-column:2;overflow-wrap:anywhere}
+.ce-mt span{display:block;max-width:100%;overflow-wrap:anywhere}
+.ce-chips{grid-column:1/-1;display:flex;flex-wrap:wrap;min-width:0}
+.ce-chips button{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.ce-id,.ce-link{min-width:0}
+@media(max-width:520px){
+  .ce-top{padding-left:12px;padding-right:12px}
+  .ce-top-in{width:100%}
+  .ce-meter{padding:12px;gap:8px 10px}
+  .ce-chips{grid-column:1/-1}
+  .ce-chips button{font-size:12px;padding:6px 9px}
+  .ce-form .a-card{padding:18px 16px 18px 20px}
+  .ce-hero{width:100%;min-width:0}
+}
