@@ -226,6 +226,7 @@ function meta(attr, key, content) {
   el.setAttribute('content', content);
 }
 function jsonld(b) {
+  if (document.head.querySelector('script[type="application/ld+json"]')) return;   // middleware already added one for crawlers
   const data = {
     '@context': 'https://schema.org', '@type': vertical(b.vertical).schemaType, name: b.name,
     url: shareUrl(), image: httpsOnly(b.logo_url) || undefined, description: b.tagline || undefined,
@@ -243,11 +244,14 @@ function share(b) {
   meta('property', 'og:title', title);
   meta('property', 'og:type', 'website');
   meta('property', 'og:url', location.origin + location.pathname);
-  const desc = (b.about ? String(b.about).replace(/\s+/g, ' ').trim().slice(0, 160) : '') || b.tagline || ('Find ' + b.name + ' — contact, menu and links in one place.');
+  const items = (MENU && MENU.items) || [];
+  const desc = collectionRoute
+    ? (items.length ? 'Browse ' + items.length + ' product' + (items.length == 1 ? '' : 's') + ' from ' + b.name + '. ' : 'Explore the product collection from ' + b.name + '. ') + 'Open a product to read more or ask on WhatsApp.'
+    : (b.about ? String(b.about).replace(/\s+/g, ' ').trim().slice(0, 160) : '') || b.tagline || ('Find ' + b.name + ' — contact, menu and links in one place.');
   meta('property', 'og:description', desc);
   meta('name', 'description', desc);
   meta('name', 'twitter:card', 'summary_large_image');
-  const ogImg = httpsOnly(b.hero_url) || httpsOnly(b.logo_url);
+  const ogImg = (collectionRoute && items.map(x => httpsOnly(x.image_url)).find(Boolean)) || httpsOnly(b.hero_url) || httpsOnly(b.logo_url);
   if (ogImg) meta('property', 'og:image', ogImg);
   meta('name', 'theme-color', HEX6.test(b.color || '') ? b.color : '#8a4b2a');
   const link = document.head.querySelector('link[rel="canonical"]') || (() => { const l = document.createElement('link'); l.rel = 'canonical'; document.head.appendChild(l); return l })();
@@ -269,6 +273,5 @@ async function loadMenu() {
   V = vertical(B.vertical);
   await loadMenu();
   brand(B); share(B);
-  if (collectionRoute) { document.title = B.name + ' · Collection'; meta('name', 'description', 'Explore the product collection from ' + B.name + '. Open a product to read more or ask us on WhatsApp.'); }
   app.innerHTML = view();
 })();

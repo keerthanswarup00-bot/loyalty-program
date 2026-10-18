@@ -564,53 +564,34 @@ function editorV() {
 }
 
 // ---------- images ----------
-// Images live in the public Supabase Storage bucket "brand" (folder = business id). If the bucket is not set up yet
-// (schema.sql not re-run), small images fall back to being stored inside the database as before.
-const IMG_OK = /^image\/(png|jpeg|webp|gif)$/i, EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
-const toDataUrl = file => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject('read'); r.readAsDataURL(file) });
-const inBucket = u => typeof u == 'string' && u.includes('/storage/v1/object/public/brand/' + biz.id + '/');
-async function dropOld(u) {
-  if (!inBucket(u)) return;
-  try { await sb.storage.from('brand').remove([decodeURIComponent(u.split('/brand/')[1].split('?')[0])]) } catch (e) { }
-}
-async function readImg(file, kind) {
-  if (!IMG_OK.test(file.type || '')) throw 'type';
-  file = await shrink(file);
-  if (file.size > 2e6) throw 'too big';
-  const path = biz.id + '/' + kind + '-' + Date.now().toString(36) + '.' + EXT[file.type.toLowerCase()];
-  const { error } = await sb.storage.from('brand').upload(path, file, { contentType: file.type, cacheControl: '31536000' });
-  if (!error) return sb.storage.from('brand').getPublicUrl(path).data.publicUrl;
-  if (file.size > 300000) throw 'no bucket';
-  return toDataUrl(file);
-}
-// Down-scale large images before upload so customers aren't served megabytes on mobile data.
-async function shrink(file) {
-  if (file.type == 'image/gif' || file.size < 150000) return file;
-  const bm = await createImageBitmap(file), k = Math.min(1, 640 / Math.max(bm.width, bm.height));
-  const c = document.createElement('canvas'); c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
-  c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
-  const blob = await new Promise(r => c.toBlob(r, 'image/webp', .85));
-  return blob ? new File([blob], 'img.webp', { type: 'image/webp' }) : file;
-}
+// Images live in the public Supabase Storage bucket "brand" (folder = business id). assets/img.js resizes them, strips
+// their metadata and uploads them; if storage is unavailable the upload fails with a clear message instead of quietly
+// saving the picture inside the database.
+const readImg = (file, kind) => BrandImg.upload(sb, biz.id, file, kind);
+const dropOld = u => BrandImg.remove(sb, biz.id, u);
+const IMG_COLS = [['logo_url', 'logo'], ['hero_url', 'hero'], ['stamp_url', 'stamp']];
 // One-click: move images that are still stored inside the database into the storage bucket.
 async function moveImgs(btn) {
   btn.disabled = true;
+  const fresh = [];
   try {
     const patch = {};
-    for (const [col, kind] of [['logo_url', 'logo'], ['stamp_url', 'stamp']]) {
-      const u = biz[col]; if (!u || !u.startsWith('data:')) continue;
-      const blob = await (await fetch(u)).blob();
-      patch[col] = await readImg(new File([blob], kind, { type: blob.type }), kind);
-      if (patch[col].startsWith('data:')) throw 'no bucket';
+    for (const [col, kind] of IMG_COLS) {
+      const u = biz[col]; if (!BrandImg.isData(u)) continue;
+      patch[col] = await BrandImg.fromData(sb, biz.id, u, kind); fresh.push(patch[col]);
     }
     if (!Object.keys(patch).length) return toast('Nothing to move');
-    const { error } = await sb.from('businesses').update(patch).eq('id', biz.id);
+    const { data, error } = await sb.from('businesses').update(patch).eq('id', biz.id).select('id');
     if (error) throw error;
+    if (!data || !data.length) throw new Error('The database did not update any row. Sign in again and retry.');
     Object.assign(biz, patch); toast('Images moved to storage'); render();
-  } catch (e) { toast(e == 'no bucket' ? 'Storage is not set up yet. Run the latest supabase/schema.sql.' : nice(e)) }
+  } catch (e) {
+    for (const u of fresh) await BrandImg.remove(sb, biz.id, u);   // nothing points at them, so don't leave them behind
+    toast(typeof e == 'string' ? BrandImg.message(e) : nice(e));
+  }
   finally { btn.disabled = false }
 }
-const dbImgs = () => ['logo_url', 'stamp_url'].filter(c => (biz[c] || '').startsWith('data:')).length;
+const dbImgs = () => IMG_COLS.filter(([c]) => BrandImg.isData(biz[c])).length;
 function pvImg(fid, pvid, hid) {
   const f = $('#' + fid).files[0]; if (!f) return;
   const p = $('#' + pvid); p.hidden = false;
@@ -618,7 +599,7 @@ function pvImg(fid, pvid, hid) {
   $('#' + hid).value = '0';
 }
 function rmImg(hid, pvid) { $('#' + hid).value = '1'; const p = $('#' + pvid); p.hidden = true; p.innerHTML = '' }
-const imgErr = e => toast(e == 'too big' ? 'Image too big (max 2 MB)' : e == 'no bucket' ? 'Storage is not set up yet: run the latest supabase/schema.sql, or use an image under 300 KB' : e == 'type' ? 'Use a PNG, JPG, WebP or GIF image' : 'Could not read that image');
+const imgErr = e => toast(BrandImg.message(e));
 
 // ---------- saving ----------
 async function save(patch, btn, after) {

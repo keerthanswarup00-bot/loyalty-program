@@ -5,35 +5,24 @@
 const SUPPORT_AS = (new URLSearchParams(location.search).get('as') || '').toLowerCase();
 const sb = notReady() ? null : mkClient(SUPPORT_AS ? 'lk-platform' : 'lk-admin');
 let signed = false, bz = null, tab = 'story', CATS = [], ITEMS = [], form = null, recover = false, support = null;
+let status = null;   // outcome of the last save; stays on screen (see noticesV) until the next full save or a tab change
 let dlinks = [], dgal = [], heroDraft;   // heroDraft: undefined = saved photo, '' = removed, blob: = just picked
 
-const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
-const IMG_OK = /^image\/(png|jpe?g|webp|gif)$/;
 const urlOk = u => !u || /^https?:\/\//i.test(u);
 const shareUrl = () => pubOrigin() + connectBase();
 const waQrUrl = () => shareUrl();
 
 // ---------- images ----------
-async function shrink(file, max) {
-  if (file.type == 'image/gif' || file.size < 150000) return file;
-  const bm = await createImageBitmap(file), k = Math.min(1, (max || 900) / Math.max(bm.width, bm.height));
-  const c = document.createElement('canvas'); c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
-  c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
-  const blob = await new Promise(r => c.toBlob(r, 'image/webp', .85));
-  return blob ? new File([blob], 'img.webp', { type: 'image/webp' }) : file;
+// assets/img.js resizes every photo, strips its metadata and uploads it to the "brand" storage bucket. If storage is
+// unavailable the upload fails with a clear message; images are never saved inside the database as a data: URL.
+const uploadImg = (file, kind) => BrandImg.upload(sb, bz.id, file, kind);
+const imgErr = e => toast(BrandImg.message(e));
+const isDataImg = u => BrandImg.isData(u);
+// After a save: the replaced file is deleted if the row took the new one; the new file is deleted if the row refused it.
+async function settleImg(field, oldUrl, newUrl, res) {
+  if (newUrl === oldUrl) return;
+  await BrandImg.remove(sb, bz.id, res.done.includes(field) ? oldUrl : newUrl);
 }
-const toDataUrl = file => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej('read'); r.readAsDataURL(file) });
-async function uploadImg(file, kind) {
-  if (!IMG_OK.test(file.type || '')) throw 'type';
-  file = await shrink(file, kind == 'hero' ? 1400 : 900);
-  if (file.size > 2e6) throw 'too big';
-  const path = bz.id + '/' + kind + '-' + Date.now().toString(36) + '.' + EXT[file.type.toLowerCase()];
-  const { error } = await sb.storage.from('brand').upload(path, file, { contentType: file.type, cacheControl: '31536000' });
-  if (!error) return sb.storage.from('brand').getPublicUrl(path).data.publicUrl;
-  if (file.size > 300000) throw 'no bucket';
-  return toDataUrl(file);
-}
-const imgErr = e => toast(e == 'too big' ? 'Image too big (max 2 MB)' : e == 'no bucket' ? 'Storage is not set up yet: run the latest supabase/schema.sql' : e == 'type' ? 'Use a PNG, JPG, WebP or GIF image' : 'Could not read that image');
 
 // ---------- auth (same owner account and session as the dashboard) ----------
 async function login(btn) {
@@ -135,44 +124,164 @@ async function loadMenu() {
     }
   }
 }
+
+// ---------- saving ----------
+// Every save is checked by reading the row back from the database and comparing it with what was sent, so a save the
+// database quietly refused (no row updated, missing column, no permission) can never show up as "Saved". If the whole
+// form is refused, each field is tried on its own so the owner is told exactly which ones did not save and why.
+const FIELDS = { name: 'Shop name', tagline: 'Tagline', color: 'Brand colour', vertical: 'Shop type', logo_url: 'Logo', hero_url: 'Hero photo', about: 'Description', connect_loyalty: 'Loyalty button',
+  phone: 'Phone number', wa_phone: 'WhatsApp number', address: 'Address', maps_url: 'Google Maps link', lat: 'Latitude', lng: 'Longitude', review_url: 'Review link',
+  ig: 'Instagram link', fb: 'Facebook link', yt: 'YouTube link', web: 'Website link', links: 'Other links', gallery: 'Photos' };
+const FIELD_INPUT = { name: 'nm', tagline: 'tg', color: 'col', vertical: 'vt', logo_url: 'lgf', hero_url: 'hrf', about: 'ab', connect_loyalty: 'ly', phone: 'ph', wa_phone: 'wap', address: 'ad',
+  maps_url: 'map', lat: 'lat', lng: 'lng', review_url: 'rv', ig: 'ig', fb: 'fb', yt: 'yt', web: 'web' };
+const FILE_INPUT = { logo_url: ['lgf', 'lgrm'], hero_url: ['hrf', 'hrrm'] };
+// Which SQL file adds a column (and the right to edit it). Anything else: the full schema.sql, which is safe to re-run.
+const SQL_FOR = { about: '2026-10-18-connect-hero.sql', hero_url: '2026-10-18-connect-hero.sql', connect_loyalty: '2026-10-18-connect-hero.sql',
+  phone: '2026-10-16-connect.sql', wa_phone: '2026-10-16-connect.sql', address: '2026-10-16-connect.sql', maps_url: '2026-10-16-connect.sql', lat: '2026-10-16-connect.sql', lng: '2026-10-16-connect.sql',
+  review_url: '2026-10-16-connect.sql', yt: '2026-10-16-connect.sql', links: '2026-10-16-connect.sql', gallery: '2026-10-16-connect.sql', vertical: '2026-10-16-connect.sql' };
+const sqlFile = k => 'supabase/' + (SQL_FOR[k] || 'schema.sql');
+
+// Deep equality that ignores object key order (Postgres jsonb stores keys in its own order).
+function same(a, b) {
+  if (a === b) return true;
+  if (typeof a == 'number' && typeof b == 'number') return Math.abs(a - b) < 1e-9;
+  if (a && b && typeof a == 'object' && typeof b == 'object') {
+    if (Array.isArray(a) != Array.isArray(b)) return false;
+    const ka = Object.keys(a), kb = Object.keys(b);
+    return ka.length == kb.length && ka.every(k => same(a[k], b[k]));
+  }
+  return false;
+}
+// Plain-words reason a field could not be saved.
+function whyNot(e, field) {
+  const m = String((e && e.message) || e || '');
+  if (e && e.code == 'NOROW') return 'the database did not update any row. Sign in again; if it keeps happening, this account may not manage this shop.';
+  if (/could not find the .* column|column .* does not exist|schema cache/i.test(m)) return 'the database is missing this column. Run ' + sqlFile(field) + ' in the Supabase SQL editor.';
+  if ((e && e.code == '42501') || /permission denied|row-level security/i.test(m)) return 'the database does not allow editing it yet. Run ' + sqlFile(field) + ' in the Supabase SQL editor.';
+  if (/fetch|network/i.test(m)) return 'no connection. Check your internet and try again.';
+  return nice(e);
+}
+// One update, read back. { error } if refused, otherwise { off: the fields whose stored value is not what was sent }.
+async function writeFields(fields) {
+  try {
+    const keys = Object.keys(fields);
+    const r = await sb.from('businesses').update(fields).eq('id', bz.id).select(keys.join(','));
+    if (r.error) return { error: r.error };
+    const row = r.data && r.data[0];
+    if (!row) return { error: { code: 'NOROW' } };
+    return { off: keys.filter(k => !same(row[k], fields[k])) };
+  } catch (e) { return { error: e } }
+}
+const KEPT_OTHER = 'it was sent, but the database kept a different value.';
+// Saves `patch`. Returns { ok, done, failed } — ok only when every field was stored and verified.
 async function savePatch(patch, btn, msg) {
   if (btn) btn.disabled = true;
-  let payload = patch, aboutMissing = false;
-  let { error } = await sb.from('businesses').update(payload).eq('id', bz.id);
-  if (error && Object.prototype.hasOwnProperty.call(payload, 'about') && /about.*schema cache|column.*about.*does not exist/i.test(String(error.message || error))) {
-    payload = { ...payload }; delete payload.about; aboutMissing = true;
-    ({ error } = await sb.from('businesses').update(payload).eq('id', bz.id));
-  }
+  const keys = Object.keys(patch), done = [], failed = [];
+  const r = await writeFields(patch);
+  if (r.error && keys.length > 1) {
+    for (const k of keys) {
+      const x = await writeFields({ [k]: patch[k] });
+      if (x.error) failed.push({ k, why: whyNot(x.error, k) });
+      else if (x.off.length) failed.push({ k, why: KEPT_OTHER });
+      else done.push(k);
+    }
+  } else if (r.error) failed.push({ k: keys[0], why: whyNot(r.error, keys[0]) });
+  else keys.forEach(k => r.off.includes(k) ? failed.push({ k, why: KEPT_OTHER }) : done.push(k));
   if (btn) btn.disabled = false;
-  if (error) { toast(nice(error)); return false }
-  Object.assign(bz, payload); brand(bz); document.title = bz.name + ' · Connect editor';
-  if (aboutMissing) toast('Other changes saved. Run the about-column SQL migration to save the description.');
-  else if (msg) toast(msg);
-  return true;
+  done.forEach(k => { bz[k] = patch[k] });
+  if (done.length) { brand(bz); document.title = bz.name + ' · Connect editor' }
+  const res = { ok: !failed.length, done, failed };
+  if (res.ok) { setStatus(null); if (msg) toast(msg); return res }
+  // Partly or fully refused: keep the form exactly as the owner typed it, say what happened, and mark the fields.
+  Object.keys(FILE_INPUT).forEach(k => { if (done.includes(k)) FILE_INPUT[k].forEach((id, i) => { const el = $('#' + id); if (el) el.value = i ? '0' : '' }) });
+  failed.forEach(f => { const el = $('#' + (FIELD_INPUT[f.k] || '')); if (el) el.setAttribute('aria-invalid', 'true') });
+  setStatus({ kind: done.length ? 'warn' : 'err', title: done.length ? 'Some changes were saved, others were not' : 'Nothing was saved',
+    saved: done.map(k => FIELDS[k] || k), failed: failed.map(f => ({ label: FIELDS[f.k] || f.k, why: f.why })) });
+  toast(done.length ? 'Some changes did not save. See the note at the top.' : 'Could not save. See the note at the top.');
+  return res;
 }
-const go = t => { tab = t; form = null; heroDraft = undefined; render(); window.scrollTo(0, 0) };
+document.addEventListener('input', e => { if (e.target && e.target.removeAttribute) e.target.removeAttribute('aria-invalid') });
+
+// Columns the Connect page needs. If the editor's own read of the shop row lacks one, the migration has not been run.
+const NEEDED = ['about', 'hero_url', 'connect_loyalty', 'phone', 'wa_phone', 'address', 'maps_url', 'lat', 'lng', 'review_url', 'yt', 'links', 'gallery', 'vertical'];
+const missingCols = () => bz ? NEEDED.filter(k => !(k in bz)) : [];
+const dataImgs = () => bz ? [bz.logo_url, bz.hero_url, ...(Array.isArray(bz.gallery) ? bz.gallery : []), ...ITEMS.map(x => x.image_url)].filter(isDataImg).length : 0;
+
+function setStatus(s) { status = s; const el = $('#ce-notes'); if (el) el.innerHTML = noticesV() }
+// Messages that stay visible at the top of the form until they no longer apply (unlike a toast, which disappears).
+function noticesV() {
+  const out = [], gaps = missingCols();
+  if (gaps.length) {
+    const files = [...new Set(gaps.map(sqlFile))];
+    out.push(`<div class="ce-note err" role="alert"><b>Your database is missing something this page needs</b><p>${gaps.map(k => esc(FIELDS[k] || k)).join(', ')} cannot be saved yet. In Supabase, open the SQL Editor and run ${files.map(f => '<code>' + esc(f) + '</code>').join(' and ')}. It is safe to run more than once. Then reload this page.</p></div>`);
+  }
+  const n = dataImgs();
+  if (n) out.push(`<div class="ce-note"><b>${n} ${n == 1 ? 'image is' : 'images are'} stored inside your database</b><p>That makes your pages slower to open, especially on mobile data, and stops WhatsApp showing the picture when your link is shared. <button type="button" class="lnk" onclick="moveImages(this)">Move ${n == 1 ? 'it' : 'them'} to storage</button></p></div>`);
+  if (status) out.push(`<div class="ce-note ${status.kind}" role="${status.kind == 'ok' ? 'status' : 'alert'}"><b>${esc(status.title)}</b>`
+    + (status.failed && status.failed.length ? `<ul>${status.failed.map(f => `<li><b style="display:inline">${esc(f.label)}</b> was not saved: ${esc(f.why)}</li>`).join('')}</ul>` : '')
+    + (status.saved && status.saved.length ? `<p>Saved: ${status.saved.map(esc).join(', ')}.</p>` : '') + `</div>`);
+  return out.join('');
+}
+
+// Move every image still stored inside the database (logo, hero, photos, product pictures) into the storage bucket.
+async function moveImages(btn) {
+  if (btn) btn.disabled = true;
+  const fresh = [], kept = new Set();   // fresh = uploaded in this run; kept = the ones a database row now points at
+  const up = async (u, kind) => { const url = await BrandImg.fromData(sb, bz.id, u, kind); fresh.push(url); return url };
+  try {
+    const patch = {};
+    for (const [col, kind] of [['logo_url', 'logo'], ['hero_url', 'hero']]) if (isDataImg(bz[col])) patch[col] = await up(bz[col], kind);
+    if ((bz.gallery || []).some(isDataImg)) { patch.gallery = []; for (const u of bz.gallery) patch.gallery.push(isDataImg(u) ? await up(u, 'gallery') : u) }
+    const items = ITEMS.filter(x => isDataImg(x.image_url)), newItem = {};
+    for (const it of items) newItem[it.id] = await up(it.image_url, 'item');
+    if (Object.keys(patch).length) {
+      const r = await savePatch(patch, null);
+      r.done.forEach(k => [].concat(patch[k]).forEach(u => kept.add(u)));
+      if (!r.ok) throw 'saved-partly';
+    }
+    for (const it of items) {
+      await rpc(sb, 'save_menu_item', { p_slug: CFG.slug, p_id: it.id, p_title: it.title, p_description: it.description || '', p_price: it.price || '', p_image: newItem[it.id], p_available: it.available !== false, p_category: it.category_id || null });
+      kept.add(newItem[it.id]);
+    }
+    await load(); render(); toast('Images moved to storage');
+  } catch (e) {
+    for (const u of fresh) if (!kept.has(u)) await BrandImg.remove(sb, bz.id, u);   // never delete a file a saved row uses
+    if (e !== 'saved-partly') toast(typeof e == 'string' ? BrandImg.message(e) : nice(e));
+    if (btn) btn.disabled = false;
+  }
+}
+const go = t => { tab = t; form = null; heroDraft = undefined; status = null; render(); window.scrollTo(0, 0) };
 
 // ---------- savings ----------
 async function saveBrand(btn) {
   const name = v('nm').trim(); if (!name) return toast('Give your shop a name');
   const patch = { name, tagline: v('tg').trim(), color: HEX6.test(v('colp')) ? v('colp') : bz.color, vertical: v('vt') };
+  const oldLogo = bz.logo_url;
   if ($('#lgrm').value == '1') patch.logo_url = '';
-  else if ($('#lgf').files[0]) { try { patch.logo_url = await uploadImg($('#lgf').files[0], 'logo') } catch (e) { return imgErr(e) } }
-  if (await savePatch(patch, btn, 'Branding saved')) { $('#lgrm').value = '0'; $('#lgf').value = ''; render() }
+  else if ($('#lgf').files[0]) { btn.disabled = true; try { patch.logo_url = await uploadImg($('#lgf').files[0], 'logo') } catch (e) { btn.disabled = false; return imgErr(e) } }
+  const res = await savePatch(patch, btn, 'Branding saved');
+  if ('logo_url' in patch) await settleImg('logo_url', oldLogo, patch.logo_url, res);
+  if (res.ok) render();
 }
 async function saveStory(btn) {
   const patch = { about: v('ab').trim().slice(0, 600), connect_loyalty: !!$('#ly').checked };
+  const oldHero = bz.hero_url;
   if ($('#hrrm').value == '1') patch.hero_url = '';
-  else if ($('#hrf').files[0]) { try { patch.hero_url = await uploadImg($('#hrf').files[0], 'hero') } catch (e) { return imgErr(e) } }
-  if (await savePatch(patch, btn, 'Story saved')) { heroDraft = undefined; render() }
+  else if ($('#hrf').files[0]) { btn.disabled = true; try { patch.hero_url = await uploadImg($('#hrf').files[0], 'hero') } catch (e) { btn.disabled = false; return imgErr(e) } }
+  const res = await savePatch(patch, btn, 'Story saved');
+  if ('hero_url' in patch) await settleImg('hero_url', oldHero, patch.hero_url, res);
+  if (res.ok) { heroDraft = undefined; render() }
 }
 async function saveContact(btn) {
   const map = v('map').trim(), rv = v('rv').trim();
   if (!urlOk(map)) return toast('The map link should start with https://');
   if (!urlOk(rv)) return toast('The review link should start with https://');
   const num = id => { const x = parseFloat(v(id)); return isFinite(x) ? x : null };
-  const patch = { phone: v('ph').trim(), wa_phone: v('wap').trim(), address: v('ad').trim(), maps_url: map, lat: num('lat'), lng: num('lng'), review_url: rv };
-  if (await savePatch(patch, btn, 'Contact details saved')) render();
+  const lat = num('lat'), lng = num('lng');
+  if (lat !== null && (lat < -90 || lat > 90)) return toast('Latitude must be between -90 and 90');
+  if (lng !== null && (lng < -180 || lng > 180)) return toast('Longitude must be between -180 and 180');
+  const patch = { phone: v('ph').trim(), wa_phone: v('wap').trim(), address: v('ad').trim(), maps_url: map, lat, lng, review_url: rv };
+  if ((await savePatch(patch, btn, 'Contact details saved')).ok) render();
 }
 async function saveLinks(btn) {
   const clean = u => { const s = String(u || '').trim(); return urlOk(s) ? s : '' };
@@ -180,7 +289,7 @@ async function saveLinks(btn) {
   if ([v('ig'), v('fb'), v('yt'), v('web')].some((x, i) => x.trim() && ![ig, fb, yt, web][i])) return toast('Links should start with https://');
   syncLinks();
   const links = dlinks.map(x => ({ label: x.label.trim().slice(0, 30), url: x.url.trim() })).filter(x => urlOk(x.url) && x.url);
-  if (await savePatch({ ig, fb, yt, web, links }, btn, 'Links saved')) render();
+  if ((await savePatch({ ig, fb, yt, web, links }, btn, 'Links saved')).ok) render();
 }
 
 // ---------- link rows (kept in dlinks so typing does not re-render) ----------
@@ -194,17 +303,22 @@ function editItemId(id) { const it = ITEMS.find(i => i.id == id); if (it) editIt
 async function saveItem(btn) {
   const title = v('it-t').trim(); if (!title) return toast('Give this item a name');
   btn.disabled = true;
-  let image = form.image_url;
+  const oldImage = form.image_url || '';
+  let image = oldImage;
   const f = $('#it-f').files[0];
   if (f) { try { image = await uploadImg(f, 'item') } catch (e) { btn.disabled = false; return imgErr(e) } }
   try {
     await rpc(sb, 'save_menu_item', { p_slug: CFG.slug, p_id: form.id || null, p_title: title, p_description: v('it-d').trim(), p_price: v('it-p').trim(), p_image: image || '', p_available: true, p_category: v('it-c') || null });
-  } catch (e) { btn.disabled = false; return toast(nice(e)) }
+  } catch (e) { btn.disabled = false; if (image !== oldImage) await BrandImg.remove(sb, bz.id, image); return toast(nice(e)) }
+  if (image !== oldImage) await BrandImg.remove(sb, bz.id, oldImage);
   form = null; await loadMenu(); render(); toast('Saved');
 }
 async function delItem(id) {
   if (!confirm('Delete this item?')) return;
-  await rpc(sb, 'delete_menu_item', { p_id: id }); await loadMenu(); render(); toast('Deleted');
+  const old = (ITEMS.find(x => x.id == id) || {}).image_url;
+  try { await rpc(sb, 'delete_menu_item', { p_id: id }) } catch (e) { return toast('Could not delete that item: ' + nice(e)) }
+  await BrandImg.remove(sb, bz.id, old);
+  await loadMenu(); render(); toast('Deleted');
 }
 async function moveItem(id, dir) {
   const ids = ITEMS.map(i => i.id), k = ids.indexOf(id), j = dir < 0 ? k - 1 : k + 1;
@@ -225,7 +339,8 @@ async function saveCat(id) {
 }
 async function delCat(id) {
   if (!confirm('Delete this category? Its items stay on the list.')) return;
-  await rpc(sb, 'delete_menu_category', { p_id: id }); await loadMenu(); render(); toast('Category deleted');
+  try { await rpc(sb, 'delete_menu_category', { p_id: id }) } catch (e) { return toast('Could not delete that category: ' + nice(e)) }
+  await loadMenu(); render(); toast('Category deleted');
 }
 async function addSample(btn) {
   btn.disabled = true;
@@ -240,11 +355,17 @@ async function addSample(btn) {
 // ---------- photos ----------
 async function onPhotos(input) {
   const files = [...(input.files || [])]; if (!files.length) return;
-  for (const f of files) { try { dgal.push(await uploadImg(f, 'gallery')) } catch (e) { imgErr(e) } }
+  const added = [];
+  for (const f of files) { try { const u = await uploadImg(f, 'gallery'); added.push(u); dgal.push(u) } catch (e) { imgErr(e) } }
   input.value = '';
-  if (await savePatch({ gallery: dgal }, null, 'Photos saved')) render(); else dgal = bz.gallery.slice();
+  if (!added.length) return;
+  if ((await savePatch({ gallery: dgal }, null, added.length == files.length ? 'Photos saved' : 'Some photos saved')).ok) render();
+  else { dgal = bz.gallery.slice(); for (const u of added) await BrandImg.remove(sb, bz.id, u) }   // the row refused them: don't leave the files behind
 }
-async function rmPhoto(i) { dgal.splice(i, 1); if (await savePatch({ gallery: dgal }, null, 'Photo removed')) render(); else dgal = bz.gallery.slice() }
+async function rmPhoto(i) {
+  const gone = dgal[i]; dgal.splice(i, 1);
+  if ((await savePatch({ gallery: dgal }, null, 'Photo removed')).ok) { await BrandImg.remove(sb, bz.id, gone); render() } else dgal = bz.gallery.slice();
+}
 
 // ---------- preview ----------
 const digits = raw => { let d = String(raw || '').replace(/\D/g, ''); if (d.length == 11 && d[0] == '0') d = d.slice(1); if (d.length == 10) d = (CFG.countryCode || '91') + d; return d };
@@ -379,7 +500,7 @@ function shell() {
   ${support ? `<div class="a-support" style="margin:12px auto;max-width:1180px">Support mode · managing for the owner. Changes are logged.</div>` : ''}
   <div class="ce-layout">
     <nav class="ce-nav" aria-label="Sections">${NAV.map(n => `<button class="${tab == n[0] ? 'on' : ''}" onclick="go('${n[0]}')"><i>${n[2]}</i><span>${n[1]}</span>${todo[n[0]] === false ? '<em title="Not finished"></em>' : ''}</button>`).join('')}</nav>
-    <div class="ce-form">${tabV()}</div>
+    <div class="ce-form"><div id="ce-notes" class="ce-notes">${noticesV()}</div>${tabV()}</div>
     <aside class="ce-pv">
       <div class="ce-pv-h"><b>Live preview</b><a href="${esc(shareUrl())}" target="_blank" rel="noopener">Open full page</a></div>
       <div class="ce-phone"><i class="ce-notch"></i><div class="ce-screen"><div id="pv" class="cn"></div></div></div>

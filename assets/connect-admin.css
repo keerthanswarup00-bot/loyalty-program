@@ -148,3 +148,13 @@ main#app.ce{max-width:none;padding:0 0 60px;background:radial-gradient(900px 420
   .ce-form .a-card{padding:18px 16px 18px 20px}
   .ce-hero{width:100%;min-width:0}
 }
+
+/* --- persistent notices at the top of the form: save results, missing database setup, images to move --- */
+.ce-notes{display:grid;gap:12px;margin-bottom:16px}.ce-notes:empty{display:none}
+.ce-note{border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:var(--r-in,14px);background:var(--card);padding:14px 16px;font-size:14px;line-height:1.5}
+.ce-note>b{display:block;margin-bottom:2px}
+.ce-note p{margin:4px 0 0;color:var(--mut)}
+.ce-note ul{margin:6px 0 0;padding-left:18px}.ce-note li+li{margin-top:4px}
+.ce-note code{font-size:12.5px;background:var(--bg);padding:1px 6px;border-radius:6px;word-break:break-all}
+.ce-note.err{border-left-color:#b91c1c}.ce-note.warn{border-left-color:#b45309}.ce-note.ok{border-left-color:#15803d}
+.ce-form [aria-invalid=true]{border-color:#b91c1c;box-shadow:0 0 0 3px color-mix(in srgb,#b91c1c 16%,transparent)}
