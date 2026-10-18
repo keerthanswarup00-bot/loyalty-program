@@ -7,7 +7,7 @@ const CFG = window.LK;
 // session (per shop) is shared between the dashboard and the Connect editor. The old /app/ and /admin/ addresses are
 // untouched: they still use config.js `slug`, or the host name (see resolveShop).
 const ROUTE_SLUG = (() => {
-  const m = location.pathname.match(/^\/(?:app|connect)\/([a-z0-9][a-z0-9-]*)(?:\/admin)?\/?$/i), s = m && m[1].toLowerCase();
+  const m = location.pathname.match(/^\/(?:app|connect)\/([a-z0-9][a-z0-9-]*)(?:\/(?:admin|collection))?\/?$/i), s = m && m[1].toLowerCase();
   if (!s || ['assets', 'admin', 'platform', 'index'].includes(s)) return null;
   CFG.slug = s; return s;
 })();

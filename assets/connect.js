@@ -2,8 +2,9 @@
 // Everything shown comes from the public get_business(slug) and get_menu(slug) RPCs: name, tagline,
 // colour, logo, contact details, links and the product/service list. The scan token, owner and any other
 // private field are never read or shown. No visitor login, no cookies.
+const collectionRoute = /\/collection\/?$/i.test(location.pathname);
 const slugFromPath = (() => {
-  const m = location.pathname.match(/^\/connect\/([a-z0-9][a-z0-9-]*)\/?$/i);
+  const m = location.pathname.match(/^\/connect\/([a-z0-9][a-z0-9-]*)(?:\/collection)?\/?$/i);
   const s = m && m[1].toLowerCase();
   return s && !['assets', 'index', 'app', 'admin', 'platform'].includes(s) ? s : null;
 })();
@@ -87,7 +88,7 @@ function aboutSection(b) {
 }
 
 function menuSection() {
-  if (!MENU || !MENU.items || !MENU.items.length) return '';
+  if (!MENU || !MENU.items || !MENU.items.length || collectionRoute) return '';
   const cats = (MENU.categories || []).map(c => ({ ...c, items: MENU.items.filter(i => i.category_id == c.id) })).filter(c => c.items.length);
   const loose = MENU.items.filter(i => !i.category_id || !(MENU.categories || []).some(c => c.id == i.category_id));
   const wd = waDigits(B);
@@ -99,6 +100,45 @@ function menuSection() {
   const group = (name, items) => `<div class="cn-grp">${name ? `<h3>${esc(name)}</h3>` : ''}<ul class="cn-list">${items.map(item).join('')}</ul></div>`;
   const body = cats.length ? cats.map(c => group(c.name, c.items)).join('') + (loose.length ? group('Others', loose) : '') : group('', MENU.items);
   return `<section class="cn-sec" id="products"><h2>${esc(V.section)}</h2>${body}</section>`;
+}
+
+function slugifyText(value) {
+  return String(value || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'product';
+}
+
+function collectionUrl() { return connectBase() + 'collection/'; }
+
+function collectionLink() {
+  if (!MENU || !MENU.items || !MENU.items.length) return '';
+  return `<section class="cn-collection-cta"><div><span class="cn-eyebrow">Explore</span><h2>Our collection</h2><p>Browse everything we make and ask us about the pieces you love.</p></div><a class="cn-collection-btn" href="${esc(collectionUrl())}">View collection <span aria-hidden="true">${I.arrow}</span></a></section>`;
+}
+
+function toggleProduct(button) {
+  const detail = document.getElementById(button.getAttribute('aria-controls'));
+  if (!detail) return;
+  const open = button.getAttribute('aria-expanded') === 'true';
+  button.setAttribute('aria-expanded', String(!open));
+  detail.hidden = open;
+}
+
+function productCollectionSection() {
+  if (!MENU || !Array.isArray(MENU.items) || !MENU.items.length) return '<section class="cn-sec"><div class="cn-empty"><h2>Collection coming soon</h2><p class="sub">Products will appear here when this shop adds them.</p></div></section>';
+  const wd = waDigits(B);
+  const cats = (MENU.categories || []).map(c => ({ ...c, items: MENU.items.filter(i => i.category_id == c.id) })).filter(c => c.items.length);
+  const loose = MENU.items.filter(i => !i.category_id || !(MENU.categories || []).some(c => c.id == i.category_id));
+  const detail = x => {
+    const image = imgOk(x.image_url) ? `<div class="cn-product-detail-img"><img src="${esc(x.image_url)}" alt="${esc(x.title)}" loading="lazy" decoding="async"></div>` : '';
+    const desc = x.description ? `<p>${esc(x.description).replace(/\n/g, '<br>')}</p>` : '<p>Contact us for more information about this product.</p>';
+    const ask = wd ? `<a class="cn-product-ask" href="${esc(waHref(wd, 'Hi ' + B.name + ', I want more details about ' + x.title + '.'))}" target="_blank" rel="noopener">${I.wa}<span>Ask for more details</span>${I.arrow}</a>` : '<p class="cn-product-contact-note">WhatsApp enquiry is not available yet. Please use the contact details on the main page.</p>';
+    return `<div class="cn-product-detail" id="collection-detail-${esc(x.id || slugifyText(x.title))}" hidden>${image}<div class="cn-product-detail-copy">${desc}</div>${ask}</div>`;
+  };
+  const item = x => {
+    const id = x.id || slugifyText(x.title);
+    const img = imgOk(x.image_url) ? `<span class="cn-product-thumb"><img src="${esc(x.image_url)}" alt="" loading="lazy" decoding="async"></span>` : '<span class="cn-product-thumb cn-product-thumb-empty" aria-hidden="true">✦</span>';
+    return `<article class="cn-product"><button class="cn-product-toggle" type="button" aria-expanded="false" aria-controls="collection-detail-${esc(id)}" onclick="toggleProduct(this)">${img}<span class="cn-product-title"><b>${esc(x.title)}</b>${x.price ? `<small>${esc(x.price)}</small>` : ''}</span><span class="cn-product-chevron" aria-hidden="true">⌄</span></button>${detail(x)}</article>`;
+  };
+  const group = (name, items) => `<section class="cn-collection-group">${name ? `<h2>${esc(name)}</h2>` : ''}<div class="cn-product-list">${items.map(item).join('')}</div></section>`;
+  return `<div class="cn-collection-intro"><a class="cn-back-link" href="${esc(connectBase())}">← Back to ${esc(B.name)}</a><span class="cn-eyebrow">The collection</span><h1>${esc(B.name)} <em>Collection</em></h1><p>Explore our products. Select any item to read more and ask us for details.</p><span class="cn-collection-count">${MENU.items.length} ${MENU.items.length === 1 ? 'product' : 'products'}</span></div><div class="cn-collection-groups">${cats.map(c => group(c.name, c.items)).join('')}${loose.length ? group(cats.length ? 'Others' : '', loose) : ''}</div>`;
 }
 
 function gallerySection() {
@@ -120,12 +160,13 @@ function view() {
   const loyalty = b.connect_loyalty !== false;      // false = the shop has switched the loyalty button off
   const acts = (loyalty ? row(appBase(), I.gift, 'Join the loyalty card', 'Collect stamps, earn rewards', true, false) : '')
     + (rev ? row(rev, I.star, 'Leave a review', 'Takes a minute', false, true) : '');
+  if (collectionRoute) return `${productCollectionSection()}<footer class="cn-foot">${esc(b.name)} · <a href="https://www.innondu.com/" target="_blank" rel="noopener">Powered by Innondu</a></footer>`;
   return `${heroSection(b)}
   ${aboutSection(b)}
   ${q ? `<nav class="cn-quick" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
   ${acts ? `<nav class="cn-acts" aria-label="More from ${esc(b.name)}">${acts}</nav>` : ''}
   ${rev ? `<p class="cn-note">Honest reviews only — we don't offer rewards in exchange for them.</p>` : ''}
-  ${menuSection()}
+  ${collectionLink()}
   ${gallerySection()}
   ${soc.length ? `<section class="cn-sec"><h2>Find us online</h2><div class="cn-soc">${soc.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${x.icon}<span>${esc(x.label)}</span></a>`).join('')}</div></section>` : ''}
   <section class="cn-sec"><h2>Share</h2>
@@ -184,11 +225,11 @@ function jsonld(b) {
   document.head.appendChild(s);
 }
 function share(b) {
-  const title = b.name + ' · Connect';
+  const title = collectionRoute ? b.name + ' · Collection' : b.name + ' · Connect';
   document.title = title;
   meta('property', 'og:title', title);
   meta('property', 'og:type', 'website');
-  meta('property', 'og:url', shareUrl());
+  meta('property', 'og:url', location.origin + location.pathname);
   const desc = (b.about ? String(b.about).replace(/\s+/g, ' ').trim().slice(0, 160) : '') || b.tagline || ('Find ' + b.name + ' — contact, menu and links in one place.');
   meta('property', 'og:description', desc);
   meta('name', 'description', desc);
@@ -197,7 +238,7 @@ function share(b) {
   if (ogImg) meta('property', 'og:image', ogImg);
   meta('name', 'theme-color', HEX6.test(b.color || '') ? b.color : '#8a4b2a');
   const link = document.head.querySelector('link[rel="canonical"]') || (() => { const l = document.createElement('link'); l.rel = 'canonical'; document.head.appendChild(l); return l })();
-  link.href = shareUrl();
+  link.href = location.origin + location.pathname;
   jsonld(b);
 }
 
@@ -215,5 +256,6 @@ async function loadMenu() {
   V = vertical(B.vertical);
   await loadMenu();
   brand(B); share(B);
+  if (collectionRoute) { document.title = B.name + ' · Collection'; meta('name', 'description', 'Explore the product collection from ' + B.name + '. Open a product to read more or ask us on WhatsApp.'); }
   app.innerHTML = view();
 })();

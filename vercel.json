@@ -49,6 +49,14 @@
       "destination": "/connect-admin/index.html"
     },
     {
+      "source": "/connect/:slug/collection",
+      "destination": "/connect-shop/index.html"
+    },
+    {
+      "source": "/connect/:slug/collection/",
+      "destination": "/connect-shop/index.html"
+    },
+    {
       "source": "/connect/:slug",
       "destination": "/connect-shop/index.html"
     },
