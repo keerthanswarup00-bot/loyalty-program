@@ -76,9 +76,9 @@ function heroSection(b) {
   const isAroma = String(b.slug || '').toLowerCase() === 'aroma-scripts';
   const tagText = b.tagline || (isAroma ? 'Every Scent Has a Story.' : '');
   const tag = tagText ? `<p>${esc(tagText)}</p>` : '';
-  const heroUrl = imgOk(b.hero_url) ? b.hero_url : (isAroma ? 'https://www.innondu.com/assets/aroma-scripts-hero.svg' : '');
-  if (imgOk(heroUrl)) {
-    return `<header class="cn-hero cn-hero-img"><img class="cn-hero-bg" src="${esc(heroUrl)}" alt="" decoding="async" fetchpriority="high" onerror="this.parentNode.classList.remove('cn-hero-img');this.remove()"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
+  const heroUrl = imgOk(b.hero_url) ? b.hero_url : (isAroma ? '/assets/aroma-scripts-hero-clean.svg' : '');
+  if (heroUrl) {
+    return `<header class="cn-hero cn-hero-img${isAroma ? ' cn-hero-aroma' : ''}"><img class="cn-hero-bg" src="${esc(heroUrl)}" alt="" decoding="async" fetchpriority="high" onerror="this.parentNode.classList.remove('cn-hero-img','cn-hero-aroma');this.remove()"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
   }
   return `<header class="cn-hero${b.about ? ' cn-art' : ''}"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
 }
@@ -202,6 +202,32 @@ function offerSection(b) {
   return `<section class="cn-offer-aroma"><span class="cn-offer-kicker">A little something special</span><div class="cn-offer-copy"><h2>${esc(title || 'A special offer')}</h2>${text ? `<p>${esc(text)}</p>` : ''}</div>${href ? `<a class="cn-offer-button" href="${esc(href)}" target="_blank" rel="noopener">${esc(label)} ${I.arrow}</a>` : ''}</section>`;
 }
 
+// Aroma actions: one full-width WhatsApp button, then Call / Directions / Instagram, each only when the shop filled it in.
+// The prefilled message follows the language the visitor chose on the Innondu site (innondu-lang) or the page's lang attribute.
+const WA_TEXT = {
+  en: n => 'Hi ' + n + '! I found your page and I\u2019d like to know more.',
+  hi: n => '\u0928\u092e\u0938\u094d\u0924\u0947 ' + n + '! \u092e\u0948\u0902\u0928\u0947 \u0906\u092a\u0915\u093e \u092a\u0947\u091c \u0926\u0947\u0916\u093e \u0914\u0930 \u092e\u0941\u091d\u0947 \u0914\u0930 \u091c\u093e\u0928\u0915\u093e\u0930\u0940 \u091a\u093e\u0939\u093f\u090f\u0964',
+  kn: n => '\u0ca8\u0cae\u0cb8\u0ccd\u0c95\u0cbe\u0cb0 ' + n + '! \u0ca8\u0cbf\u0cae\u0ccd\u0cae \u0caa\u0cc1\u0c9f \u0ca8\u0ccb\u0ca1\u0cbf\u0ca6\u0cc6, \u0c87\u0ca8\u0ccd\u0ca8\u0cb7\u0ccd\u0c9f\u0cc1 \u0ca4\u0cbf\u0cb3\u0cbf\u0caf\u0cb2\u0cc1 \u0cac\u0caf\u0cb8\u0cc1\u0ca4\u0ccd\u0ca4\u0cc7\u0ca8\u0cc6.'
+};
+function activeLang() {
+  let l = '';
+  try { l = localStorage.getItem('innondu-lang') || '' } catch (e) { }
+  l = (l || document.documentElement.lang || 'en').toLowerCase().slice(0, 2);
+  return WA_TEXT[l] ? l : 'en';
+}
+function aromaActions(b) {
+  const wd = waDigits(b);
+  const ig = socialList(b).find(x => x.label === 'Instagram');
+  const sec = [
+    telHref(b) ? ['Call', I.call, telHref(b), false] : null,
+    mapsHref(b) ? ['Directions', I.pin, mapsHref(b), true] : null,
+    ig ? ['Instagram', I.ig, ig.url, true] : null
+  ].filter(Boolean);
+  const primary = wd ? `<a class="cn-wa-primary" href="${esc(waHref(wd, WA_TEXT[activeLang()](b.name)))}" target="_blank" rel="noopener">${I.wa}<span>Chat on WhatsApp</span></a>` : '';
+  const row2 = sec.length ? `<nav class="cn-sec-actions" style="--n:${sec.length}" aria-label="Contact ${esc(b.name)}">${sec.map(x => `<a class="cn-sec-a" href="${esc(x[2])}"${x[3] ? ' target="_blank" rel="noopener"' : ''}>${x[1]}<span>${x[0]}</span></a>`).join('')}</nav>` : '';
+  return primary || row2 ? `<div class="cn-cta-aroma">${primary}${row2}</div>` : '';
+}
+
 function view() {
   const b = B;
   const isAroma = String(b.slug || '').toLowerCase() === 'aroma-scripts';
@@ -223,8 +249,9 @@ function view() {
     ? `<section class="cn-sec cn-share-aroma"><div class="cn-share-head"><div><span class="cn-eyebrow">Take us with you</span><h2>Share Aroma Scripts</h2><p>Send our scents to someone who’d love them.</p></div><button type="button" class="cn-share-primary" onclick="sharePage()">${I.share}<span>Share</span></button></div><div class="cn-share-tools"><button type="button" class="cn-share-tool" onclick="copyText(shareUrl(),'Link copied')">${I.copy}<span>Copy link</span></button><button type="button" class="cn-share-tool" onclick="toggleQr()">${I.qr}<span>Show QR</span></button></div><div id="cn-qr" class="cn-qr" hidden></div></section>`
     : `<section class="cn-sec"><h2>Share</h2><div class="cn-share"><button type="button" class="cn-act" onclick="sharePage()"><span class="cn-ai">${I.share}</span><span class="cn-at"><b>Share this page</b><small>WhatsApp, or anywhere</small></span></button><button type="button" class="cn-act" onclick="copyText(shareUrl(),'Link copied')"><span class="cn-ai">${I.copy}</span><span class="cn-at"><b>Copy link</b></span></button><button type="button" class="cn-act" onclick="toggleQr()"><span class="cn-ai">${I.qr}</span><span class="cn-at"><b>Show QR code</b><small>Print it, or write it to a tag</small></span></button></div><div id="cn-qr" class="cn-qr" hidden></div></section>`;
   return `${heroSection(b)}
+  ${isAroma ? aromaActions(b) : ''}
   ${aboutSection(b)}
-  ${q ? `<nav class="cn-quick${isAroma ? ' cn-quick-aroma' : ''}" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
+  ${q && !isAroma ? `<nav class="cn-quick${isAroma ? ' cn-quick-aroma' : ''}" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
   ${acts ? `<nav class="cn-acts" aria-label="More from ${esc(b.name)}">${acts}</nav>` : ''}
   ${rev ? `<p class="cn-note">Honest reviews only — we don't offer rewards in exchange for them.</p>` : ''}
   ${featuredProductsSection()}

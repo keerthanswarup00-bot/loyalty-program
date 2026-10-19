@@ -213,3 +213,22 @@ body.cn-product-sheet-open{overflow:hidden}
 @media(max-width:360px){.cn-featured-grid{gap:7px}.cn-featured-meta{padding:9px}.cn-featured-meta b{font-size:15px}.cn-featured-ask{padding:9px;font-size:10.5px}.cn-offer-aroma{padding:19px 16px}}
 @media(min-width:520px){.cn-featured-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.cn-featured-meta b{font-size:16px}.cn-featured-ask{font-size:11px}}
 .ce-pv .cn-offer-aroma{margin:12px 0;padding:14px}.ce-pv .cn-offer-copy h2{font-size:17px}.ce-pv .cn-offer-copy p{font-size:10px}
+
+/* Phase 2 (Aroma) — hero and actions. Fits above the fold: hero ~236px + 52px WhatsApp button on a 700px viewport. */
+.cn-hero.cn-hero-aroma{min-height:236px;align-items:center;background:#07121f}
+.cn-hero-aroma .cn-hero-bg{object-position:right center}
+.cn-hero-aroma.cn-hero-img::after{background:linear-gradient(90deg,rgba(3,7,12,.66) 0%,rgba(3,7,12,.3) 50%,rgba(3,7,12,0) 74%)}
+.cn-hero-aroma.cn-hero-img .cn-hero-in{padding:var(--sp-5) var(--sp-4) var(--sp-5) var(--sp-5);padding-right:38%;overflow-wrap:anywhere}
+.cn-hero-aroma.cn-hero-img .logo{width:48px;height:48px;border-radius:var(--r-3);font-size:22px;margin:0 0 var(--sp-3)}
+.cn-hero-aroma.cn-hero-img h1{font-size:clamp(26px,7.5vw,34px)}
+.cn-hero-aroma.cn-hero-img p{font-size:14.5px;max-width:24ch}
+.cn-cta-aroma{display:grid;gap:var(--sp-3);margin-top:var(--sp-4)}
+.cn-wa-primary{display:flex;align-items:center;justify-content:center;gap:var(--sp-3);width:100%;min-height:52px;padding:var(--sp-3) var(--sp-4);border-radius:var(--r-btn,var(--r-2));background:var(--brand);color:var(--on-brand,#fff);font:700 16px var(--f-b);text-decoration:none}
+.cn-wa-primary svg{width:22px;height:22px;flex:none}
+.cn-wa-primary:hover,.cn-wa-primary:focus-visible{opacity:.92;outline:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 30%,transparent)}
+.cn-sec-actions{display:grid;grid-template-columns:repeat(var(--n,1),minmax(0,1fr));gap:var(--sp-3)}
+.cn-sec-a{display:flex;align-items:center;justify-content:center;gap:var(--sp-2);min-width:44px;min-height:48px;padding:var(--sp-2) var(--sp-3);border:1px solid var(--line);border-radius:var(--r-2);background:var(--card);color:var(--tx);font:600 14px var(--f-b);text-decoration:none}
+.cn-sec-a svg{width:20px;height:20px;flex:none;color:var(--brand-t-l,var(--gold-t))}
+.cn-sec-a:hover,.cn-sec-a:focus-visible{border-color:var(--brand-t-l,var(--gold-t));outline:0}
+.cn-cta-aroma+.cn-about-aroma{margin-top:var(--sp-5)}
+@media(max-width:360px){.cn-sec-a{font-size:13px;padding-inline:var(--sp-2);gap:6px}.cn-hero-aroma.cn-hero-img .cn-hero-in{padding-right:34%}}
