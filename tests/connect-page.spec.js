@@ -207,3 +207,31 @@ test('Connect remains usable on a small mobile viewport', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflow).toBe(false);
 });
+
+test('Aroma Scripts: scent line, one collection link, single-line enquiry, collection rows, sticky bar, bespoke card, Back', async ({ page }) => {
+  const aroma = {
+    slug: 'aroma-scripts', name: 'Aroma Scripts', tagline: 'Every Scent Has a Story.', color: '#48233d', logo_url: '', about: '', hero_url: '',
+    wa_phone: '9876543210', bespoke_text: 'Tell us the notes you love and we will blend a scent just for you.',
+    menu: { categories: [], items: [
+      { id: 'vanilla-cloud', title: 'Vanilla Cloud', price: '₹799', description: 'Warm and soft.', scent_notes: 'Warm · sweet · vanilla', image_url: 'https://images.example/vanilla.jpg', available: true },
+      { id: 'his-muse', title: 'His Muse', price: '₹899', description: 'A bold scent.', image_url: 'https://images.example/muse.jpg', available: true }
+    ] }
+  };
+  await page.route('https://images.example/**', route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="#ddd"/></svg>' }));
+  await mock(page, aroma);
+  await page.goto('/connect/aroma-scripts/');
+  await expect(page.locator('.cn-featured-card .cn-scent')).toHaveText('Warm · sweet · vanilla');
+  await expect(page.locator('.cn-featured-plus')).toHaveCount(0);
+  await expect(page.locator('a[href$="/collection/"]')).toHaveCount(1);
+  await expect(page.getByRole('link', { name: 'Enquire on WhatsApp' }).first()).toHaveAttribute('href', /wa\.me\/919876543210\?text=.*interested%20in%20Vanilla%20Cloud/);
+  await page.goto('/connect/aroma-scripts/collection/');
+  await expect(page.getByRole('heading', { name: 'The collection', exact: true })).toBeVisible();
+  await expect(page.locator('.cn-row-enquire')).toHaveCount(3);          // two products + the bespoke card
+  await expect(page.locator('.cn-sticky-wa a')).toBeVisible();
+  await expect(page.locator('.cn-bespoke-aroma')).toBeVisible();
+  await page.getByRole('button', { name: 'View Vanilla Cloud' }).click();
+  await expect(page.getByRole('dialog', { name: 'Product details' })).toBeVisible();
+  await page.goBack();                                                   // browser Back closes the sheet first
+  await expect(page.getByRole('dialog', { name: 'Product details' })).toBeHidden();
+  await expect(page).toHaveURL(/\/collection\/$/);
+});

@@ -143,16 +143,23 @@ function openProduct(id) {
   const modal = document.getElementById('cn-product-sheet'), content = document.getElementById('cn-product-sheet-content');
   if (!modal || !content) return;
   const wd = waDigits(B);
+  const isAromaShop = String(B.slug || '').toLowerCase() === 'aroma-scripts';
   const image = imgOk(product.image_url) ? `<img class="cn-product-sheet-image" src="${esc(product.image_url)}" alt="${esc(product.title)}" decoding="async">` : '<div class="cn-product-sheet-image cn-product-sheet-image-empty" aria-hidden="true">✦</div>';
   const desc = product.description ? `<p class="cn-product-sheet-description">${esc(product.description).replace(/\n/g, '<br>')}</p>` : '<p class="cn-product-sheet-description">Contact us for more information about this product.</p>';
   const price = product.price ? `<div class="cn-product-sheet-price">${esc(product.price)}</div>` : '';
-  const ask = wd ? `<a class="cn-product-sheet-ask" href="${esc(waHref(wd, 'Hi ' + B.name + ', I want more details about ' + product.title + '.'))}" target="_blank" rel="noopener">${I.wa}<span>Ask for more details</span>${I.arrow}</a>` : '<p class="cn-product-contact-note">WhatsApp enquiry is not available yet. Please use the contact details on the main page.</p>';
+  const ask = wd ? `<a class="cn-product-sheet-ask" href="${esc(isAromaShop ? waHref(wd, productMsg(product.title)) : waHref(wd, 'Hi ' + B.name + ', I want more details about ' + product.title + '.'))}" target="_blank" rel="noopener">${I.wa}<span>${isAromaShop ? 'Enquire on WhatsApp' : 'Ask for more details'}</span>${isAromaShop ? '' : I.arrow}</a>` : '<p class="cn-product-contact-note">WhatsApp enquiry is not available yet. Please use the contact details on the main page.</p>';
   const category = (MENU.categories || []).find(c => c.id == product.category_id);
-  content.innerHTML = `${image}<div class="cn-product-sheet-info"><div class="cn-product-sheet-heading"><div><span class="cn-eyebrow">${esc(category ? category.name : 'Product')}</span><h2>${esc(product.title)}</h2></div>${price}</div>${desc}${ask}</div>`;
+  content.innerHTML = `${image}<div class="cn-product-sheet-info"><div class="cn-product-sheet-heading"><div><span class="cn-eyebrow">${esc(category ? category.name : 'Product')}</span><h2>${esc(product.title)}</h2>${product.scent_notes ? `<p class="cn-scent">${esc(product.scent_notes)}</p>` : ''}</div>${price}</div>${desc}${ask}</div>`;
   modal.hidden = false; document.body.classList.add('cn-product-sheet-open'); modal.setAttribute('aria-hidden', 'false');
+  try { history.pushState({ cnSheet: 1 }, '') } catch (e) { }
   const close = modal.querySelector('.cn-product-sheet-close'); if (close) close.focus();
 }
 function closeProduct() {
+  if (history.state && history.state.cnSheet) { history.back(); return }   // popstate below hides the sheet
+  hideProduct();
+}
+window.addEventListener('popstate', () => hideProduct());
+function hideProduct() {
   const modal = document.getElementById('cn-product-sheet'); if (!modal) return;
   modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); document.body.classList.remove('cn-product-sheet-open');
 }
@@ -163,12 +170,24 @@ function productCollectionSection() {
   if (!MENU || !Array.isArray(MENU.items) || !MENU.items.length) return '<section class="cn-sec"><div class="cn-empty"><h2>Collection coming soon</h2><p class="sub">Products will appear here when this shop adds them.</p></div></section>';
   const cats = (MENU.categories || []).map(c => ({ ...c, items: MENU.items.filter(i => i.category_id == c.id) })).filter(c => c.items.length);
   const loose = MENU.items.filter(i => !i.category_id || !(MENU.categories || []).some(c => c.id == i.category_id));
+  const isAroma = String(B.slug || '').toLowerCase() === 'aroma-scripts';
+  const wdc = waDigits(B);
   const item = x => {
     const id = x.id || slugifyText(x.title);
+    if (isAroma) {
+      const th = imgOk(x.image_url) ? `<span class="cn-product-thumb"><img src="${esc(x.image_url)}" alt="" loading="lazy" decoding="async"></span>` : '<span class="cn-product-thumb cn-product-thumb-empty" aria-hidden="true">✦</span>';
+      return `<article class="cn-product cn-product-row"><button class="cn-product-toggle" type="button" onclick="openProduct('${esc(id)}')" aria-label="View ${esc(x.title)}">${th}<span class="cn-product-title"><b>${esc(x.title)}</b>${x.scent_notes ? `<em class="cn-scent">${esc(x.scent_notes)}</em>` : ''}${x.price ? `<small>${esc(x.price)}</small>` : ''}</span></button>${wdc ? `<a class="cn-row-enquire" href="${esc(waHref(wdc, productMsg(x.title)))}" target="_blank" rel="noopener">Enquire on WhatsApp</a>` : ''}</article>`;
+    }
     const img = imgOk(x.image_url) ? `<span class="cn-product-thumb"><img src="${esc(x.image_url)}" alt="" loading="lazy" decoding="async"></span>` : '<span class="cn-product-thumb cn-product-thumb-empty" aria-hidden="true">✦</span>';
     return `<article class="cn-product"><button class="cn-product-toggle" type="button" onclick="openProduct('${esc(id)}')" aria-label="View details for ${esc(x.title)}">${img}<span class="cn-product-title"><b>${esc(x.title)}</b>${x.price ? `<small>${esc(x.price)}</small>` : ''}</span><span class="cn-product-chevron" aria-hidden="true">⌄</span></button></article>`;
   };
   const group = (name, items) => `<section class="cn-collection-group">${name ? `<h2>${esc(name)}</h2>` : ''}<div class="cn-product-list">${items.map(item).join('')}</div></section>`;
+  if (isAroma) {
+    const bespoke = String(B.bespoke_text || '').trim();
+    const bespokeCard = bespoke ? `<section class="cn-bespoke-aroma"><span class="cn-eyebrow">Made for you</span><h2>Bespoke fragrance</h2><p>${esc(bespoke).replace(/\n/g, '<br>')}</p>${wdc ? `<a class="cn-row-enquire" href="${esc(waHref(wdc, WA_BESPOKE[activeLang()]))}" target="_blank" rel="noopener">Enquire on WhatsApp</a>` : ''}</section>` : '';
+    const bar = wdc ? `<div class="cn-sticky-wa"><a class="cn-wa-primary" href="${esc(waHref(wdc, WA_TEXT[activeLang()](B.name)))}" target="_blank" rel="noopener">${I.wa}<span>Chat on WhatsApp</span></a></div>` : '';
+    return `<div class="cn-collection-intro"><a class="cn-back-link" href="${esc(connectBase())}">← Back</a><h1>The collection</h1><span class="cn-collection-count">${MENU.items.length} ${MENU.items.length === 1 ? 'product' : 'products'}</span></div><div class="cn-collection-groups">${cats.map(c => group(c.name, c.items)).join('')}${loose.length ? group(cats.length ? 'Others' : '', loose) : ''}</div>${bespokeCard}${productSheetMarkup()}${bar ? '<div class="cn-sticky-gap" aria-hidden="true"></div>' + bar : ''}`;
+  }
   return `<div class="cn-collection-intro"><a class="cn-back-link" href="${esc(connectBase())}">← Back to ${esc(B.name)}</a><span class="cn-eyebrow">The collection</span><h1>${esc(B.name)} <em>Collection</em></h1><p>Explore our products. Select any item to read more and ask us for details.</p><span class="cn-collection-count">${MENU.items.length} ${MENU.items.length === 1 ? 'product' : 'products'}</span></div><div class="cn-collection-groups">${cats.map(c => group(c.name, c.items)).join('')}${loose.length ? group(cats.length ? 'Others' : '', loose) : ''}</div>${productSheetMarkup()}`;
 }
 
@@ -184,10 +203,10 @@ function featuredProductsSection() {
   const items = MENU.items.filter(x => x && x.available !== false && imgOk(x.image_url)).slice(0, 3);
   if (!items.length) return '';
   const wd = waDigits(B);
-  return `<section class="cn-sec cn-featured-aroma"><div class="cn-featured-head"><div><span class="cn-eyebrow">Discover your scent</span><h2>Featured fragrances</h2><p class="cn-section-intro">Explore a few favourites, then find the scent that feels like you.</p></div><a class="cn-featured-all" href="${esc(collectionUrl())}">View all ${I.arrow}</a></div><div class="cn-featured-grid">${items.map(x => {
+  return `<section class="cn-sec cn-featured-aroma"><div class="cn-featured-head"><div><span class="cn-eyebrow">Discover your scent</span><h2>Featured fragrances</h2><p class="cn-section-intro">Explore a few favourites, then find the scent that feels like you.</p></div></div><div class="cn-featured-grid">${items.map(x => {
     const category = (MENU.categories || []).find(c => c.id == x.category_id);
-    return `<article class="cn-featured-card"><button type="button" class="cn-featured-open" onclick="openProduct('${esc(x.id || slugifyText(x.title))}')" aria-label="View ${esc(x.title)}"><img src="${esc(x.image_url)}" alt="${esc(x.title)}" loading="lazy" decoding="async" onerror="this.closest('.cn-featured-card').remove()"><span class="cn-featured-meta">${category ? `<small>${esc(category.name)}</small>` : ''}<b>${esc(x.title)}</b>${x.price ? `<span>${esc(x.price)}</span>` : ''}</span><span class="cn-featured-plus" aria-hidden="true">↗</span></button>${wd ? `<a class="cn-featured-ask" href="${esc(waHref(wd, 'Hi ' + B.name + ', I would love to know more about ' + x.title + '.'))}" target="_blank" rel="noopener">Enquire on WhatsApp ${I.arrow}</a>` : ''}</article>`;
-  }).join('')}</div><a class="cn-featured-mobile-all" href="${esc(collectionUrl())}">Explore the full collection ${I.arrow}</a></section>${productSheetMarkup()}`;
+    return `<article class="cn-featured-card"><button type="button" class="cn-featured-open" onclick="openProduct('${esc(x.id || slugifyText(x.title))}')" aria-label="View ${esc(x.title)}"><img src="${esc(x.image_url)}" alt="${esc(x.title)}" loading="lazy" decoding="async" onerror="this.closest('.cn-featured-card').remove()"><span class="cn-featured-meta">${category ? `<small>${esc(category.name)}</small>` : ''}<b>${esc(x.title)}</b>${x.scent_notes ? `<em class="cn-scent">${esc(x.scent_notes)}</em>` : ''}${x.price ? `<span>${esc(x.price)}</span>` : ''}</span></button>${wd ? `<a class="cn-featured-ask" href="${esc(waHref(wd, productMsg(x.title)))}" target="_blank" rel="noopener">Enquire on WhatsApp</a>` : ''}</article>`;
+  }).join('')}</div><a class="cn-featured-mobile-all" href="${esc(collectionUrl())}">View the full collection <span aria-hidden="true">→</span></a></section>${productSheetMarkup()}`;
 }
 
 function offerSection(b) {
@@ -209,6 +228,17 @@ const WA_TEXT = {
   hi: n => '\u0928\u092e\u0938\u094d\u0924\u0947 ' + n + '! \u092e\u0948\u0902\u0928\u0947 \u0906\u092a\u0915\u093e \u092a\u0947\u091c \u0926\u0947\u0916\u093e \u0914\u0930 \u092e\u0941\u091d\u0947 \u0914\u0930 \u091c\u093e\u0928\u0915\u093e\u0930\u0940 \u091a\u093e\u0939\u093f\u090f\u0964',
   kn: n => '\u0ca8\u0cae\u0cb8\u0ccd\u0c95\u0cbe\u0cb0 ' + n + '! \u0ca8\u0cbf\u0cae\u0ccd\u0cae \u0caa\u0cc1\u0c9f \u0ca8\u0ccb\u0ca1\u0cbf\u0ca6\u0cc6, \u0c87\u0ca8\u0ccd\u0ca8\u0cb7\u0ccd\u0c9f\u0cc1 \u0ca4\u0cbf\u0cb3\u0cbf\u0caf\u0cb2\u0cc1 \u0cac\u0caf\u0cb8\u0cc1\u0ca4\u0ccd\u0ca4\u0cc7\u0ca8\u0cc6.'
 };
+const WA_PRODUCT = {
+  en: t => 'Hi, I\u2019m interested in ' + t + '.',
+  hi: t => '\u0928\u092e\u0938\u094d\u0924\u0947, \u092e\u0941\u091d\u0947 ' + t + ' \u092e\u0947\u0902 \u0930\u0941\u091a\u093f \u0939\u0948\u0964',
+  kn: t => '\u0ca8\u0cae\u0cb8\u0ccd\u0c95\u0cbe\u0cb0, \u0ca8\u0ca8\u0c97\u0cc6 ' + t + ' \u0cac\u0c97\u0ccd\u0c97\u0cc6 \u0c86\u0cb8\u0c95\u0ccd\u0ca4\u0cbf \u0c87\u0ca6\u0cc6.'
+};
+const WA_BESPOKE = {
+  en: 'Hi, I\u2019m interested in a bespoke fragrance.',
+  hi: '\u0928\u092e\u0938\u094d\u0924\u0947, \u092e\u0941\u091d\u0947 \u0905\u092a\u0928\u0947 \u0932\u093f\u090f \u0916\u093e\u0938 \u0907\u0924\u094d\u0930 \u092c\u0928\u0935\u093e\u0928\u093e \u0939\u0948\u0964',
+  kn: '\u0ca8\u0cae\u0cb8\u0ccd\u0c95\u0cbe\u0cb0, \u0ca8\u0ca8\u0c97\u0cc6 \u0ca8\u0ca8\u0ccd\u0ca8\u0ca6\u0cc7 \u0c86\u0ca6 \u0cb8\u0cc1\u0c97\u0c82\u0ca7 \u0cac\u0cc7\u0c95\u0cc1.'
+};
+const productMsg = t => WA_PRODUCT[activeLang()](t);
 function activeLang() {
   let l = '';
   try { l = localStorage.getItem('innondu-lang') || '' } catch (e) { }
@@ -243,6 +273,7 @@ function view() {
   const acts = (loyalty ? row(appBase(), I.gift, 'Join the loyalty card', 'Collect stamps, earn rewards', true, false) : '')
     + (rev ? row(rev, I.star, 'Leave a review', 'Takes a minute', false, true) : '');
   if (collectionRoute) return `${productCollectionSection()}<footer class="cn-foot">${esc(b.name)} · <a href="https://www.innondu.com/" target="_blank" rel="noopener">Powered by Innondu</a></footer>`;
+  const featured = featuredProductsSection();
   const socials = isAroma ? [soc.find(x => x.label === 'Instagram'), soc.find(x => x.label === 'Website')].filter(Boolean) : soc;
   const socialMarkup = socials.length ? `<section class="cn-sec${isAroma ? ' cn-social-aroma' : ''}"><h2>${isAroma ? 'Follow the fragrance' : 'Find us online'}</h2><div class="cn-soc${isAroma ? ' cn-soc-pair' : ''}">${socials.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${x.icon}<span>${esc(x.label)}</span></a>`).join('')}</div></section>` : '';
   const shareMarkup = isAroma
@@ -254,9 +285,9 @@ function view() {
   ${q && !isAroma ? `<nav class="cn-quick${isAroma ? ' cn-quick-aroma' : ''}" aria-label="Contact ${esc(b.name)}">${q}</nav>` : ''}
   ${acts ? `<nav class="cn-acts" aria-label="More from ${esc(b.name)}">${acts}</nav>` : ''}
   ${rev ? `<p class="cn-note">Honest reviews only — we don't offer rewards in exchange for them.</p>` : ''}
-  ${featuredProductsSection()}
+  ${featured}
   ${offerSection(b)}
-  ${collectionLink()}
+  ${isAroma && featured ? '' : collectionLink()}
   ${gallerySection()}
   ${socialMarkup}
   ${shareMarkup}

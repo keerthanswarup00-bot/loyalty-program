@@ -682,7 +682,7 @@ async function svBrand(btn) {
   const themeP = 'theme' in biz ? { theme: Object.assign({}, brLook(), { done: true }) } : {};   // only if the 2026-10-12-branding.sql update has been run
   await save({
     ...themeP,
-    name: t('cn') || biz.name, tagline: t('ct'), about: t('about'), logo_url: logoUrl, hero_url: heroUrl, color: v('cc') || biz.color,
+    name: t('cn') || biz.name, tagline: t('ct'), about: t('about'), ...('bespoke_text' in biz ? { bespoke_text: v('bespoke').trim().slice(0, 400) } : {}), logo_url: logoUrl, hero_url: heroUrl, color: v('cc') || biz.color,
     ig: t('ci'), fb: t('cf'), wa: t('cw'), web: t('cs'),
     news_text: nw, news_at: nw ? (nw == (biz.news_text || '') && biz.news_at ? biz.news_at : new Date().toISOString()) : null,
     ref_on: v('rfon') == '1', ref_offer: t('rfo') || '20% off your next bill', ref_cap: Math.max(1, Math.min(100, Math.round(+v('rfc')) || 5)),
@@ -800,6 +800,7 @@ function moreV() {
     <label class="lb">Hero image <span>(wide image shown at the top of your Connect page)</span></label>
     <div class="a-up"><input id="herofile" type="file" accept="image/png,image/jpeg,image/webp"><label class="a-check"><input id="herox" type="checkbox" value="1"> Remove hero image</label>${biz.hero_url ? `<img src="${esc(biz.hero_url)}" alt="Current hero image" style="display:block;width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-top:10px">` : '<p class="hint">No hero image uploaded yet.</p>'}</div>
     <label class="lb">About the brand <span>(shown under the hero image; editable anytime)</span></label><textarea id="about" rows="7" maxlength="1800" placeholder="Tell customers about your brand…">${esc(biz.about || (biz.slug == 'aroma-scripts' ? "Aroma Scripts Perfumes\n\nEvery Scent Has a Story.\n\nAt Aroma Scripts, we believe that every fragrance tells a story, evokes an emotion, and creates a memory worth remembering.\n\nBorn from a passion for the art of perfumery, Aroma Scripts is an independent fragrance brand dedicated to crafting distinctive, high-quality perfumes that reflect individuality and personal expression.\n\nOur perfumes are thoughtfully handcrafted in small batches, using carefully selected fragrance oils with a 30% fragrance concentration to create rich, captivating scents that leave a lasting impression.\n\nFrom fresh and refreshing notes to deep, mysterious, and indulgent compositions, every creation is designed to offer a unique sensory experience.\n\nWhat makes Aroma Scripts special is our belief that fragrance should be personal, not ordinary. Alongside our signature collection, we offer bespoke perfumes crafted around individual preferences, creating one-of-a-kind scents as unique as the people who wear them.\n\nWe aim to make the experience of fine perfumery accessible without compromising on creativity, craftsmanship, or character.\n\nAroma Scripts — Crafted with Passion. Worn as a Story. Remembered as a Scent." : ''))}</textarea>
+    ${'bespoke_text' in biz ? `<label class="lb">Bespoke fragrances <span>(optional; shows a card at the end of the collection)</span></label><textarea id="bespoke" rows="3" maxlength="400" placeholder="e.g. Tell us the notes you love and we will blend a scent just for you.">${esc(biz.bespoke_text || '')}</textarea>` : ''}
     ${brandKit()}${dbHint()}</div>
   <div class="a-card"><h2>Links</h2>${fld('ci', 'Instagram', biz.ig || 'https://www.instagram.com/aromascripts?dlrf=MTgydmdmZDZpa3FoZg==', '', 'https://…')}${fld('cf', 'Facebook', biz.fb, '', 'https://…')}${fld('cw', 'WhatsApp', biz.wa, '', 'https://wa.me/…')}${fld('cs', 'Website', biz.web, '', 'https://…')}</div>
   <div class="a-card"><h2>Connect page</h2><p class="sub">One public page for your shop with your rewards, menu and social links. Share it in your bio or on WhatsApp, or print the QR for the counter.</p>
@@ -939,6 +940,7 @@ const catOk = () => Array.isArray(CATS);
 const catName = id => ((catOk() ? CATS : []).find(c => c.id == id) || {}).name || '';
 const catErr = e => /function|schema cache|relation|does not exist/i.test(String(e && e.message || e)) ? 'Run supabase/2026-10-11-menu-categories-fast-stamp.sql first' : nice(e);
 const MCOLS = 'id,title,description,price,image_url,available,sort,created_at';
+let SCENT_OK = false;                                         // true once the 2026-10-19-scent-bespoke.sql update has been run
 async function loadCats() {
   const r = await sb.from('menu_categories').select('id,name,sort').eq('business_id', biz.id).order('sort').order('created_at');
   CATS = r.error ? 'err' : r.data;
@@ -983,7 +985,9 @@ async function seedAromaProductsIfMissing() {
 }
 async function loadMenuAdm() {
   const q = cols => sb.from('menu_items').select(cols).eq('business_id', biz.id).order('sort').order('created_at');
-  const [it, ct] = await Promise.all([q(MCOLS + ',category_id'), sb.from('menu_categories').select('id,name,sort').eq('business_id', biz.id).order('sort').order('created_at')]);
+  const [it0, ct] = await Promise.all([q(MCOLS + ',category_id,scent_notes'), sb.from('menu_categories').select('id,name,sort').eq('business_id', biz.id).order('sort').order('created_at')]);
+  SCENT_OK = !it0.error;
+  const it = SCENT_OK ? it0 : await q(MCOLS + ',category_id');
   let items = it;
   if (it.error) items = await q(MCOLS);                       // database not updated yet: items still work, just without categories
   MENU = items.error ? 'err' : items.data.map(x => ({ category_id: null, ...x }));
@@ -1077,6 +1081,7 @@ function menuEditV() {
     ${catPick}
     ${fld('mp', 'Price', x.price, 'maxlength="24" autocomplete="off"', 'e.g. 120')}
     <p class="hint">A plain number shows with a ₹. For sizes you can type "80 / 120".</p>
+    ${SCENT_OK ? fld('ms', 'Scent notes <span>(optional, one line)</span>', x.scent_notes || '', 'maxlength="80" autocomplete="off"', 'e.g. Warm · sweet · vanilla') : ''}
     <label class="lb">Description <span>(optional)</span></label><textarea id="md" rows="4" maxlength="600" placeholder="What is it, what is in it?">${esc(x.description)}</textarea>
     ${upl('mfile', 'mx', x.image_url, 'Photo')}
     <label class="lb">Show on the menu</label><select id="mav"><option value="1"${x.available ? ' selected' : ''}>Yes</option><option value="0"${x.available ? '' : ' selected'}>Hidden for now</option></select></div>
@@ -1092,6 +1097,7 @@ async function svMenu(btn) {
     const f = $('#mfile').files[0];
     if (f) img = await readImg(f, 'menu');
     const args = { p_slug: CFG.slug, p_id: isNew ? null : ov, p_title: title, p_description: v('md').trim(), p_price: v('mp').trim(), p_image: img, p_available: v('mav') != '0' };
+    if (SCENT_OK) args.p_scent = v('ms').trim();
     if (catOk()) {
       let cat = v('mcat') || null;
       if (cat == '__new') {
