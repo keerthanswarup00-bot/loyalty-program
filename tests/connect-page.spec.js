@@ -127,3 +127,83 @@ test('other Connect shops do not show Aroma-only featured sections', async ({ pa
   await expect(page.locator('.cn-featured-aroma')).toHaveCount(0);
   await expect(page.locator('.cn-offer-aroma')).toHaveCount(0);
 });
+
+
+test('Connect handles long shop names and empty optional sections without overflow', async ({ page }) => {
+  const longName = 'Aroma Scripts — Bespoke Fragrance Atelier and Perfume Studio';
+  await mock(page, {
+    name: longName, tagline: 'A long tagline for testing narrow viewports and graceful wrapping.',
+    color: '#48233d', logo_url: '', about: '', phone: '', wa_phone: '',
+    address: '', maps_url: '', ig: '', fb: '', yt: '', web: '', links: [], gallery: [],
+    menu: { categories: [], items: [] }
+  });
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto('/connect/aroma-scripts/');
+  await expect(page.getByRole('heading', { name: longName })).toBeVisible();
+  await expect(page.locator('.cn-offer-aroma')).toHaveCount(0);
+  await expect(page.locator('.cn-gal-aroma')).toHaveCount(0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+});
+
+test('Connect product cards gracefully handle missing images and long product names', async ({ page }) => {
+  const aroma = {
+    slug: 'aroma-scripts', name: 'Aroma Scripts', tagline: 'Every Scent Has a Story.',
+    color: '#48233d', logo_url: '', about: '', hero_url: '',
+    wa_phone: '', ig: '', web: '', gallery: [],
+    menu: { categories: [], items: [
+      { id: 'long', title: 'A Very Long Fragrance Name That Should Wrap Without Breaking The Layout', price: '₹1,299', description: 'A description.', image_url: '', available: true },
+      { id: 'bad-image', title: 'Broken Image', price: '', description: '', image_url: 'javascript:alert(1)', available: true }
+    ] }
+  };
+  await mock(page, aroma);
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/connect/aroma-scripts/');
+  await expect(page.getByRole('button', { name: /View A Very Long Fragrance Name/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'View Broken Image' })).toHaveCount(0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+});
+
+test('Connect slug resolution stays scoped to the requested shop', async ({ page }) => {
+  const shops = {
+    'aroma-scripts': { ...BIZ, slug: 'aroma-scripts', name: 'Aroma Scripts', color: '#48233d', menu: { categories: [], items: [] } },
+    'bean-brew': { ...BIZ, slug: 'bean-brew', name: 'Bean Brew', color: '#123456', menu: { categories: [], items: [] } }
+  };
+  await page.route(SB, route => {
+    const url = new URL(route.request().url());
+    const json = body => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
+    if (url.href.includes('get_business')) {
+      const body = JSON.parse(route.request().postData() || '{}');
+      const slug = body.p_slug || new URLSearchParams(url.search).get('p_slug');
+      return json(shops[slug] || null);
+    }
+    if (url.href.includes('get_menu')) return json({ categories: [], items: [] });
+    return json(null);
+  });
+  await page.goto('/connect/aroma-scripts/');
+  await expect(page.getByRole('heading', { name: 'Aroma Scripts' })).toBeVisible();
+  await page.goto('/connect/bean-brew/');
+  await expect(page.getByRole('heading', { name: 'Bean Brew' })).toBeVisible();
+  await expect(page.locator('.cn-featured-aroma')).toHaveCount(0);
+  await expect(page.locator('.cn-offer-aroma')).toHaveCount(0);
+});
+
+test('Connect remains usable on a small mobile viewport', async ({ page }) => {
+  await mock(page, {
+    ...BIZ, slug: 'aroma-scripts', name: 'Aroma Scripts', color: '#48233d',
+    about: 'A fragrance studio.', wa_phone: '9876543210',
+    gallery: ['https://images.example/gallery-1.jpg'],
+    menu: { categories: [], items: [
+      { id: 'perfume', title: 'Vanilla Cloud', price: '₹799', description: 'Soft vanilla notes.', image_url: 'https://images.example/vanilla.jpg', available: true }
+    ] }
+  });
+  await page.route('https://images.example/**', route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="#ddd"/></svg>' }));
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto('/connect/aroma-scripts/');
+  await expect(page.getByRole('heading', { name: 'Aroma Scripts' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'View Vanilla Cloud' })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+});
