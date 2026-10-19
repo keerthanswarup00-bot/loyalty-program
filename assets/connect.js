@@ -312,6 +312,8 @@ async function loadMenu() {
   V = vertical(B.vertical);
   await loadMenu();
   brand(B); share(B);
+  // Aroma Scripts: accent text and icons use the hero-artwork gold (AA on light and dark) instead of the purple brand colour. Fills keep --brand.
+  if (String(B.slug || '').toLowerCase() === 'aroma-scripts') { const st = document.documentElement.style; st.setProperty('--brand-t-l', '#855a1a'); st.setProperty('--brand-t-d', '#e0b062') }
   if (collectionRoute) { document.title = B.name + ' · Collection'; meta('name', 'description', 'Explore the product collection from ' + B.name + '. Open a product to read more or ask us on WhatsApp.'); }
   app.innerHTML = view();
 })();

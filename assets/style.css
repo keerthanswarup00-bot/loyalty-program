@@ -1,8 +1,19 @@
-:root{--brand-t:var(--brand-t-l,var(--brand));--bg:#f6f2ec;--card:#fffdfa;--tx:#1c1917;--mut:#78716c;--line:#e8e0d5;--brand:#8a4b2a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--brand-t:var(--brand-t-d,var(--brand));--bg:#141211;--card:#1d1b19;--tx:#f3efe9;--mut:#a59e96;--line:#34302c}}
-:root[data-theme="dark"]{--brand-t:var(--brand-t-d,var(--brand));--bg:#141211;--card:#1d1b19;--tx:#f3efe9;--mut:#a59e96;--line:#34302c}
+/* ---- Design tokens ----
+   Colour: --tx / --mut pass 4.5:1 on --bg and --card (light 16:1 / 5.6:1, dark 15:1 / 6.5:1).
+   --gold is the decorative accent from the Aroma hero artwork; --gold-t is the same hue as TEXT or ICONS
+   (5.4:1 on the light page, 7:1+ on dark). --on-gold is the text colour for gold fills (5.2:1).
+   --brand is still set per shop by themeVars(); --brand-t is its legible text form with a gold fallback.
+   Radius scale --r-1..4, spacing scale --sp-1..6, type: --f-d (serif, headings) and --f-b (sans, body). */
+:root{--bg:#f6f2ec;--card:#fffdfa;--tx:#1c1917;--mut:#665f59;--line:#e8e0d5;--brand:#8a4b2a;
+  --gold:#b98843;--gold-t:#855a1a;--on-gold:#18202a;--brand-t:var(--brand-t-l,var(--gold-t));
+  --r-1:8px;--r-2:12px;--r-3:17px;--r-4:22px;
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;
+  --f-b:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--brand-t:var(--brand-t-d,var(--gold-t));--gold-t:#e0b062;--bg:#141211;--card:#1d1b19;--tx:#f3efe9;--mut:#a59e96;--line:#34302c}}
+:root[data-theme="dark"]{--brand-t:var(--brand-t-d,var(--gold-t));--gold-t:#e0b062;--bg:#141211;--card:#1d1b19;--tx:#f3efe9;--mut:#a59e96;--line:#34302c}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:15.5px/1.5 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--tx);font:15.5px/1.5 var(--f-b);-webkit-font-smoothing:antialiased}
 main{max-width:480px;margin:0 auto;padding:18px 18px 48px}main.wide{max-width:920px}
 .top{display:flex;justify-content:space-between;align-items:center;max-width:920px;margin:0 auto;padding:16px 18px 0}.top b{font:600 18px var(--f-d,'Instrument Serif',Georgia,serif)}
 .lnk{background:none;border:0;padding:0;color:var(--mut);font:inherit;font-size:13.5px;cursor:pointer;text-decoration:underline}

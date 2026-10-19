@@ -93,7 +93,8 @@ function themeVars(color, theme) {
   const r = RADII[t.radius] || RADII.soft;
   return {
     '--brand': c, '--on-brand': on,
-    '--brand-t-l': _legible(c, '#fffdfa', '#000000'), '--brand-t-d': _legible(c, '#1d1b19', '#ffffff'),
+    // Checked against the page background and the brand-tinted wash icons sit on, not just the card, so text and icons stay AA.
+    '--brand-t-l': _legible(c, _mix('#f6f2ec', c, .15), '#000000'), '--brand-t-d': _legible(c, _mix('#1d1b19', c, .14), '#ffffff'),
     '--brand-2': t.hero == 'solid' ? c : on == '#ffffff' ? _mix(c, '#000000', .45) : _mix(c, '#ffffff', .3),
     '--r-card': r[0], '--r-btn': r[1], '--r-in': r[2],
     '--f-d': t.font == 'sans' ? 'Inter,system-ui,sans-serif' : 'Fraunces,Georgia,serif'
