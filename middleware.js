@@ -26,7 +26,10 @@ async function shop(slug) {
 
 function inject(b, url) {
   const name = b.name, desc = (b.about ? String(b.about).replace(/\s+/g, ' ').trim().slice(0, 160) : '') || b.tagline || ('Find ' + name + ' — contact, offers and links in one place.');
-  const img = /^https?:\/\//i.test(b.hero_url || '') ? b.hero_url : /^https?:\/\//i.test(b.logo_url || '') ? b.logo_url : '';
+  // Crawlers (WhatsApp included) ignore SVG, so only raster images count; Aroma has its own card, everyone else falls back to the Innondu card.
+  const ok = u => /^https?:\/\//i.test(u || '') && !/\.svg(\?|#|$)/i.test(u);
+  const origin = new URL(url).origin;
+  const img = ok(b.hero_url) ? b.hero_url : b.slug === 'aroma-scripts' || /aroma-scripts/.test(url) ? origin + '/assets/aroma-scripts-og.jpg' : ok(b.logo_url) ? b.logo_url : origin + '/assets/og.png';
   const ld = {
     '@context': 'https://schema.org', '@type': SCHEMA[b.vertical] || 'LocalBusiness',
     name, url, description: desc, image: img || undefined,
@@ -41,8 +44,10 @@ function inject(b, url) {
     '<meta property="og:title" content="' + esc(name + ' · Connect') + '">',
     '<meta property="og:description" content="' + esc(desc) + '">',
     '<meta property="og:url" content="' + esc(url) + '">',
-    img ? '<meta property="og:image" content="' + esc(img) + '">' : '',
-    '<meta name="twitter:card" content="' + (img ? 'summary_large_image' : 'summary') + '">',
+    '<meta property="og:image" content="' + esc(img) + '">',
+    '<meta property="og:image:alt" content="' + esc(name) + '">',
+    '<meta property="og:site_name" content="Innondu">',
+    '<meta name="twitter:card" content="summary_large_image">',
     '<link rel="canonical" href="' + esc(url) + '">',
     '<script type="application/ld+json">' + JSON.stringify(ld) + '</script>'
   ].filter(Boolean).join('\n');

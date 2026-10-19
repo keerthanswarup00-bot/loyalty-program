@@ -78,7 +78,7 @@ function heroSection(b) {
   const tag = tagText ? `<p>${esc(tagText)}</p>` : '';
   const heroUrl = imgOk(b.hero_url) ? b.hero_url : (isAroma ? '/assets/aroma-scripts-hero-clean.svg' : '');
   if (heroUrl) {
-    return `<header class="cn-hero cn-hero-img${isAroma ? ' cn-hero-aroma' : ''}"><img class="cn-hero-bg" src="${esc(heroUrl)}" alt="" decoding="async" fetchpriority="high" onerror="this.parentNode.classList.remove('cn-hero-img','cn-hero-aroma');this.remove()"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
+    return `<header class="cn-hero cn-hero-img${isAroma ? ' cn-hero-aroma' : ''}"><img class="cn-hero-bg" src="${esc(heroUrl)}" alt="" width="1600" height="800" decoding="async" fetchpriority="high" onerror="this.parentNode.classList.remove('cn-hero-img','cn-hero-aroma');this.remove()"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
   }
   return `<header class="cn-hero${b.about ? ' cn-art' : ''}"><div class="cn-hero-in">${logo}<h1>${esc(b.name)}</h1>${tag}</div></header>`;
 }
@@ -117,7 +117,7 @@ function menuSection() {
   const loose = MENU.items.filter(i => !i.category_id || !(MENU.categories || []).some(c => c.id == i.category_id));
   const wd = waDigits(B);
   const item = x => {
-    const im = imgOk(x.image_url) ? `<span class="mn-ph"><img src="${esc(x.image_url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>` : '';
+    const im = imgOk(x.image_url) ? `<span class="mn-ph"><img src="${esc(x.image_url)}" alt="" width="64" height="64" loading="lazy" decoding="async" onerror="this.remove()"></span>` : '';
     const ask = wd ? `<a class="mn-ask" href="${esc(waHref(wd, V.orderText(B.name, x.title)))}" target="_blank" rel="noopener" aria-label="${esc(V.ask + ': ' + x.title)}">${I.wa}</a>` : '';
     return `<li class="cn-item"><div class="mn-tx"><b>${esc(x.title)}</b>${x.description ? `<small>${esc(x.description)}</small>` : ''}</div>${im}${x.price ? `<span class="mn-pr">${esc(x.price)}</span>` : ''}${ask}</li>`;
   };
@@ -144,7 +144,7 @@ function openProduct(id) {
   if (!modal || !content) return;
   const wd = waDigits(B);
   const isAromaShop = String(B.slug || '').toLowerCase() === 'aroma-scripts';
-  const image = imgOk(product.image_url) ? `<img class="cn-product-sheet-image" src="${esc(product.image_url)}" alt="${esc(product.title)}" decoding="async">` : '<div class="cn-product-sheet-image cn-product-sheet-image-empty" aria-hidden="true">✦</div>';
+  const image = imgOk(product.image_url) ? `<img class="cn-product-sheet-image" src="${esc(product.image_url)}" alt="${esc(product.title)}" width="600" height="600" decoding="async">` : '<div class="cn-product-sheet-image cn-product-sheet-image-empty" aria-hidden="true">✦</div>';
   const desc = product.description ? `<p class="cn-product-sheet-description">${esc(product.description).replace(/\n/g, '<br>')}</p>` : '<p class="cn-product-sheet-description">Contact us for more information about this product.</p>';
   const price = product.price ? `<div class="cn-product-sheet-price">${esc(product.price)}</div>` : '';
   const ask = wd ? `<a class="cn-product-sheet-ask" href="${esc(isAromaShop ? waHref(wd, productMsg(product.title)) : waHref(wd, 'Hi ' + B.name + ', I want more details about ' + product.title + '.'))}" target="_blank" rel="noopener">${I.wa}<span>${isAromaShop ? 'Enquire on WhatsApp' : 'Ask for more details'}</span>${isAromaShop ? '' : I.arrow}</a>` : '<p class="cn-product-contact-note">WhatsApp enquiry is not available yet. Please use the contact details on the main page.</p>';
@@ -175,10 +175,10 @@ function productCollectionSection() {
   const item = x => {
     const id = x.id || slugifyText(x.title);
     if (isAroma) {
-      const th = imgOk(x.image_url) ? `<span class="cn-product-thumb"><img src="${esc(x.image_url)}" alt="" loading="lazy" decoding="async"></span>` : '<span class="cn-product-thumb cn-product-thumb-empty" aria-hidden="true">✦</span>';
+      const th = imgOk(x.image_url) ? `<span class="cn-product-thumb"><img src="${esc(x.image_url)}" alt="" width="64" height="64" loading="lazy" decoding="async"></span>` : '<span class="cn-product-thumb cn-product-thumb-empty" aria-hidden="true">✦</span>';
       return `<article class="cn-product cn-product-row"><button class="cn-product-toggle" type="button" onclick="openProduct('${esc(id)}')" aria-label="View ${esc(x.title)}">${th}<span class="cn-product-title"><b>${esc(x.title)}</b>${x.scent_notes ? `<em class="cn-scent">${esc(x.scent_notes)}</em>` : ''}${x.price ? `<small>${esc(x.price)}</small>` : ''}</span></button>${wdc ? `<a class="cn-row-enquire" href="${esc(waHref(wdc, productMsg(x.title)))}" target="_blank" rel="noopener">Enquire on WhatsApp</a>` : ''}</article>`;
     }
-    const img = imgOk(x.image_url) ? `<span class="cn-product-thumb"><img src="${esc(x.image_url)}" alt="" loading="lazy" decoding="async"></span>` : '<span class="cn-product-thumb cn-product-thumb-empty" aria-hidden="true">✦</span>';
+    const img = imgOk(x.image_url) ? `<span class="cn-product-thumb"><img src="${esc(x.image_url)}" alt="" width="64" height="64" loading="lazy" decoding="async"></span>` : '<span class="cn-product-thumb cn-product-thumb-empty" aria-hidden="true">✦</span>';
     return `<article class="cn-product"><button class="cn-product-toggle" type="button" onclick="openProduct('${esc(id)}')" aria-label="View details for ${esc(x.title)}">${img}<span class="cn-product-title"><b>${esc(x.title)}</b>${x.price ? `<small>${esc(x.price)}</small>` : ''}</span><span class="cn-product-chevron" aria-hidden="true">⌄</span></button></article>`;
   };
   const group = (name, items) => `<section class="cn-collection-group">${name ? `<h2>${esc(name)}</h2>` : ''}<div class="cn-product-list">${items.map(item).join('')}</div></section>`;
@@ -195,7 +195,7 @@ function gallerySection() {
   const g = (Array.isArray(B.gallery) ? B.gallery : []).map(httpsOnly).filter(Boolean);
   if (!g.length) return '';
   const isAroma = String(B.slug || '').toLowerCase() === 'aroma-scripts';
-  return `<section class="cn-sec${isAroma ? ' cn-gallery-aroma' : ''}"><h2>${isAroma ? 'A closer look' : 'Photos'}</h2>${isAroma ? '<p class="cn-section-intro">A little more of the world behind our fragrances.</p>' : ''}<div class="cn-gal${isAroma ? ' cn-gal-aroma' : ''}">${g.slice(0, isAroma ? 6 : 12).map((u, i) => `<img src="${esc(u)}" alt="${esc(B.name)} photo ${i + 1}" loading="lazy" decoding="async" onerror="this.remove()">`).join('')}</div></section>`;
+  return `<section class="cn-sec${isAroma ? ' cn-gallery-aroma' : ''}"><h2>${isAroma ? 'A closer look' : 'Photos'}</h2>${isAroma ? '<p class="cn-section-intro">A little more of the world behind our fragrances.</p>' : ''}<div class="cn-gal${isAroma ? ' cn-gal-aroma' : ''}">${g.slice(0, isAroma ? 6 : 12).map((u, i) => `<img src="${esc(u)}" alt="${esc(B.name)} photo ${i + 1}" width="400" height="400" loading="lazy" decoding="async" onerror="this.remove()">`).join('')}</div></section>`;
 }
 
 function featuredProductsSection() {
@@ -205,7 +205,7 @@ function featuredProductsSection() {
   const wd = waDigits(B);
   return `<section class="cn-sec cn-featured-aroma"><div class="cn-featured-head"><div><span class="cn-eyebrow">Discover your scent</span><h2>Featured fragrances</h2><p class="cn-section-intro">Explore a few favourites, then find the scent that feels like you.</p></div></div><div class="cn-featured-grid">${items.map(x => {
     const category = (MENU.categories || []).find(c => c.id == x.category_id);
-    return `<article class="cn-featured-card"><button type="button" class="cn-featured-open" onclick="openProduct('${esc(x.id || slugifyText(x.title))}')" aria-label="View ${esc(x.title)}"><img src="${esc(x.image_url)}" alt="${esc(x.title)}" loading="lazy" decoding="async" onerror="this.closest('.cn-featured-card').remove()"><span class="cn-featured-meta">${category ? `<small>${esc(category.name)}</small>` : ''}<b>${esc(x.title)}</b>${x.scent_notes ? `<em class="cn-scent">${esc(x.scent_notes)}</em>` : ''}${x.price ? `<span>${esc(x.price)}</span>` : ''}</span></button>${wd ? `<a class="cn-featured-ask" href="${esc(waHref(wd, productMsg(x.title)))}" target="_blank" rel="noopener">Enquire on WhatsApp</a>` : ''}</article>`;
+    return `<article class="cn-featured-card"><button type="button" class="cn-featured-open" onclick="openProduct('${esc(x.id || slugifyText(x.title))}')" aria-label="View ${esc(x.title)}"><img src="${esc(x.image_url)}" alt="${esc(x.title)}" width="400" height="400" loading="lazy" decoding="async" onerror="this.closest('.cn-featured-card').remove()"><span class="cn-featured-meta">${category ? `<small>${esc(category.name)}</small>` : ''}<b>${esc(x.title)}</b>${x.scent_notes ? `<em class="cn-scent">${esc(x.scent_notes)}</em>` : ''}${x.price ? `<span>${esc(x.price)}</span>` : ''}</span></button>${wd ? `<a class="cn-featured-ask" href="${esc(waHref(wd, productMsg(x.title)))}" target="_blank" rel="noopener">Enquire on WhatsApp</a>` : ''}</article>`;
   }).join('')}</div><a class="cn-featured-mobile-all" href="${esc(collectionUrl())}">View the full collection <span aria-hidden="true">→</span></a></section>${productSheetMarkup()}`;
 }
 
@@ -348,8 +348,9 @@ function share(b) {
   meta('property', 'og:description', desc);
   meta('name', 'description', desc);
   meta('name', 'twitter:card', 'summary_large_image');
-  const ogImg = httpsOnly(b.hero_url) || httpsOnly(b.logo_url);
-  if (ogImg) meta('property', 'og:image', ogImg);
+  const raster = u => { u = httpsOnly(u); return u && !/\.svg(\?|#|$)/i.test(u) ? u : '' };   // WhatsApp and most crawlers ignore SVG
+  const ogImg = raster(b.hero_url) || (String(b.slug || '').toLowerCase() === 'aroma-scripts' ? location.origin + '/assets/aroma-scripts-og.jpg' : '') || raster(b.logo_url) || location.origin + '/assets/og.png';
+  meta('property', 'og:image', ogImg); meta('property', 'og:image:alt', b.name + (b.tagline ? ' — ' + b.tagline : '')); meta('property', 'og:site_name', 'Innondu');
   meta('name', 'theme-color', HEX6.test(b.color || '') ? b.color : '#8a4b2a');
   const link = document.head.querySelector('link[rel="canonical"]') || (() => { const l = document.createElement('link'); l.rel = 'canonical'; document.head.appendChild(l); return l })();
   link.href = location.origin + location.pathname;

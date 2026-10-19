@@ -183,9 +183,9 @@ test('Connect slug resolution stays scoped to the requested shop', async ({ page
     return json(null);
   });
   await page.goto('/connect/aroma-scripts/');
-  await expect(page.getByRole('heading', { name: 'Aroma Scripts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Aroma Scripts', exact: true })).toBeVisible();
   await page.goto('/connect/bean-brew/');
-  await expect(page.getByRole('heading', { name: 'Bean Brew' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bean Brew', exact: true })).toBeVisible();
   await expect(page.locator('.cn-featured-aroma')).toHaveCount(0);
   await expect(page.locator('.cn-offer-aroma')).toHaveCount(0);
 });
@@ -202,7 +202,7 @@ test('Connect remains usable on a small mobile viewport', async ({ page }) => {
   await page.route('https://images.example/**', route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="#ddd"/></svg>' }));
   await page.setViewportSize({ width: 320, height: 700 });
   await page.goto('/connect/aroma-scripts/');
-  await expect(page.getByRole('heading', { name: 'Aroma Scripts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Aroma Scripts', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'View Vanilla Cloud' })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflow).toBe(false);

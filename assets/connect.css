@@ -253,3 +253,20 @@ body.cn-product-sheet-open{overflow:hidden}
 .cn-sticky-gap{height:96px}
 .cn-sticky-wa{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--bg) 92%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid var(--line)}
 .cn-sticky-wa .cn-wa-primary{max-width:488px;margin:0 auto}
+
+/* Quality pass (E): focus rings, 44px targets, narrow-screen hero and action row */
+:root{--focus:var(--brand-t-l,var(--gold-t))}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--focus:var(--brand-t-d,var(--gold-t))}}
+:root[data-theme="dark"]{--focus:var(--brand-t-d,var(--gold-t))}
+.cn a:focus-visible,.cn button:focus-visible,.cn-product-sheet-backdrop button:focus-visible,.cn-product-sheet-backdrop a:focus-visible,.cn-sticky-wa a:focus-visible{outline:3px solid var(--focus)!important;outline-offset:2px}
+.cn-offer-button,.cn-share-primary,.cn-share-tool{min-height:44px}
+.cn-scent{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+@media(max-width:440px){
+  .cn-hero-aroma.cn-hero-img .cn-hero-in{padding-right:46%}
+  .cn-hero-aroma.cn-hero-img h1{font-size:clamp(24px,7.4vw,30px)}
+  .cn-hero-aroma.cn-hero-img p{max-width:16ch}
+  .cn-hero.cn-hero-aroma{min-height:248px}
+}
+@media(max-width:350px){
+  .cn-sec-a{flex-direction:column;gap:4px;min-height:56px;font-size:12.5px;padding-inline:4px}
+}
